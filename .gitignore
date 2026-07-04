@@ -1,0 +1,18 @@
+﻿# Dependencies
+**/node_modules
+
+# Build files
+**/dist
+**/.vite
+
+# Environment
+**/.env
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+**/uploads
