@@ -15,12 +15,16 @@ import warehouseRoutes from "./routes/warehouseRoutes.js";
 import ticketRoutes from "./routes/ticketRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import pageContentRoutes from "./routes/pageContentRoutes.js";
+import testimonialRoutes from "./routes/testimonialRoutes.js";
+import couponRoutes from "./routes/couponRoutes.js";
+import settingRoutes from "./routes/settingRoutes.js";
 
 const app = express();
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Serve uploads statically so labels and attachments are downloadable
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
@@ -38,6 +42,14 @@ app.use("/api/warehouses", warehouseRoutes);
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/page-content", pageContentRoutes);
+app.use("/api/testimonials", testimonialRoutes);
+app.use("/api/coupons", couponRoutes);
+app.use("/api/settings", settingRoutes);
+
+// Dummy menu route to avoid 404 in frontend console
+app.get("/api/menu", (req, res) => {
+  res.json([]);
+});
 
 // Health check
 app.get("/", (req, res) => {

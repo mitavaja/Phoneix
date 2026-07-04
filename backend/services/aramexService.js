@@ -1,27 +1,35 @@
 import axios from "axios";
+import SystemSetting from "../models/SystemSetting.js";
 
-// Read environment variables
-const ARAMEX_USERNAME = process.env.ARAMEX_USERNAME || "your_aramex_username";
-const ARAMEX_PASSWORD = process.env.ARAMEX_PASSWORD || "your_aramex_password";
-const ARAMEX_ACCOUNT_NUMBER = process.env.ARAMEX_ACCOUNT_NUMBER || "your_account_number";
-const ARAMEX_ACCOUNT_PIN = process.env.ARAMEX_ACCOUNT_PIN || "your_account_pin";
-const ARAMEX_ENTITY = process.env.ARAMEX_ENTITY || "DEL";
-const ARAMEX_COUNTRY_CODE = process.env.ARAMEX_COUNTRY_CODE || "IN";
+const getClientInfo = async () => {
+  const settings = await SystemSetting.findOne({});
+  
+  const username = settings?.aramexUsername || process.env.ARAMEX_USERNAME || "your_aramex_username";
+  const password = settings?.aramexPassword || process.env.ARAMEX_PASSWORD || "your_aramex_password";
+  const accountNum = settings?.aramexAccountNumber || process.env.ARAMEX_ACCOUNT_NUMBER || "your_account_number";
+  const pin = settings?.aramexAccountPin || process.env.ARAMEX_ACCOUNT_PIN || "your_account_pin";
+  const entity = settings?.aramexAccountEntity || process.env.ARAMEX_ENTITY || "DEL";
+  const country = settings?.aramexAccountCountryCode || process.env.ARAMEX_COUNTRY_CODE || "IN";
+  
+  return {
+    UserName: username,
+    Password: password,
+    Version: "v1.0",
+    AccountNumber: accountNum,
+    AccountPin: pin,
+    AccountEntity: entity,
+    AccountCountryCode: country,
+  };
+};
 
-const isSimulated =
-  ARAMEX_USERNAME.includes("your_") ||
-  ARAMEX_PASSWORD.includes("your_") ||
-  ARAMEX_ACCOUNT_NUMBER.includes("your_");
-
-const getClientInfo = () => ({
-  UserName: ARAMEX_USERNAME,
-  Password: ARAMEX_PASSWORD,
-  Version: "v1.0",
-  AccountNumber: ARAMEX_ACCOUNT_NUMBER,
-  AccountPin: ARAMEX_ACCOUNT_PIN,
-  AccountEntity: ARAMEX_ENTITY,
-  AccountCountryCode: ARAMEX_COUNTRY_CODE,
-});
+const checkIsSimulated = async () => {
+  const info = await getClientInfo();
+  return (
+    info.UserName.includes("your_") ||
+    info.Password.includes("your_") ||
+    info.AccountNumber.includes("your_")
+  );
+};
 
 /**
  * Calculate rate from Aramex or simulated matrix
@@ -37,7 +45,7 @@ export const calculateAramexRate = async ({
 }) => {
   const chargeableWeight = Math.max(weight, (length * width * height) / 5000.0);
 
-  if (isSimulated) {
+  if (await checkIsSimulated()) {
     // Simulated sandbox calculator (costs in ₹ Rupees)
     let baseRate = 350.0;
     let ratePerKg = 80.0;
@@ -60,7 +68,7 @@ export const calculateAramexRate = async ({
     const response = await axios.post(
       "https://ws.aramex.net/ShippingAPI.V2/RateCalculator/Service_1_0.svc/json/CalculateRate",
       {
-        ClientInfo: getClientInfo(),
+        ClientInfo: await getClientInfo(),
         OriginAddress: { CountryCode: originCountry },
         DestinationAddress: { CountryCode: destinationCountry },
         ShipmentDetails: {
@@ -111,7 +119,7 @@ export const createAramexShipment = async ({
   const isDocument = type === "Document";
   const chargeableWeight = Math.max(weight, (length * width * height) / 5000.0);
 
-  if (isSimulated) {
+  if (await checkIsSimulated()) {
     const awb = `ARM${Math.floor(100000000 + Math.random() * 900000000)}`;
     return {
       success: true,
@@ -127,7 +135,7 @@ export const createAramexShipment = async ({
     const response = await axios.post(
       "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreateShipments",
       {
-        ClientInfo: getClientInfo(),
+        ClientInfo: await getClientInfo(),
         Shipments: [
           {
             Reference1: parcel.referenceId || "",
@@ -243,7 +251,7 @@ export const createAramexPickup = async ({
   address,
   contact,
 }) => {
-  if (isSimulated) {
+  if (await checkIsSimulated()) {
     const pickupId = `PKP${Math.floor(1000000 + Math.random() * 9000000)}`;
     return {
       success: true,
@@ -257,7 +265,7 @@ export const createAramexPickup = async ({
     const response = await axios.post(
       "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreatePickup",
       {
-        ClientInfo: getClientInfo(),
+        ClientInfo: await getClientInfo(),
         Pickup: {
           PickupAddress: {
             Line1: address.address,
@@ -311,7 +319,7 @@ export const createAramexPickup = async ({
  * Track shipment via Aramex
  */
 export const trackAramexShipment = async (trackingNumber) => {
-  if (isSimulated || trackingNumber.startsWith("ARM")) {
+  if (await checkIsSimulated() || trackingNumber.startsWith("ARM")) {
     // Generate realistic transitions based on AWB
     const mockStates = [
       { status: "Booked", description: "Consignment registered on aggregator portal", location: "Warehouse" },
@@ -339,7 +347,7 @@ export const trackAramexShipment = async (trackingNumber) => {
     const response = await axios.post(
       "https://ws.aramex.net/ShippingAPI.V2/Tracking/Service_1_0.svc/json/TrackShipments",
       {
-        ClientInfo: getClientInfo(),
+        ClientInfo: await getClientInfo(),
         Shipments: [trackingNumber],
       }
     );
@@ -389,5 +397,44 @@ export const trackAramexShipment = async (trackingNumber) => {
       simulated: true,
       error: err.message,
     };
+  }
+};
+
+/**
+ * Verify address serviceability (Validate Address)
+ */
+export const checkAramexServiceability = async (address) => {
+  if (await checkIsSimulated()) {
+    const unserved = ["KP", "SY", "IR", "CU"];
+    if (unserved.includes(address.country)) {
+      return { success: false, message: `Aramex logistics does not service country destination: ${address.country}` };
+    }
+    return { success: true };
+  }
+
+  try {
+    const response = await axios.post(
+      "https://ws.aramex.net/ShippingAPI.V2/Location/Service_1_0.svc/json/ValidateAddress",
+      {
+        ClientInfo: await getClientInfo(),
+        Address: {
+          Line1: address.address,
+          City: address.city,
+          StateOrProvince: address.state,
+          PostCode: address.pincode,
+          CountryCode: address.country,
+        },
+      }
+    );
+
+    if (response.data.HasErrors) {
+      const errorMsg = response.data.Notifications?.[0]?.Message || "Address validation failed";
+      return { success: false, message: errorMsg };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error("Aramex address validation failed:", err.message);
+    return { success: true };
   }
 };

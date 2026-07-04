@@ -5,6 +5,8 @@ import csvParser from "csv-parser";
 import { Readable } from "stream";
 
 import Shipment from "../models/Shipment.js";
+import User from "../models/User.js";
+import KYC from "../models/KYC.js";
 import Wallet from "../models/Wallet.js";
 import WalletTransaction from "../models/WalletTransaction.js";
 import PickupAddress from "../models/PickupAddress.js";
@@ -14,8 +16,30 @@ import Notification from "../models/Notification.js";
 import AuditLog from "../models/AuditLog.js";
 import MarginRule from "../models/MarginRule.js";
 
-import { createAramexShipment, createAramexPickup } from "../services/aramexService.js";
+import { createAramexShipment, createAramexPickup, checkAramexServiceability } from "../services/aramexService.js";
 import { sendShipmentBookedEmail } from "../services/emailService.js";
+
+// Helper to determine wallet currency and country based on receiverCountry
+export const getCurrencyForCountry = (country) => {
+  const c = (country || "").toLowerCase().trim();
+  if (c === "in" || c === "india") return { country: "India", currency: "INR" };
+  if (c === "ae" || c === "uae" || c === "united arab emirates") return { country: "UAE", currency: "AED" };
+  if (c === "us" || c === "usa" || c === "united states") return { country: "USA", currency: "USD" };
+  if (c === "gb" || c === "uk" || c === "united kingdom") return { country: "UK", currency: "GBP" };
+  return { country: "USA", currency: "USD" }; // Fallback
+};
+
+// Simple conversion rates from INR to target currencies
+export const convertFromINR = (amountInINR, targetCurrency) => {
+  const rates = {
+    INR: 1.0,
+    AED: 1 / 22.5,
+    USD: 1 / 83.5,
+    GBP: 1 / 106.0
+  };
+  const rate = rates[targetCurrency] || 1.0;
+  return amountInINR * rate;
+};
 
 // Helper to evaluate priority margin
 const evaluatePriorityMargin = async (countryCode, weight) => {
@@ -79,27 +103,56 @@ export const bookShipment = async (req, res) => {
     // 1. Calculate shipping costs & decoupled GST (18%)
     // Simulated base rate: Delhi to receiverCountry (e.g. Domestic ₹300, International ₹1200)
     const isDomestic = receiverCountry.toLowerCase() === "in" || receiverCountry.toLowerCase() === "india";
-    const baseRate = isDomestic ? 300.0 + chargeableWeight * 60.0 : 1200.0 + chargeableWeight * 200.0;
+    const baseRateINR = isDomestic ? 300.0 + chargeableWeight * 60.0 : 1200.0 + chargeableWeight * 200.0;
 
     const marginRule = await evaluatePriorityMargin(receiverCountry, chargeableWeight);
-    let shippingCharge = baseRate;
+    let shippingChargeINR = baseRateINR;
     if (marginRule.type === "Fixed") {
-      shippingCharge = baseRate + marginRule.value;
+      shippingChargeINR = baseRateINR + marginRule.value;
     } else {
-      shippingCharge = baseRate * (1 + marginRule.value / 100.0);
+      shippingChargeINR = baseRateINR * (1 + marginRule.value / 100.0);
     }
-    const gstAmount = shippingCharge * 0.18;
-    const invoiceTotal = shippingCharge + gstAmount;
+    const gstAmountINR = shippingChargeINR * 0.18;
+    const invoiceTotalINR = shippingChargeINR + gstAmountINR;
 
-    // 2. Fetch merchant wallet & check availableBalance
-    const wallet = await Wallet.findOne({ user: req.user._id });
+    // Convert to target country and currency
+    const { country: destCountry, currency: destCurrency } = getCurrencyForCountry(receiverCountry);
+    const shippingCharge = convertFromINR(shippingChargeINR, destCurrency);
+    const gstAmount = convertFromINR(gstAmountINR, destCurrency);
+    const invoiceTotal = convertFromINR(invoiceTotalINR, destCurrency);
+
+    // 2. Fetch merchant wallet & check availableBalance (create if missing)
+    let wallet = await Wallet.findOne({ user: req.user._id, currency: destCurrency });
     if (!wallet) {
-      return res.status(404).json({ message: "Merchant wallet profile not found" });
+      wallet = await Wallet.create({
+        user: req.user._id,
+        storeName: req.user.companyName || `${req.user.name}'s Store`,
+        country: destCountry,
+        currency: destCurrency,
+        balance: 0.0,
+        totalBalance: 0.0,
+        availableBalance: 0.0,
+        holdBalance: 0.0,
+      });
     }
 
     if (wallet.availableBalance < invoiceTotal) {
       return res.status(400).json({
-        message: `Insufficient wallet balance. Total cost is ₹${invoiceTotal.toFixed(2)} (Charge: ₹${shippingCharge.toFixed(2)} + GST: ₹${gstAmount.toFixed(2)}), available balance is ₹${wallet.availableBalance.toFixed(2)}. Please recharge first.`,
+        message: `Insufficient wallet balance in ${destCurrency}. Total cost is ${destCurrency} ${invoiceTotal.toFixed(2)} (Charge: ${shippingCharge.toFixed(2)} + GST: ${gstAmount.toFixed(2)}), available balance is ${destCurrency} ${wallet.availableBalance.toFixed(2)}. Please recharge first.`,
+      });
+    }
+
+    // 2.5: Verify destination serviceability via Aramex
+    const serviceability = await checkAramexServiceability({
+      address: receiverAddress,
+      city: receiverCity,
+      state: receiverState,
+      pincode: receiverPincode,
+      country: receiverCountry,
+    });
+    if (!serviceability.success) {
+      return res.status(400).json({
+        message: serviceability.message || "Destination is not serviceable by Aramex.",
       });
     }
 
@@ -114,13 +167,17 @@ export const bookShipment = async (req, res) => {
     const refId = `HOLD-${shipmentId}`;
 
     const holdTransaction = await WalletTransaction.create({
+      walletId: wallet._id,
       userId: req.user._id,
       transactionType: "Hold",
       amount: -invoiceTotal,
+      currency: destCurrency,
       openingBalance,
       closingBalance: wallet.availableBalance,
       referenceId: refId,
       remarks: `Reserved funds for Shipment ${shipmentId}`,
+      description: `Reserved funds for Shipment ${shipmentId}`,
+      shipmentId: shipmentId,
       status: "HOLD",
     });
 
@@ -450,20 +507,20 @@ export const downloadInvoicePdf = async (req, res) => {
     const rowY = tableY + 25;
     doc.text(`Logistics Delivery charges (${shipment.shipmentType})`, 50, rowY);
     doc.text(`${shipment.weight} kg (Chargeable: ${shipment.chargeableWeight || shipment.weight} kg)`, 250, rowY);
-    doc.text(`₹${shipment.shippingCharge.toFixed(2)}`, 450, rowY, { align: "right" });
+    doc.text(`Rs. ${shipment.shippingCharge.toFixed(2)}`, 450, rowY, { align: "right" });
 
     const totalY = rowY + 30;
     doc.strokeColor("#E5E7EB").lineWidth(1).moveTo(50, totalY).lineTo(550, totalY).stroke();
 
     // Decoupled Taxes summary
     doc.text("Base Shipping Cost:", 300, totalY + 10);
-    doc.text(`₹${shipment.shippingCharge.toFixed(2)}`, 450, totalY + 10, { align: "right" });
+    doc.text(`Rs. ${shipment.shippingCharge.toFixed(2)}`, 450, totalY + 10, { align: "right" });
 
     doc.text("GST Tax Amount (18%):", 300, totalY + 25);
-    doc.text(`₹${shipment.gstAmount.toFixed(2)}`, 450, totalY + 25, { align: "right" });
+    doc.text(`Rs. ${shipment.gstAmount.toFixed(2)}`, 450, totalY + 25, { align: "right" });
 
     doc.fontSize(11).text("Net Invoice Total (Payable):", 300, totalY + 45, { bold: true });
-    doc.fillColor("#FF6A00").text(`₹${shipment.invoiceTotal.toFixed(2)}`, 450, totalY + 45, { align: "right", bold: true });
+    doc.fillColor("#FF6A00").text(`Rs. ${shipment.invoiceTotal.toFixed(2)}`, 450, totalY + 45, { align: "right", bold: true });
 
     doc.moveDown(4);
     doc.fontSize(8).fillColor("#687280").text("This is an auto-generated GST tax invoice. No signature is required. Thank you for shipping with Phoenix Commerce.", { align: "center" });
@@ -614,15 +671,30 @@ export const confirmBulkUpload = async (req, res) => {
       return res.status(400).json({ message: "A validated rows list is required to confirm bookings." });
     }
 
-    const wallet = await Wallet.findOne({ user: req.user._id });
+    const firstRow = validRows[0];
+    const { country: destCountry, currency: destCurrency } = getCurrencyForCountry(firstRow.receiverCountry);
+
+    let wallet = await Wallet.findOne({ user: req.user._id, currency: destCurrency });
     if (!wallet) {
-      return res.status(404).json({ message: "Merchant wallet profile not found" });
+      wallet = await Wallet.create({
+        user: req.user._id,
+        storeName: req.user.companyName || `${req.user.name}'s Store`,
+        country: destCountry,
+        currency: destCurrency,
+        balance: 0.0,
+        totalBalance: 0.0,
+        availableBalance: 0.0,
+        holdBalance: 0.0,
+      });
     }
 
-    const totalCost = validRows.reduce((sum, r) => sum + r.invoiceTotal, 0);
+    // Convert totalCost to target currency
+    const totalCostINR = validRows.reduce((sum, r) => sum + r.invoiceTotal, 0);
+    const totalCost = convertFromINR(totalCostINR, destCurrency);
+
     if (wallet.availableBalance < totalCost) {
       return res.status(400).json({
-        message: `Insufficient wallet balance. Total batch cost is ₹${totalCost.toFixed(2)}, available balance is ₹${wallet.availableBalance.toFixed(2)}.`,
+        message: `Insufficient wallet balance in ${destCurrency}. Total batch cost is ${destCurrency} ${totalCost.toFixed(2)}, available balance is ${destCurrency} ${wallet.availableBalance.toFixed(2)}.`,
       });
     }
 
@@ -635,13 +707,16 @@ export const confirmBulkUpload = async (req, res) => {
 
     const batchId = `BTCH-${Date.now().toString().slice(-6)}`;
     const holdTransaction = await WalletTransaction.create({
+      walletId: wallet._id,
       userId: req.user._id,
       transactionType: "Hold",
       amount: -totalCost,
+      currency: destCurrency,
       openingBalance,
       closingBalance: wallet.availableBalance,
       referenceId: batchId,
       remarks: `Reserved funds for Bulk Batch ${batchId} (${validRows.length} shipments)`,
+      description: `Reserved funds for Bulk Batch ${batchId} (${validRows.length} shipments)`,
       status: "HOLD",
     });
 
@@ -750,7 +825,8 @@ export const confirmBulkUpload = async (req, res) => {
           eventTime: new Date(),
         });
 
-        processedCost += row.invoiceTotal;
+        const targetCost = convertFromINR(row.invoiceTotal, destCurrency);
+        processedCost += targetCost;
         successBookings.push(shipment);
       } else {
         await Shipment.findByIdAndDelete(shipment._id);
@@ -770,7 +846,7 @@ export const confirmBulkUpload = async (req, res) => {
     if (processedCost > 0) {
       holdTransaction.transactionType = "Debit";
       holdTransaction.status = "Completed";
-      holdTransaction.remarks = `Bulk Debit: Completed ${successBookings.length} shipments. Debited ₹${processedCost.toFixed(2)}`;
+      holdTransaction.remarks = `Bulk Debit: Completed ${successBookings.length} shipments. Debited ${destCurrency} ${processedCost.toFixed(2)}`;
       holdTransaction.amount = -processedCost;
       await holdTransaction.save();
     } else {
@@ -790,7 +866,7 @@ export const confirmBulkUpload = async (req, res) => {
     });
 
     res.status(200).json({
-      message: `Batch complete: ${successBookings.length} shipments booked, ${failedBookings.length} failed. Total debited ₹${processedCost.toFixed(2)}.`,
+      message: `Batch complete: ${successBookings.length} shipments booked, ${failedBookings.length} failed. Total debited ${destCurrency} ${processedCost.toFixed(2)}.`,
       successBookings,
       failedBookings,
     });
@@ -832,6 +908,13 @@ export const updateShipmentStatus = async (req, res) => {
     const prevStatus = shipment.status;
     shipment.status = status;
     shipment.statusHistory.push({ status, time: new Date() });
+
+    if (req.body.pickupDate) {
+      shipment.pickupDate = new Date(req.body.pickupDate);
+    }
+    if (req.body.pickupManifestId) {
+      shipment.pickupManifestId = req.body.pickupManifestId;
+    }
 
     if (status === "Delivered") {
       shipment.dateDelivered = new Date();
@@ -1053,6 +1136,9 @@ export const getAdminMetrics = async (req, res) => {
     ]);
     const revenue = rechargeAggr[0] ? rechargeAggr[0].total : 0.0;
 
+    const totalBlockedUsers = await User.countDocuments({ status: "Blocked" });
+    const totalPendingKYC = await KYC.countDocuments({ status: { $in: ["Pending", "Under Review", "Reupload Required"] } });
+
     res.status(200).json({
       revenue,
       users: totalUsers,
@@ -1060,6 +1146,8 @@ export const getAdminMetrics = async (req, res) => {
       shipmentsCount: totalShipments,
       transactionsCount: totalTransactions,
       discrepanciesCount: totalDiscrepancies,
+      blockedUsersCount: totalBlockedUsers,
+      pendingKYCCount: totalPendingKYC,
     });
   } catch (err) {
     res.status(500).json({ message: "Error getting statistics metrics", error: err.message });

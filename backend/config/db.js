@@ -4,6 +4,8 @@ import User from "../models/User.js";
 import Wallet from "../models/Wallet.js";
 import Rate from "../models/Rate.js";
 import PageContent from "../models/PageContent.js";
+import Testimonial from "../models/Testimonial.js";
+import Coupon from "../models/Coupon.js";
 
 const hashPassword = (password) => {
   return crypto.createHash("sha256").update(password + "phreight-salt-90382").digest("hex");
@@ -13,6 +15,14 @@ const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGO_URI);
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+
+    // Drop old single user unique index if it exists on wallets collection
+    try {
+      await mongoose.connection.collection("wallets").dropIndex("user_1");
+      console.log("Successfully dropped legacy unique index user_1 from wallets collection");
+    } catch (err) {
+      // Index might not exist or already dropped, which is fine
+    }
 
     // Seed default admin if none exists
     const adminExists = await User.findOne({ role: "Admin" });
@@ -73,6 +83,50 @@ const connectDB = async () => {
               { value: "500", label: "Active Sellers" },
               { value: "20", label: "Countries Covered" },
               { value: "99", label: "Success Rate %" }
+            ]
+          },
+          services: {
+            title: "Our Services",
+            description: "Powerful shipping solutions designed for modern businesses",
+            items: [
+              { title: "International Shipping", icon: "Globe" },
+              { title: "Pickup Service", icon: "Truck" },
+              { title: "Live Tracking", icon: "BarChart3" },
+              { title: "Courier Aggregation", icon: "Package" }
+            ]
+          },
+          howItWorks: {
+            title: "How It Works",
+            description: "Simple steps to start shipping with Phreight",
+            items: [
+              { step: "01", title: "Signup", desc: "Create your account and complete KYC verification" },
+              { step: "02", title: "Add Wallet", desc: "Recharge your wallet to start shipping" },
+              { step: "03", title: "Create Shipment", desc: "Enter shipment details and generate label" },
+              { step: "04", title: "Track Delivery", desc: "Track your shipment in real-time" }
+            ]
+          },
+          rateCalc: {
+            title: "Calculate Shipping Cost Instantly",
+            description: "Enter your shipment details and get the best courier rates instantly.",
+            points: ["Real-time pricing", "Multiple courier options", "Transparent charges"]
+          },
+          whyChoose: {
+            title: "Why Choose Phreight",
+            description: "Powerful features designed to simplify your shipping experience",
+            items: [
+              { title: "Lowest Shipping Rates", desc: "Get unbeatable prices with smart rate optimization", icon: "Wallet" },
+              { title: "Fast Pickup Service", desc: "Schedule pickups easily and save time", icon: "Zap" },
+              { title: "Global Coverage", desc: "Ship to 20+ countries with reliable partners", icon: "Globe" },
+              { title: "Secure & Trusted", desc: "Safe transactions with wallet protection", icon: "ShieldCheck" }
+            ]
+          },
+          testimonials: {
+            title: "What Our Clients Say",
+            description: "Trusted by sellers across India",
+            items: [
+              { name: "Rahul Sharma", feedback: "Phreight made shipping super easy and affordable!" },
+              { name: "Priya Patel", feedback: "Best platform for international shipping. Highly recommended!" },
+              { name: "Amit Verma", feedback: "Smooth dashboard and fast pickup service. Loved it!" }
             ]
           },
           cta: {
@@ -391,6 +445,68 @@ const connectDB = async () => {
         await PageContent.create(p);
         console.log(`Seeded default dynamic content for: ${p.page}`);
       }
+    }
+
+    // Seed default testimonials if none exist
+    const testimonialExists = await Testimonial.findOne({});
+    if (!testimonialExists) {
+      console.log("No testimonials found. Seeding default testimonials...");
+      const defaultTestimonials = [
+        {
+          name: "Rahul Sharma",
+          description: "Phreight made shipping super easy and affordable!",
+          stars: 5
+        },
+        {
+          name: "Priya Patel",
+          description: "Best platform for international shipping. Highly recommended!",
+          stars: 5
+        },
+        {
+          name: "Amit Verma",
+          description: "Smooth dashboard and fast pickup service. Loved it!",
+          stars: 5
+        }
+      ];
+      await Testimonial.insertMany(defaultTestimonials);
+      console.log("Default testimonials seeded successfully!");
+    }
+
+    // Seed default coupons if none exist
+    const couponExists = await Coupon.findOne({});
+    if (!couponExists) {
+      console.log("No coupons found. Seeding default wallet recharge coupons...");
+      const defaultCoupons = [
+        {
+          code: "WELCOME100",
+          description: "Get flat ₹100 extra balance on your first topup of ₹500 or more!",
+          couponType: "Flat",
+          value: 100,
+          minRecharge: 500,
+          firstTimeOnly: true,
+          isActive: true,
+        },
+        {
+          code: "GROW20",
+          description: "Get 20% bonus balance on your first wallet recharge of ₹1000 or more!",
+          couponType: "Percentage",
+          value: 20,
+          minRecharge: 1000,
+          firstTimeOnly: true,
+          isActive: true,
+        },
+        {
+          code: "FESTIVE10",
+          description: "Enjoy 10% bonus balance on any recharge of ₹1000 or more!",
+          couponType: "Percentage",
+          value: 10,
+          minRecharge: 1000,
+          firstTimeOnly: false,
+          isActive: true,
+        },
+      ];
+      await Coupon.insertMany(defaultCoupons);
+      console.log("Default offer coupons seeded successfully!");
     }
   } catch (error) {
     console.error("DB Error:", error.message);

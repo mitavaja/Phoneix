@@ -6,11 +6,18 @@ const walletSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
     },
     storeName: {
       type: String,
       required: true,
+    },
+    country: {
+      type: String,
+      default: "India",
+    },
+    currency: {
+      type: String,
+      default: "INR",
     },
     balance: {
       type: Number,
@@ -28,11 +35,18 @@ const walletSchema = new mongoose.Schema(
       type: Number,
       default: 0.0,
     },
+    status: {
+      type: String,
+      enum: ["Active", "Inactive", "Suspended"],
+      default: "Active",
+    },
   },
   {
     timestamps: true,
   }
 );
+
+walletSchema.index({ user: 1, currency: 1 }, { unique: true });
 
 const Wallet = mongoose.model("Wallet", walletSchema);
 export default Wallet;

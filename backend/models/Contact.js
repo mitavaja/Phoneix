@@ -14,6 +14,15 @@ const contactSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    status: {
+      type: String,
+      enum: ["Pending", "Replied", "Closed"],
+      default: "Pending",
+    },
+    reply: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

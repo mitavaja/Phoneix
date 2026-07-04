@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import SupportTicket from "../models/SupportTicket.js";
 import Claim from "../models/Claim.js";
 import Shipment from "../models/Shipment.js";
@@ -146,8 +147,13 @@ export const createClaim = async (req, res) => {
       return res.status(400).json({ message: "Shipment target, claim type, and claim amount are required." });
     }
 
+    const queryConditions = [{ shipmentId }, { courierTrackingNumber: shipmentId }];
+    if (mongoose.Types.ObjectId.isValid(shipmentId)) {
+      queryConditions.push({ _id: shipmentId });
+    }
+
     const shipment = await Shipment.findOne({
-      $or: [{ _id: shipmentId }, { shipmentId }, { courierTrackingNumber: shipmentId }]
+      $or: queryConditions
     });
 
     if (!shipment) {
