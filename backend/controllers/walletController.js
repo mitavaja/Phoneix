@@ -198,13 +198,23 @@ export const addBalanceAdmin = async (req, res) => {
  */
 export const rechargeWallet = async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, currency } = req.body;
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
       return res.status(400).json({ message: "A positive recharge amount is required" });
     }
 
+    const targetCurrency = currency || "INR";
+    const conversionRates = {
+      INR: 1.0,
+      AED: 22.5,
+      USD: 83.5,
+      GBP: 106.0
+    };
+    const rate = conversionRates[targetCurrency] || 1.0;
+    const amountInINR = parseFloat(amount) * rate;
+
     const receiptId = `REC-${Date.now()}`;
-    const orderDetails = await createPaymentOrder(parseFloat(amount), receiptId);
+    const orderDetails = await createPaymentOrder(amountInINR, receiptId);
 
     res.status(201).json({
       message: "Razorpay recharge order created successfully",
