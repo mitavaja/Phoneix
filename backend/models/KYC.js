@@ -48,6 +48,10 @@ const kycSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    lightbill: {
+      type: String,
+      default: "",
+    },
     status: {
       type: String,
       enum: ["Pending", "Under Review", "Approved", "Rejected", "Reupload Required"],

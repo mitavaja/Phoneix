@@ -104,9 +104,7 @@ const Dashboard = () => {
   const [utrNumber, setUtrNumber] = useState("");
   const [rechargeSuccess, setRechargeSuccess] = useState("");
   const [rechargeError, setRechargeError] = useState("");
-  const [showMockRazorpay, setShowMockRazorpay] = useState(false);
-  const [mockOrderDetails, setMockOrderDetails] = useState(null);
-  const [mockKeyId, setMockKeyId] = useState("");
+
 
   // Coupon States
   const [coupons, setCoupons] = useState([]);
@@ -528,7 +526,7 @@ const Dashboard = () => {
   };
 
   // 9. Wallet Top Ups
-  const handleSimulateRazorpay = async () => {
+  const handleRazorpayCheckout = async () => {
     if (!rechargeAmount || isNaN(parseFloat(rechargeAmount)) || parseFloat(rechargeAmount) <= 0) {
       setRechargeError("Please enter a valid recharge amount.");
       return;
@@ -545,96 +543,54 @@ const Dashboard = () => {
       const { orderDetails, keyId } = orderRes.data;
       
       const orderId = orderDetails.id;
-      const isSimulatedOrder = orderDetails.simulated || keyId === "your_key_id";
 
-      if (isSimulatedOrder) {
-        // Show simulated Razorpay modal
-        setMockOrderDetails(orderDetails);
-        setMockKeyId(keyId);
-        setShowMockRazorpay(true);
-      } else {
-        // Open standard Razorpay Checkout
-        if (window.Razorpay) {
-          const options = {
-            key: keyId,
-            amount: orderDetails.amount,
-            currency: orderDetails.currency,
-            name: "Phreight Aggregator",
-            description: "Wallet Recharge",
-            order_id: orderId,
-            handler: async function (response) {
-              try {
-                const verifyRes = await API.post("/wallet/verify-recharge", {
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpayOrderId: response.razorpay_order_id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpayPaymentId: response.razorpay_payment_id,
-                  razorpay_signature: response.razorpay_signature,
-                  razorpaySignature: response.razorpay_signature,
-                  amount: parseFloat(rechargeAmount),
-                  couponCode: selectedCoupon ? selectedCoupon.code : undefined,
-                  currency: selectedCurrency
-                });
-                setRechargeSuccess(verifyRes.data.message || "Wallet recharged successfully!");
-                setRechargeAmount("");
-                setSelectedCoupon(null);
-                await fetchWalletData();
-              } catch (err) {
-                setRechargeError(err.response?.data?.message || "Recharge verification failed.");
-              }
-            },
-            prefill: {
-              name: user?.name,
-              email: user?.email,
-              contact: user?.mobileNumber
-            },
-            theme: {
-              color: "#FF6A00"
+      // Open standard Razorpay Checkout
+      if (window.Razorpay) {
+        const options = {
+          key: keyId,
+          amount: orderDetails.amount,
+          currency: orderDetails.currency,
+          name: "Phreight Aggregator",
+          description: "Wallet Recharge",
+          order_id: orderId,
+          handler: async function (response) {
+            try {
+              const verifyRes = await API.post("/wallet/verify-recharge", {
+                razorpay_order_id: response.razorpay_order_id,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                razorpaySignature: response.razorpay_signature,
+                amount: parseFloat(rechargeAmount),
+                couponCode: selectedCoupon ? selectedCoupon.code : undefined,
+                currency: selectedCurrency
+              });
+              setRechargeSuccess(verifyRes.data.message || "Wallet recharged successfully!");
+              setRechargeAmount("");
+              setSelectedCoupon(null);
+              await fetchWalletData();
+            } catch (err) {
+              setRechargeError(err.response?.data?.message || "Recharge verification failed.");
             }
-          };
-          const rzp = new window.Razorpay(options);
-          rzp.open();
-        } else {
-          setRechargeError("Razorpay SDK failed to load. Please verify internet connection.");
-        }
+          },
+          prefill: {
+            name: user?.name,
+            email: user?.email,
+            contact: user?.mobileNumber
+          },
+          theme: {
+            color: "#FF6A00"
+          }
+        };
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      } else {
+        setRechargeError("Razorpay SDK failed to load. Please verify internet connection.");
       }
     } catch (err) {
       setRechargeError(err.response?.data?.message || "Failed to initiate recharge order.");
     }
-  };
-
-  const handleMockRazorpaySuccess = async () => {
-    if (!mockOrderDetails) return;
-    setShowMockRazorpay(false);
-    setRechargeError("");
-    setRechargeSuccess("");
-    try {
-      const verifyRes = await API.post("/wallet/verify-recharge", {
-        razorpay_order_id: mockOrderDetails.id,
-        razorpayOrderId: mockOrderDetails.id,
-        razorpay_payment_id: `pay_${Math.floor(100000 + Math.random() * 900000)}`,
-        razorpayPaymentId: `pay_${Math.floor(100000 + Math.random() * 900000)}`,
-        razorpay_signature: "mock_sig_code",
-        razorpaySignature: "mock_sig_code",
-        amount: parseFloat(rechargeAmount),
-        couponCode: selectedCoupon ? selectedCoupon.code : undefined,
-        currency: selectedCurrency
-      });
-      setRechargeSuccess(verifyRes.data.message || "Simulated Wallet Recharge completed!");
-      setRechargeAmount("");
-      setSelectedCoupon(null);
-      await fetchWalletData();
-    } catch (err) {
-      setRechargeError(err.response?.data?.message || "Recharge verification failed.");
-    } finally {
-      setMockOrderDetails(null);
-    }
-  };
-
-  const handleMockRazorpayCancel = () => {
-    setShowMockRazorpay(false);
-    setMockOrderDetails(null);
-    setRechargeError("Payment checkout cancelled by user.");
   };
 
   // 10. File Insurance Claim
@@ -1752,15 +1708,15 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {/* Simulated Razorpay Top Up */}
+                {/* Razorpay Top Up */}
                 <div className="bg-[#E5E7EB]/5 border border-[#687280]/20 rounded-3xl p-8 flex flex-col justify-between min-h-[220px] space-y-4">
                   <div className="space-y-1">
                     <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#687280]/20 pb-3">
                       <Wallet size={18} className="text-[#FF6A00]" />
-                      Simulated Instant Card Recharge
+                      Razorpay Instant Recharge
                     </h4>
                     <p className="text-xs text-[#687280] pt-1">
-                      Simulate Razorpay payment gateway checkout orders verification.
+                      Add money to your wallet securely using Razorpay gateway.
                     </p>
                   </div>
                   
@@ -1903,10 +1859,10 @@ const Dashboard = () => {
                     )}
                     
                     <button
-                      onClick={handleSimulateRazorpay}
+                      onClick={handleRazorpayCheckout}
                       className="w-full bg-[#FF6A00] hover:bg-[#ff7b1a] text-[#0A1F44] font-extrabold py-3.5 rounded-xl text-xs hover:scale-[1.01] active:scale-[0.99] transition duration-300 shadow-lg shadow-[#FF6A00]/20"
                     >
-                      Process Simulated Topup
+                      Process Wallet Topup
                     </button>
                   </div>
                 </div>
@@ -2543,89 +2499,7 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* 💳 SIMULATED RAZORPAY PAYMENT MODAL */}
-      {showMockRazorpay && mockOrderDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-[#0B1528] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative">
-            
-            {/* Blue Razorpay Header */}
-            <div className="bg-[#1F6BFF] px-6 py-4 flex items-center justify-between text-white select-none">
-              <div className="flex items-center gap-2">
-                <div className="bg-white text-[#1F6BFF] w-7 h-7 rounded-lg flex items-center justify-center font-black text-lg shadow-sm">
-                  R
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-sm tracking-tight">Razorpay Checkout</h4>
-                  <span className="text-[10px] text-white/70 font-semibold uppercase tracking-wider block">Demo/Simulation Mode</span>
-                </div>
-              </div>
-              <button 
-                onClick={handleMockRazorpayCancel}
-                className="text-white/80 hover:text-white text-xs font-semibold bg-black/10 hover:bg-black/20 px-2.5 py-1.5 rounded-lg transition"
-              >
-                Cancel
-              </button>
-            </div>
 
-            {/* Modal Body */}
-            <div className="p-6 space-y-6">
-              
-              {/* Amount Display */}
-              <div className="text-center bg-[#071630] border border-white/5 rounded-xl p-4">
-                <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold block mb-1">Payment Amount</span>
-                <span className="text-3xl font-black text-white">₹{parseFloat(rechargeAmount).toFixed(2)}</span>
-                <span className="text-[10px] text-gray-500 block mt-1">Order ID: {mockOrderDetails.id}</span>
-              </div>
-
-              {/* Prefill User Info */}
-              <div className="bg-[#0A1F44] border border-white/5 rounded-xl p-4 text-xs space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Merchant Store:</span>
-                  <span className="font-semibold text-white">{wallet?.storeName || user?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Billing Email:</span>
-                  <span className="font-semibold text-white">{user?.email}</span>
-                </div>
-              </div>
-
-              {/* Mock Methods Selector */}
-              <div className="space-y-2">
-                <span className="text-[10px] text-gray-500 uppercase tracking-widest font-bold block">Simulate Payment Method</span>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-[#0A1F44] border border-[#1F6BFF]/30 text-white rounded-xl p-3 flex flex-col items-center justify-center gap-1.5 cursor-pointer hover:border-[#1F6BFF]/60 transition">
-                    <span className="font-bold">Instant Card</span>
-                    <span className="text-[9px] text-[#1F6BFF] font-semibold">Demo Auto-Success</span>
-                  </div>
-                  <div className="bg-[#0A1F44] border border-white/5 text-gray-400 rounded-xl p-3 flex flex-col items-center justify-center gap-1.5 opacity-50 select-none">
-                    <span className="font-bold">UPI / QR Code</span>
-                    <span className="text-[9px]">Unavailable</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Simulated Action Buttons */}
-              <div className="space-y-3 pt-4 border-t border-white/5">
-                <button
-                  onClick={handleMockRazorpaySuccess}
-                  className="w-full bg-[#1F6BFF] hover:bg-[#3479FF] text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98] transition shadow-lg shadow-[#1F6BFF]/25"
-                >
-                  <CheckCircle size={16} />
-                  <span>Simulate Payment Success</span>
-                </button>
-                <button
-                  onClick={handleMockRazorpayCancel}
-                  className="w-full bg-white/5 hover:bg-white/10 text-gray-300 py-3 rounded-xl text-xs font-semibold transition"
-                >
-                  Simulate Payment Cancel/Failure
-                </button>
-              </div>
-
-            </div>
-
-          </div>
-        </div>
-      )}
 
     </div>
   );

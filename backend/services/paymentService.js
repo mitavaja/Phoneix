@@ -1,24 +1,27 @@
 import Razorpay from "razorpay";
 import crypto from "crypto";
 
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || "your_key_id";
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || "your_key_secret";
-
-const isSimulated =
-  RAZORPAY_KEY_ID.includes("your_") ||
-  RAZORPAY_KEY_SECRET.includes("your_");
-
 let razorpayInstance = null;
-if (!isSimulated) {
+
+const getRazorpayInstance = () => {
+  if (razorpayInstance) return razorpayInstance;
+  
+  const key_id = process.env.RAZORPAY_KEY_ID;
+  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+  
+  if (!key_id || !key_secret) {
+    console.warn("WARNING: Razorpay keys are missing in the .env file!");
+    return null;
+  }
+  
   try {
-    razorpayInstance = new Razorpay({
-      key_id: RAZORPAY_KEY_ID,
-      key_secret: RAZORPAY_KEY_SECRET,
-    });
+    razorpayInstance = new Razorpay({ key_id, key_secret });
+    return razorpayInstance;
   } catch (err) {
     console.error("Failed to initialize Razorpay SDK instance:", err.message);
+    return null;
   }
-}
+};
 
 /**
  * Create a new Payment Order
@@ -27,20 +30,13 @@ export const createPaymentOrder = async (amountInINR, receipt = "") => {
   // Razorpay accepts amounts in paise (1 INR = 100 Paise)
   const amountInPaise = Math.round(amountInINR * 100);
 
-  if (isSimulated || !razorpayInstance) {
-    const mockOrderId = `order_${Math.random().toString(36).substring(2, 17)}`;
-    return {
-      success: true,
-      id: mockOrderId,
-      amount: amountInPaise,
-      currency: "INR",
-      receipt,
-      simulated: true,
-    };
+  const instance = getRazorpayInstance();
+  if (!instance) {
+    throw new Error("Razorpay is not properly configured. Check your environment variables.");
   }
 
   try {
-    const order = await razorpayInstance.orders.create({
+    const order = await instance.orders.create({
       amount: amountInPaise,
       currency: "INR",
       receipt,
@@ -51,17 +47,8 @@ export const createPaymentOrder = async (amountInINR, receipt = "") => {
       simulated: false,
     };
   } catch (err) {
-    console.error("Razorpay order creation failed, falling back to simulated order:", err.message);
-    const mockOrderId = `order_${Math.random().toString(36).substring(2, 17)}`;
-    return {
-      success: true,
-      id: mockOrderId,
-      amount: amountInPaise,
-      currency: "INR",
-      receipt,
-      simulated: true,
-      error: err.message,
-    };
+    console.error("Razorpay order creation failed:", err.message);
+    throw new Error(`Razorpay order creation failed: ${err.message}`);
   }
 };
 
@@ -69,15 +56,14 @@ export const createPaymentOrder = async (amountInINR, receipt = "") => {
  * Verify Razorpay Web Signature
  */
 export const verifyPaymentSignature = (orderId, paymentId, signature) => {
-  if (isSimulated || !razorpayInstance) {
-    // Simulated verification succeeds if signature contains "simulated_signature"
-    // or if we just want it to pass for development testing
-    return true;
+  const instance = getRazorpayInstance();
+  if (!instance) {
+    return false;
   }
 
   try {
     const generatedSignature = crypto
-      .createHmac("sha256", RAZORPAY_KEY_SECRET)
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(`${orderId}|${paymentId}`)
       .digest("hex");
 

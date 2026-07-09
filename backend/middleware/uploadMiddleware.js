@@ -17,6 +17,7 @@ const uploadMiddleware = upload.fields([
   { name: "gstCertificate", maxCount: 1 },
   { name: "addressProof", maxCount: 1 },
   { name: "companyRegistration", maxCount: 1 },
+  { name: "lightbill", maxCount: 1 },
   { name: "document", maxCount: 1 }, // backward compatibility
 ]);
 

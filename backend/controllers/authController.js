@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import Wallet from "../models/Wallet.js";
 import KYC from "../models/KYC.js";
 import { generateToken } from "../utils/generateToken.js";
+import { isValidEmail, isValidPhone, isValidPassword } from "../utils/validation.js";
 
 // Helper to hash password with salt
 const hashPassword = (password) => {
@@ -28,13 +29,25 @@ export const registerUser = async (req, res) => {
   try {
     const { name, email, password, role, companyName, ownerName, mobileNumber, gstType } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "Name, email, and password parameters are required" });
+    if (!name || !email || !password || !mobileNumber) {
+      return res.status(400).json({ message: "Name, email, password, and mobileNumber parameters are required" });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: "Enter a valid email address." });
+    }
+
+    if (!isValidPhone(mobileNumber)) {
+      return res.status(400).json({ message: "Enter a valid phone number." });
+    }
+
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ message: "Password must contain at least 8 characters, including uppercase, lowercase, number, and special character." });
     }
 
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ message: "User account with this email already registered" });
+      return res.status(400).json({ message: "Email already exists." });
     }
 
     const hashedPassword = hashPassword(password);
@@ -56,7 +69,7 @@ export const registerUser = async (req, res) => {
     });
 
     // Create a wallet entry for the new merchant/user
-    const initialBalance = userRole === "Seller" ? 1000.0 : 1000000.0;
+    const initialBalance = userRole === "Seller" ? 0.0 : 1000000.0;
     const wallet = await Wallet.create({
       user: user._id,
       storeName: companyName || `${name}'s Store`,
@@ -74,6 +87,7 @@ export const registerUser = async (req, res) => {
       const gstCertificate = saveUploadedFile(files.gstCertificate);
       const addressProof = saveUploadedFile(files.addressProof);
       const companyRegistration = saveUploadedFile(files.companyRegistration);
+      const lightbill = saveUploadedFile(files.lightbill);
       
       // Backward compatibility document field
       const documentName = saveUploadedFile(files.document) || panCard || "GST_Certificate.pdf";
@@ -90,6 +104,7 @@ export const registerUser = async (req, res) => {
         gstCertificate,
         addressProof,
         companyRegistration,
+        lightbill,
         status: "Pending",
       });
     }
@@ -118,6 +133,10 @@ export const loginUser = async (req, res) => {
 
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password parameters are required" });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: "Enter a valid email address." });
     }
 
     const user = await User.findOne({ email });

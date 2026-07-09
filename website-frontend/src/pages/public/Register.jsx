@@ -4,8 +4,9 @@ import { useNavigate } from "react-router-dom";
 import Logo from "../../components/Logo";
 import { 
   Upload, User, Mail, Lock, Phone, Building, Briefcase, 
-  FileText, ArrowLeft, ArrowRight, Check, ShieldAlert, FileCheck, Eye 
+  FileText, ArrowLeft, ArrowRight, Check, ShieldAlert, FileCheck, Eye, EyeOff 
 } from "lucide-react";
+import { isValidEmail, isValidPhone, isValidPassword, checkPasswordStrength } from "../../utils/validation";
 
 const Register = () => {
   const [step, setStep] = useState(1);
@@ -17,7 +18,11 @@ const Register = () => {
     ownerName: "",
     mobileNumber: "",
     gstType: "Non-GST",
+    confirmPassword: "",
   });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [files, setFiles] = useState({
     panCard: null,
@@ -25,6 +30,7 @@ const Register = () => {
     gstCertificate: null,
     addressProof: null,
     companyRegistration: null,
+    lightbill: null,
   });
 
   const [loading, setLoading] = useState(false);
@@ -45,10 +51,18 @@ const Register = () => {
   const validateStep = (currentStep) => {
     if (currentStep === 1) {
       if (!form.ownerName.trim()) return "Owner's Full Name is required.";
+      
       if (!form.mobileNumber.trim()) return "Contact Mobile is required.";
+      if (!isValidPhone(form.mobileNumber.trim())) return "Enter a valid 10-digit phone number.";
+      
       if (!form.email.trim()) return "Portal Email is required.";
-      if (!form.password.trim()) return "Account Password is required.";
-      if (form.password.length < 6) return "Password must be at least 6 characters.";
+      if (!isValidEmail(form.email.trim())) return "Enter a valid email address.";
+      
+      if (!form.password) return "Account Password is required.";
+      if (!isValidPassword(form.password)) return "Password must contain at least 8 characters, including uppercase, lowercase, number, and special character.";
+      
+      if (!form.confirmPassword) return "Confirm Password is required.";
+      if (form.password !== form.confirmPassword) return "Passwords do not match.";
     }
     if (currentStep === 2) {
       if (!form.companyName.trim()) return "Store / Company Name is required.";
@@ -56,8 +70,13 @@ const Register = () => {
     if (currentStep === 3) {
       if (!files.panCard) return "PAN Card file is required.";
       if (!files.aadhaarCard) return "Aadhaar Card file is required.";
-      if (!files.addressProof) return "Address Proof file is required.";
-      if (!files.companyRegistration) return "Company Registration file is required.";
+      if (form.gstType === "Non-GST") {
+        if (!files.lightbill) return "Lightbill file is required.";
+      } else {
+        if (!files.addressProof) return "Address Proof file is required.";
+        if (!files.companyRegistration) return "Company Registration file is required.";
+        if (!files.gstCertificate) return "GST Certificate is required.";
+      }
     }
     return null;
   };
@@ -354,14 +373,58 @@ const Register = () => {
                       <Lock size={16} />
                     </span>
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       name="password"
                       placeholder="••••••••"
                       value={form.password}
                       onChange={handleChange}
                       required
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300"
+                      className="w-full pl-10 pr-12 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-white transition"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  {form.password && (
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider mt-1 px-1">
+                      <span className="text-gray-500">Strength:</span>
+                      <span className={`${
+                        checkPasswordStrength(form.password) === "Weak" ? "text-red-500" :
+                        checkPasswordStrength(form.password) === "Medium" ? "text-yellow-500" :
+                        "text-green-500"
+                      }`}>
+                        {checkPasswordStrength(form.password)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs text-gray-400 block font-bold uppercase tracking-wider">Confirm Password</label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
+                      <Lock size={16} />
+                    </span>
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      placeholder="••••••••"
+                      value={form.confirmPassword}
+                      onChange={handleChange}
+                      required
+                      className="w-full pl-10 pr-12 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-white transition"
+                    >
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -426,12 +489,19 @@ const Register = () => {
                   <FileUploadField label="Aadhaar Card" field="aadhaarCard" required={true} />
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <FileUploadField label="Address Proof" field="addressProof" required={true} />
-                  <FileUploadField label="GST Certificate (Optional)" field="gstCertificate" required={false} />
-                </div>
-
-                <FileUploadField label="Company Registration" field="companyRegistration" required={true} />
+                {form.gstType === "Non-GST" ? (
+                  <div className="grid sm:grid-cols-1 gap-4">
+                    <FileUploadField label="Lightbill" field="lightbill" required={true} />
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <FileUploadField label="Address Proof" field="addressProof" required={true} />
+                      <FileUploadField label="GST Certificate" field="gstCertificate" required={true} />
+                    </div>
+                    <FileUploadField label="Company Registration" field="companyRegistration" required={true} />
+                  </>
+                )}
               </div>
             )}
 
@@ -480,10 +550,11 @@ const Register = () => {
                       {[
                         { label: "PAN Card", name: files.panCard?.name },
                         { label: "Aadhaar Card", name: files.aadhaarCard?.name },
-                        { label: "Address Proof", name: files.addressProof?.name },
-                        { label: "Company Reg.", name: files.companyRegistration?.name },
-                        { label: "GST Cert.", name: files.gstCertificate?.name || "Not provided" }
-                      ].map((file, i) => (
+                        form.gstType === "Non-GST" ? { label: "Lightbill", name: files.lightbill?.name } : null,
+                        form.gstType !== "Non-GST" ? { label: "Address Proof", name: files.addressProof?.name } : null,
+                        form.gstType !== "Non-GST" ? { label: "Company Reg.", name: files.companyRegistration?.name } : null,
+                        form.gstType !== "Non-GST" ? { label: "GST Cert.", name: files.gstCertificate?.name || "Not provided" } : null
+                      ].filter(Boolean).map((file, i) => (
                         <div key={i} className="flex items-center gap-1.5 bg-[#071630] border border-[#687280]/15 px-3 py-2 rounded-xl text-gray-300">
                           <FileText size={12} className="text-[#FF6A00] shrink-0" />
                           <div className="overflow-hidden flex-1 leading-tight">

@@ -18,4 +18,18 @@ API.interceptors.request.use(
   }
 );
 
+// Auto-logout on 401 Unauthorized errors
+API.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      console.warn("Session expired or invalid token. Auto-logging out...");
+      localStorage.removeItem("token");
+      localStorage.removeItem("jwt");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default API;

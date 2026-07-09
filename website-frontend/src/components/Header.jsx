@@ -5,7 +5,7 @@ import { Menu, X } from "lucide-react";
 import Logo from "./Logo";
 
 const Header = () => {
-  const [menus, setMenus] = useState([]);
+  const [headerConfig, setHeaderConfig] = useState(null);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState(null);
@@ -14,7 +14,7 @@ const Header = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchMenus();
+    fetchHeaderConfig();
     checkAuth();
 
     const handleScroll = () => {
@@ -51,13 +51,14 @@ const Header = () => {
     setMobileOpen(false);
   };
 
-  const fetchMenus = async () => {
+  const fetchHeaderConfig = async () => {
     try {
-      const res = await API.get("/menu");
-      const headerMenus = res.data.filter((m) => m.position === "header");
-      setMenus(headerMenus);
+      const res = await API.get("/page-content/header");
+      if (res.data && res.data.sections) {
+        setHeaderConfig(res.data.sections);
+      }
     } catch (err) {
-      // Endpoint `/menu` not implemented, fallback to static defaults
+      console.warn("Failed to fetch header content settings", err.message);
     }
   };
 
@@ -73,7 +74,9 @@ const Header = () => {
   ];
 
   // Dynamically append Dashboard option to menu if merchant is authenticated
-  const baseMenus = menus.length > 0 ? menus : defaultMenus;
+  const baseMenus = headerConfig?.navigation && headerConfig.navigation.length > 0 
+    ? headerConfig.navigation 
+    : defaultMenus;
   const navItems = user 
     ? [...baseMenus, { name: "Dashboard", path: "/dashboard" }]
     : baseMenus;
@@ -90,7 +93,13 @@ const Header = () => {
 
         {/* 🔥 LOGO */}
         <Link to="/" className="flex items-center gap-2 group">
-          <Logo showText={true} theme="navy" size="md" />
+          <Logo 
+            showText={true} 
+            theme="navy" 
+            size="md" 
+            text={headerConfig?.logo?.text} 
+            subtitle={headerConfig?.logo?.subtitle} 
+          />
         </Link>
 
         {/* 🔥 DESKTOP MENU */}
@@ -132,19 +141,23 @@ const Header = () => {
             </div>
           ) : (
             <>
-              <Link
-                to="/login"
-                className="px-5 py-2 border border-[#687280]/50 rounded-lg text-white hover:bg-white hover:text-black transition"
-              >
-                Login
-              </Link>
+              {(!headerConfig || headerConfig.buttons?.showLogin !== false) && (
+                <Link
+                  to="/login"
+                  className="px-5 py-2 border border-[#687280]/50 rounded-lg text-white hover:bg-white hover:text-black transition"
+                >
+                  {headerConfig?.buttons?.loginText || "Login"}
+                </Link>
+              )}
 
-              <Link
-                to="/register"
-                className="px-5 py-2 bg-[#FF6A00] text-white font-bold rounded-lg hover:bg-orange-600 hover:scale-105 transition duration-300"
-              >
-                Register
-              </Link>
+              {(!headerConfig || headerConfig.buttons?.showRegister !== false) && (
+                <Link
+                  to="/register"
+                  className="px-5 py-2 bg-[#FF6A00] text-white font-bold rounded-lg hover:bg-orange-600 hover:scale-105 transition duration-300"
+                >
+                  {headerConfig?.buttons?.registerText || "Register"}
+                </Link>
+              )}
             </>
           )}
         </nav>
@@ -187,21 +200,25 @@ const Header = () => {
             </div>
           ) : (
             <div className="space-y-2 pt-2 border-t border-white/10">
-              <Link
-                to="/login"
-                onClick={() => setMobileOpen(false)}
-                className="block text-center border border-[#687280]/50 py-2 rounded-lg text-white"
-              >
-                Login
-              </Link>
+              {(!headerConfig || headerConfig.buttons?.showLogin !== false) && (
+                <Link
+                  to="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="block text-center border border-[#687280]/50 py-2 rounded-lg text-white font-semibold"
+                >
+                  {headerConfig?.buttons?.loginText || "Login"}
+                </Link>
+              )}
 
-              <Link
-                to="/register"
-                onClick={() => setMobileOpen(false)}
-                className="block text-center bg-[#FF6A00] text-white py-2 rounded-lg font-bold"
-              >
-                Register
-              </Link>
+              {(!headerConfig || headerConfig.buttons?.showRegister !== false) && (
+                <Link
+                  to="/register"
+                  onClick={() => setMobileOpen(false)}
+                  className="block text-center bg-[#FF6A00] text-white py-2 rounded-lg font-bold"
+                >
+                  {headerConfig?.buttons?.registerText || "Register"}
+                </Link>
+              )}
             </div>
           )}
         </div>

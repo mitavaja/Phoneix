@@ -8,6 +8,7 @@ const CMSManager = () => {
   const navigate = useNavigate();
 
   const allowedPages = [
+    "header",
     "home",
     "about",
     "services",
@@ -33,6 +34,27 @@ const CMSManager = () => {
   const [pageData, setPageData] = useState(null);
 
   const defaultTemplates = {
+    header: {
+      logo: {
+        text: "Phreight",
+        subtitle: "International Courier Company",
+        logoUrl: ""
+      },
+      navigation: [
+        { name: "Home", path: "/" },
+        { name: "About", path: "/about" },
+        { name: "Services", path: "/services" },
+        { name: "Rate", path: "/rate" },
+        { name: "Tracking", path: "/tracking" },
+        { name: "Contact", path: "/contact" }
+      ],
+      buttons: {
+        loginText: "Login",
+        registerText: "Register",
+        showLogin: true,
+        showRegister: true
+      }
+    },
     home: {
       hero: { title: "", description: "", cta1: "", cta2: "" },
       stats: { title: "", description: "", items: [ { value: "", label: "" }, { value: "", label: "" }, { value: "", label: "" }, { value: "", label: "" } ] },
@@ -179,6 +201,30 @@ const CMSManager = () => {
     }));
   };
 
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("logo", file);
+
+    setLoading(true);
+    try {
+      const res = await API.post("/page-content/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      updateNestedField("logo", "logoUrl", res.data.url);
+      toast.success("Logo image uploaded successfully!");
+    } catch (err) {
+      console.error("Error uploading logo", err);
+      toast.error(err.response?.data?.message || "Failed to upload logo image");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Render Loading indicator
   const renderLoading = () => (
     <div className="flex items-center justify-center p-12 text-xs font-semibold text-gray-500 gap-2">
@@ -189,6 +235,8 @@ const CMSManager = () => {
 
   const getPageTitle = () => {
     switch (activeTab) {
+      case "header":
+        return "Header Settings";
       case "home":
         return "Home Page Sections";
       case "about":
@@ -267,6 +315,176 @@ const CMSManager = () => {
         ) : (
           <form onSubmit={handleSave} className="space-y-8 text-xs">
             
+            {/* ==================== HEADER CMS ==================== */}
+            {activeTab === "header" && pageData && (
+              <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
+                <div>
+                  <h3 className="text-sm font-bold border-b border-[#687280]/20 pb-2 mb-4">1. Brand Logo Configuration</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-[#687280] font-semibold">Logo Main Text</label>
+                      <input
+                        type="text"
+                        value={pageData.logo?.text || ""}
+                        onChange={(e) => updateNestedField("logo", "text", e.target.value)}
+                        className="w-full px-4 py-2.5 bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-lg focus:outline-none transition-all font-semibold text-black text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[#687280] font-semibold">Logo Subtitle</label>
+                      <input
+                        type="text"
+                        value={pageData.logo?.subtitle || ""}
+                        onChange={(e) => updateNestedField("logo", "subtitle", e.target.value)}
+                        className="w-full px-4 py-2.5 bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-lg focus:outline-none transition-all text-black text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="block text-[#687280] font-semibold">Logo Image (via Multer Upload)</label>
+                      <div className="flex items-center gap-4">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleLogoUpload}
+                          className="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[#FF6A00]/10 file:text-[#FF6A00] hover:file:bg-[#FF6A00]/20 cursor-pointer"
+                        />
+                        {pageData.logo?.logoUrl && (
+                          <div className="flex items-center gap-2">
+                            <img
+                              src={pageData.logo.logoUrl.startsWith("http") ? pageData.logo.logoUrl : `http://localhost:5000${pageData.logo.logoUrl}`}
+                              alt="Logo Preview"
+                              className="h-10 w-auto object-contain rounded border bg-gray-50 p-1"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => updateNestedField("logo", "logoUrl", "")}
+                              className="text-red-500 hover:text-red-700 font-bold"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-[#687280]/20 pt-6">
+                  <h3 className="text-sm font-bold border-b border-[#687280]/20 pb-2 mb-4">2. Navigation Menu Links</h3>
+                  <div className="space-y-4">
+                    {(pageData.navigation || []).map((item, idx) => (
+                      <div key={idx} className="flex items-end gap-4 p-3 bg-[#E5E7EB]/20 border border-[#687280]/15 rounded-xl">
+                        <div className="flex-1 space-y-1.5">
+                          <label className="block text-[#687280] font-semibold">Menu Label</label>
+                          <input
+                            type="text"
+                            value={item.name || ""}
+                            onChange={(e) => {
+                              const newNav = [...(pageData.navigation || [])];
+                              newNav[idx] = { ...newNav[idx], name: e.target.value };
+                              setPageData((prev) => ({ ...prev, navigation: newNav }));
+                            }}
+                            className="w-full px-4 py-2 bg-white border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-lg focus:outline-none transition-all text-black text-sm"
+                            required
+                          />
+                        </div>
+                        <div className="flex-1 space-y-1.5">
+                          <label className="block text-[#687280] font-semibold">Target Route/Path</label>
+                          <input
+                            type="text"
+                            value={item.path || ""}
+                            onChange={(e) => {
+                              const newNav = [...(pageData.navigation || [])];
+                              newNav[idx] = { ...newNav[idx], path: e.target.value };
+                              setPageData((prev) => ({ ...prev, navigation: newNav }));
+                            }}
+                            className="w-full px-4 py-2 bg-white border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-lg focus:outline-none transition-all font-mono text-black text-sm"
+                            required
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newNav = (pageData.navigation || []).filter((_, i) => i !== idx);
+                            setPageData((prev) => ({ ...prev, navigation: newNav }));
+                          }}
+                          className="px-4 py-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition border border-red-200 font-bold"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newNav = [...(pageData.navigation || []), { name: "New Link", path: "/" }];
+                        setPageData((prev) => ({ ...prev, navigation: newNav }));
+                      }}
+                      className="px-4 py-2.5 bg-[#FF6A00]/10 text-[#FF6A00] rounded-lg hover:bg-[#FF6A00]/20 transition border border-[#FF6A00]/30 font-bold text-xs uppercase tracking-wider"
+                    >
+                      + Add Menu Item
+                    </button>
+                  </div>
+                </div>
+
+                <div className="border-t border-[#687280]/20 pt-6">
+                  <h3 className="text-sm font-bold border-b border-[#687280]/20 pb-2 mb-4">3. Action Buttons</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Login CTA */}
+                    <div className="p-4 bg-[#E5E7EB]/20 border border-[#687280]/15 rounded-xl space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[#0A1F44] font-bold text-xs uppercase">Login Button</label>
+                        <input
+                          type="checkbox"
+                          checked={!!pageData.buttons?.showLogin}
+                          onChange={(e) => {
+                            updateNestedField("buttons", "showLogin", e.target.checked);
+                          }}
+                          className="w-4 h-4 text-[#FF6A00] focus:ring-[#FF6A00] border-gray-300 rounded"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-[#687280] font-semibold">Button Label</label>
+                        <input
+                          type="text"
+                          value={pageData.buttons?.loginText || ""}
+                          onChange={(e) => updateNestedField("buttons", "loginText", e.target.value)}
+                          className="w-full px-4 py-2 bg-white border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-lg focus:outline-none transition-all text-black text-sm"
+                          disabled={!pageData.buttons?.showLogin}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Register CTA */}
+                    <div className="p-4 bg-[#E5E7EB]/20 border border-[#687280]/15 rounded-xl space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[#0A1F44] font-bold text-xs uppercase">Register Button</label>
+                        <input
+                          type="checkbox"
+                          checked={!!pageData.buttons?.showRegister}
+                          onChange={(e) => {
+                            updateNestedField("buttons", "showRegister", e.target.checked);
+                          }}
+                          className="w-4 h-4 text-[#FF6A00] focus:ring-[#FF6A00] border-gray-300 rounded"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-[#687280] font-semibold">Button Label</label>
+                        <input
+                          type="text"
+                          value={pageData.buttons?.registerText || ""}
+                          onChange={(e) => updateNestedField("buttons", "registerText", e.target.value)}
+                          className="w-full px-4 py-2 bg-white border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-lg focus:outline-none transition-all text-black text-sm"
+                          disabled={!pageData.buttons?.showRegister}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ==================== HOME PAGE CMS ==================== */}
             {activeTab === "home" && pageData && (
               <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">

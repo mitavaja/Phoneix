@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       lowercase: true,
+      trim: true,
     },
     password: {
       type: String,
@@ -27,6 +28,7 @@ const userSchema = new mongoose.Schema(
     mobileNumber: {
       type: String,
       default: "",
+      trim: true,
     },
     gstType: {
       type: String,

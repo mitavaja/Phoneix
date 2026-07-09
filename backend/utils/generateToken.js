@@ -1,8 +1,7 @@
 import crypto from "crypto";
 
-const JWT_SECRET = process.env.JWT_SECRET || "phreight-super-secret-key-1049281a";
-
 export const generateToken = (payload) => {
+  const JWT_SECRET = process.env.JWT_SECRET || "phreight-super-secret-key-1049281a";
   const header = { alg: "HS256", typ: "JWT" };
   
   // Expiry time of 30 days
@@ -23,25 +22,39 @@ export const generateToken = (payload) => {
 };
 
 export const verifyToken = (token) => {
+  const JWT_SECRET = process.env.JWT_SECRET || "phreight-super-secret-key-1049281a";
   try {
     const [encodedHeader, encodedPayload, signature] = token.split(".");
+    
+    if (!encodedHeader || !encodedPayload || !signature) {
+      console.log("verifyToken failed: Missing parts");
+      return null;
+    }
     
     const expectedSignature = crypto
       .createHmac("sha256", JWT_SECRET)
       .update(`${encodedHeader}.${encodedPayload}`)
       .digest("base64url");
       
-    if (signature !== expectedSignature) return null;
+    if (signature !== expectedSignature) {
+      console.log("verifyToken failed: signature mismatch");
+      console.log("JWT_SECRET used:", JWT_SECRET);
+      console.log("expected:", expectedSignature);
+      console.log("received:", signature);
+      return null;
+    }
     
     const payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString("utf-8"));
     
     // Check expiration
     if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) {
+      console.log("verifyToken failed: Token expired");
       return null;
     }
 
     return payload;
   } catch (error) {
+    console.log("verifyToken failed: Exception", error.message);
     return null;
   }
 };

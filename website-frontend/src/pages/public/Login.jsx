@@ -2,7 +2,8 @@ import React, { useState } from "react";
 import API from "../../services/api";
 import { useNavigate } from "react-router-dom";
 import Logo from "../../components/Logo";
-import { ArrowLeft, Mail, Lock, LogIn, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Mail, Lock, LogIn, ShieldAlert, Eye, EyeOff } from "lucide-react";
+import { isValidEmail } from "../../utils/validation";
 
 const Login = () => {
   const [form, setForm] = useState({
@@ -12,6 +13,7 @@ const Login = () => {
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -21,6 +23,12 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (!isValidEmail(form.email.trim())) {
+      setError("Enter a valid email address.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -143,14 +151,21 @@ const Login = () => {
                     <Lock size={18} />
                   </span>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     name="password"
                     placeholder="••••••••"
                     value={form.password}
                     onChange={handleChange}
                     required
-                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300"
+                    className="w-full pl-10 pr-12 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-white transition"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
               </div>
             </div>
