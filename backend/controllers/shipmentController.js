@@ -879,7 +879,9 @@ export const confirmBulkUpload = async (req, res) => {
 export const updateShipmentStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    let { status } = req.body;
+
+    if (status === "Out for Delivery") status = "Out For Delivery";
 
     const allowed = [
       "Draft",

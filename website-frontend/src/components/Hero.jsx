@@ -40,8 +40,9 @@ const HeroSection = ({ data }) => {
 
           // 2. Fetch Wallet Balance
           const walletRes = await API.get("/wallet/me");
-          if (walletRes.data && walletRes.data.wallet) {
-            setBalance(walletRes.data.wallet.availableBalance);
+          if (walletRes.data && walletRes.data.wallets && walletRes.data.wallets.length > 0) {
+            // Defaulting to the first wallet (usually INR)
+            setBalance(walletRes.data.wallets[0].availableBalance);
           }
 
           // 3. Fetch Shipments
