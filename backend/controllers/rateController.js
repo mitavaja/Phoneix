@@ -1,7 +1,10 @@
 import Rate from "../models/Rate.js";
 import MarginRule from "../models/MarginRule.js";
 import AuditLog from "../models/AuditLog.js";
+import PickupAddress from "../models/PickupAddress.js";
+import RecipientCustomers from "../models/RecipientCustomers.js";
 import { calculateAramexRate } from "../services/aramexService.js";
+import { calculateShipGlobalRate } from "../services/shipglobalService.js";
 
 // List all weight slabs
 export const getAllRates = async (req, res) => {
@@ -105,20 +108,69 @@ const evaluatePriorityMargin = async (countryCode, weight) => {
   return { type: "Fixed", value: 100.0, ruleId: "Default" };
 };
 
+const computePlanFinancials = (baseRate, marginRule) => {
+  let marginAmount = 0;
+  let shippingCharge = baseRate;
+
+  if (marginRule.type === "Fixed") {
+    marginAmount = Number(marginRule.value) || 0;
+    shippingCharge = baseRate + marginAmount;
+  } else if (marginRule.type === "Percentage") {
+    marginAmount = (baseRate * (Number(marginRule.value) || 0)) / 100.0;
+    shippingCharge = baseRate + marginAmount;
+  }
+
+  const gstAmount = parseFloat((shippingCharge * 0.18).toFixed(2));
+  const invoiceTotal = parseFloat((shippingCharge + gstAmount).toFixed(2));
+
+  return {
+    baseCost: parseFloat(baseRate.toFixed(2)),
+    marginAmount: parseFloat(marginAmount.toFixed(2)),
+    shippingCharge: parseFloat(shippingCharge.toFixed(2)),
+    gstAmount,
+    invoiceTotal,
+  };
+}
+
 // Dynamic Shipping Rate Calculator API
 export const calculateShippingCost = async (req, res) => {
   try {
-    const { originCountry, destinationCountry, weight, length, width, height, shipmentType } = req.body;
+    const {
+      courier = "aramex",
+      pickupAddressId,
+      customerId,
+      weight,
+      length,
+      width,
+      height,
+      productType // e.g., 'PPX' for Aramex, or 'ShipGlobal Direct' for Phreight
+    } = req.body;
 
-    if (!originCountry || !destinationCountry || !weight) {
-      return res.status(400).json({ message: "Origin, destination, and weight are required parameters." });
+    // 1. Validation
+    if (!pickupAddressId || !customerId || !weight) {
+      return res.status(400).json({
+        message: "Origin warehouse, destination customer, and weight are required."
+      });
     }
 
     const numericWeight = parseFloat(weight);
     if (isNaN(numericWeight) || numericWeight <= 0) {
-      return res.status(400).json({ message: "Weight must be a positive number greater than 0" });
+      return res.status(400).json({
+        message: "Weight must be a positive number greater than 0."
+      });
     }
 
+    const origin = await PickupAddress.findById(pickupAddressId);
+    const destination = await RecipientCustomers.findById(customerId);
+
+    if (!origin) return res.status(404).json({
+      message: "Origin warehouse not found."
+    });
+    if (!destination) return res.status(404).json({
+      message: "Destination recipient not found."
+    });
+
+    // 2. Volumetric & Chargeable Weight
     const l = parseFloat(length || 0);
     const w = parseFloat(width || 0);
     const h = parseFloat(height || 0);
@@ -126,46 +178,116 @@ export const calculateShippingCost = async (req, res) => {
     const volumetricWeight = (l * w * h) / 5000.0;
     const chargeableWeight = Math.max(numericWeight, volumetricWeight);
 
-    // 1. Fetch base rate from Aramex API (with built-in simulated fallback)
-    const aramexResult = await calculateAramexRate({
-      originCountry,
-      destinationCountry,
-      weight: numericWeight,
-      length: l,
-      width: w,
-      height: h,
-      isDocument: shipmentType === "Document",
-    });
+    // 3. Margin Rule for Destination & Weight
+    const marginRule = await evaluatePriorityMargin(destination.countryCode, chargeableWeight);
 
-    const baseRate = aramexResult.rate;
+    let formattedServices = [];
+    let selectedPlan = null;
 
-    // 2. Evaluate Priority Margin
-    const marginRule = await evaluatePriorityMargin(destinationCountry, chargeableWeight);
-    let shippingCharge = baseRate;
+    // ============================================================
+    // A. COURIER: ARAMEX
+    // ============================================================
+    if (courier.toLowerCase() === "aramex") {
+      const aramexResult = await calculateAramexRate({
+        originAddress: origin,
+        destinationAddress: destination,
+        originCountry: origin.country || "IN",
+        destinationCountry: destination.countryCode,
+        weight: numericWeight,
+        length: l,
+        width: w,
+        height: h,
+        productGroup: "EXP",
+        productType: productType || "PPX",
+      });
 
-    if (marginRule.type === "Fixed") {
-      shippingCharge = baseRate + marginRule.value;
-    } else if (marginRule.type === "Percentage") {
-      shippingCharge = baseRate * (1 + marginRule.value / 100.0);
+      const baseRate = parseFloat(aramexResult.rate || 0);
+      const financials = computePlanFinancials(baseRate, marginRule);
+
+      selectedPlan = {
+        title: productType || "PPX",
+        serviceName: productType || "PPX",
+        serviceCode: productType || "PPX",
+        transitTime: "3 - 5 Business Days",
+        notes: "Priority Express Network",
+        ...financials,
+      };
+
+      formattedServices = [selectedPlan];
+    }
+    // =============================================================
+    // B. COURIER: PHREIGHT (SHIPGLOBAL)
+    // ============================================================
+    else if (courier.toLowerCase() === "phreight" || courier.toLowerCase() === "shipglobal") {
+      const shipGlobalResult = await calculateShipGlobalRate({
+        weight: numericWeight,
+        destinationCountry: destination.countryCode,
+        postalCode: destination.postCode || "00000",
+      });
+
+      if (!shipGlobalResult.services || shipGlobalResult.services.length === 0) {
+        return res.status(400).json({ message: "No shipping plans available for this route." });
+      }
+
+      // Compute pricing for every plan returned by ShipGlobal
+      formattedServices = shipGlobalResult.services.map((plan) => {
+        const baseRate = parseFloat(
+            plan.subtotal_fee ?? plan.price?.subtotal_fee ?? plan.price?.logistic_fee ?? 0
+        );
+        const financials = computePlanFinancials(baseRate, marginRule);
+
+        return {
+          title: plan.title,
+          serviceName: plan.title,
+          serviceCode: plan.title, // Exact title used when dispatching order/add
+          transitTime: plan.transit_time || "N/A",
+          notes: plan.notes || "",
+          ...financials,
+        };
+      });
+
+      // Default selection: User choice if provided, otherwise the first plan
+      if (productType) {
+        selectedPlan = formattedServices.find(
+            (s) => s.serviceName.toLowerCase() === productType.toLowerCase()
+        );
+      }
+      if (!selectedPlan) {
+        selectedPlan = formattedServices[0];
+      }
+    }
+    else {
+      return res.status(400).json({
+        message: `Unsupported courier '${courier}' selected.`
+      });
     }
 
-    // 3. Decouple GST (18%)
-    const gstAmount = shippingCharge * 0.18;
-    const invoiceTotal = shippingCharge + gstAmount;
-
+    // ============================================================
+    // 4. COMBINED RESPONSE
+    // ============================================================
     res.status(200).json({
-      courierName: "Aramex",
+      courierName: courier,
       actualWeight: `${numericWeight} kg`,
       volumetricWeight: `${volumetricWeight.toFixed(2)} kg`,
       chargeableWeight: `${chargeableWeight.toFixed(2)} kg`,
-      aramexBaseCost: baseRate,
       marginApplied: marginRule,
-      shippingCharge: parseFloat(shippingCharge.toFixed(2)),
-      gstAmount: parseFloat(gstAmount.toFixed(2)),
-      invoiceTotal: parseFloat(invoiceTotal.toFixed(2)),
+
+      // Top-level defaults (keeps existing Aramex UI fully functioning)
+      baseCost: selectedPlan.baseCost,
+      aramexBaseCost: selectedPlan.baseCost,
+      shippingCharge: selectedPlan.shippingCharge,
+      gstAmount: selectedPlan.gstAmount,
+      invoiceTotal: selectedPlan.invoiceTotal,
+      selectedService: selectedPlan.serviceName,
+
+      // Multi-plan array for customer service selection
+      services: formattedServices,
     });
   } catch (error) {
-    res.status(500).json({ message: "Error calculating shipping cost", error: error.message });
+    console.error("Rate Calculation Controller Error:", error.message);
+    res.status(500).json({
+      message: error.message || "Error calculating shipping cost.",
+    });
   }
 };
 

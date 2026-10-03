@@ -18,7 +18,7 @@ import pageContentRoutes from "./routes/pageContentRoutes.js";
 import testimonialRoutes from "./routes/testimonialRoutes.js";
 import couponRoutes from "./routes/couponRoutes.js";
 import settingRoutes from "./routes/settingRoutes.js";
-
+import RecipientCustomerRoutes from "./routes/RecipientCustomerRoutes.js";
 const app = express();
 
 // Middlewares
@@ -39,6 +39,7 @@ app.use("/api/shipments", shipmentRoutes);
 app.use("/api/tracking", trackingRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/warehouses", warehouseRoutes);
+app.use("/api/recipient-customer", RecipientCustomerRoutes);
 app.use("/api/tickets", ticketRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/page-content", pageContentRoutes);
@@ -56,4 +57,4 @@ app.get("/", (req, res) => {
   res.json({ message: "Phreight E-Commerce Logistics Master API running...", status: "ONLINE" });
 });
 
-export default app;
+export default app;

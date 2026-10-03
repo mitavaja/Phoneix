@@ -30,7 +30,7 @@ const Login = () => {
       localStorage.setItem("token", res.data.token);
       
       // Navigate to admin dashboard
-      navigate("/admin/dashboard");
+      navigate("/crm/dashboard");
     } catch (err) {
       console.error(err);
       setError(

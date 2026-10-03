@@ -12,6 +12,7 @@ import {
   approveBankTransfer,
   rejectBankTransfer,
 } from "../controllers/walletController.js";
+import { getDashboardMetrics } from  "../controllers/adminWalletController.js"
 import authMiddleware from "../middleware/authMiddleware.js";
 import roleMiddleware from "../middleware/roleMiddleware.js";
 
@@ -28,6 +29,7 @@ router.post("/bank-transfer", requestBankTransfer);
 
 // Admin / Operations controls
 router.get("/admin/balances", roleMiddleware("Admin", "Moderator", "Operations"), getAllBalances);
+router.get("/admin/metrics", roleMiddleware("Admin", "Moderator", "Operations"), getDashboardMetrics);
 router.get("/admin/transactions", roleMiddleware("Admin", "Moderator", "Operations"), getAllTransactions);
 router.get("/admin/bank-transfers", roleMiddleware("Admin", "Moderator", "Operations"), getPendingBankTransfers);
 router.post("/admin/add", roleMiddleware("Admin", "Moderator"), addBalanceAdmin);

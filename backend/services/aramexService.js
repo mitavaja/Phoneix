@@ -1,24 +1,29 @@
 import axios from "axios";
+import https from "https";
 import SystemSetting from "../models/SystemSetting.js";
+
+const aramexHttpsAgent = new https.Agent({
+  keepAlive: false,
+});
 
 /**
  * Get ClientInfo credentials formatted exactly for Aramex Live/Sandbox API
  */
 const getClientInfo = async () => {
   const settings = await SystemSetting.findOne({});
-  
+
   const username = settings?.aramexUsername || process.env.ARAMEX_USERNAME || "test.api@aramex.com";
   const password = settings?.aramexPassword || process.env.ARAMEX_PASSWORD || "Aramex@12345";
   const accountNum = settings?.aramexAccountNumber || process.env.ARAMEX_ACCOUNT_NUMBER || "60531487";
   const pin = settings?.aramexAccountPin || process.env.ARAMEX_ACCOUNT_PIN || "654654";
-  
+
   // Note: Aramex test account 60531487 is registered under entity "BOM"
   let entity = settings?.aramexAccountEntity || process.env.ARAMEX_ENTITY || "BOM";
   if (accountNum === "60531487") {
     entity = "BOM";
   }
   const country = settings?.aramexAccountCountryCode || process.env.ARAMEX_COUNTRY_CODE || "IN";
-  
+
   return {
     UserName: username,
     Password: password,
@@ -34,10 +39,26 @@ const getClientInfo = async () => {
 const checkIsSimulated = async () => {
   const info = await getClientInfo();
   return (
-    info.UserName.includes("your_") ||
-    info.Password.includes("your_") ||
-    info.AccountNumber.includes("your_")
+      info.UserName.includes("your_") ||
+      info.Password.includes("your_") ||
+      info.AccountNumber.includes("your_")
   );
+};
+
+const parseAramexDate = (dateString) => {
+  if (!dateString) return new Date();
+
+  if (typeof dateString === 'string' && dateString.includes('/Date(')) {
+    // Extract the digits from the string
+    const match = dateString.match(/\d+/);
+    if (match) {
+      return new Date(parseInt(match[0], 10));
+    }
+  }
+
+  // Fallback for standard date strings
+  const fallback = new Date(dateString);
+  return isNaN(fallback.getTime()) ? new Date() : fallback;
 };
 
 /**
@@ -45,12 +66,12 @@ const checkIsSimulated = async () => {
  * Live Endpoint: https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreateShipments
  */
 export const createAramexShipment = async ({
-  sender,
-  receiver,
-  parcel,
-  additionalProperties = [],
-  items = [],
-}) => {
+                                             sender,
+                                             receiver,
+                                             parcel,
+                                             additionalProperties = [],
+                                             items = [],
+                                           }) => {
   const { weight, length, width, height, productDescription, shipmentValue, type } = parcel;
   const isDocument = type === "Document";
   const chargeableWeight = Math.max(weight, (length * width * height) / 5000.0);
@@ -72,10 +93,28 @@ export const createAramexShipment = async ({
     const now = new Date();
     const dueDate = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
 
+    // FIX: Properly map Product Group and Type
+    const finalProductGroup = parcel.productGroup || "EXP"; // Must be DOM or EXP
+    const finalProductType = isDocument ? "PDX" : (parcel.productType || "PPX");
+
+    // FIX: Only apply Customs parameters for International (EXP) shipments
+    let finalAdditionalProperties = null;
+    if (finalProductGroup === "EXP") {
+      finalAdditionalProperties = additionalProperties.length > 0 ? additionalProperties : [
+        { CategoryName: "CustomsClearance", Name: "ShipperTaxIdVATEINNumber", Value: sender.taxId || "535453366" },
+        { CategoryName: "CustomsClearance", Name: "ConsigneeTaxIdVATEINNumber", Value: receiver.taxId || "P123456789012" },
+        { CategoryName: "CustomsClearance", Name: "TaxPaid", Value: "1" },
+        { CategoryName: "CustomsClearance", Name: "InvoiceDate", Value: new Date().toLocaleDateString("en-US") },
+        { CategoryName: "CustomsClearance", Name: "InvoiceNumber", Value: parcel.invoiceNumber || `Inv-${Date.now().toString().slice(-6)}` },
+        { CategoryName: "CustomsClearance", Name: "TaxAmount", Value: "0.00" },
+        { CategoryName: "CustomsClearance", Name: "ExporterType", Value: "UT" },
+      ];
+    }
+
     const payload = {
       ClientInfo: clientInfo,
       LabelInfo: {
-        ReportID: parcel.reportId || 9729,
+        ReportID: parcel.reportId || 9201, // 9201 is the standard PDF format
         ReportType: "URL",
       },
       Shipments: [
@@ -155,18 +194,7 @@ export const createAramexShipment = async ({
               Type: "",
             },
           },
-          ThirdParty: {
-            Reference1: "",
-            Reference2: "",
-            AccountNumber: "",
-            PartyAddress: {
-              Line1: "", Line2: "", Line3: "", City: "", StateOrProvinceCode: "", PostCode: "", CountryCode: "",
-              Longitude: 0, Latitude: 0, BuildingNumber: null, BuildingName: null, Floor: null, Apartment: null, POBox: null, Description: null
-            },
-            Contact: {
-              Department: "", PersonName: "", Title: "", CompanyName: "", PhoneNumber1: "", PhoneNumber1Ext: "", PhoneNumber2: "", PhoneNumber2Ext: "", FaxNumber: "", CellPhone: "", EmailAddress: "", Type: ""
-            }
-          },
+          ThirdParty: null, // Set to null unless PaymentType is '3'
           ShippingDateTime: `/Date(${now.getTime()}+0530)/`,
           DueDate: `/Date(${dueDate.getTime()}+0530)/`,
           Comments: productDescription || "E-commerce Goods",
@@ -180,41 +208,34 @@ export const createAramexShipment = async ({
             DescriptionOfGoods: productDescription || "E-commerce Parcel",
             GoodsOriginCountry: sender.country || "IN",
             NumberOfPieces: parcel.pieces || 1,
-            ProductGroup: isDocument ? "DOC" : (parcel.productGroup || "EXP"),
-            ProductType: isDocument ? "PDX" : (parcel.productType || "PPX"),
+            ProductGroup: finalProductGroup,
+            ProductType: finalProductType,
             PaymentType: parcel.paymentType || "P",
             PaymentOptions: parcel.paymentOptions || "",
-            CustomsValueAmount: {
+            // CustomsValue is only required for International (EXP)
+            CustomsValueAmount: finalProductGroup === "EXP" ? {
               CurrencyCode: parcel.currency || "USD",
               Value: shipmentValue || 0,
-            },
+            } : null,
             CashOnDeliveryAmount: parcel.codAmount ? { CurrencyCode: parcel.currency || "USD", Value: parcel.codAmount } : null,
             InsuranceAmount: null,
             CashAdditionalAmount: null,
             CashAdditionalAmountDescription: "",
             CollectAmount: null,
-            Services: parcel.services || "FRDM",
+            Services: parcel.services || "",
             Items: items.length > 0 ? items : [
               {
                 PackageType: "Box",
                 Quantity: "1",
                 Weight: { Unit: "KG", Value: weight },
-                CustomsValue: { CurrencyCode: parcel.currency || "USD", Value: shipmentValue || 0 },
+                CustomsValue: finalProductGroup === "EXP" ? { CurrencyCode: parcel.currency || "USD", Value: shipmentValue || 0 } : null,
                 Comments: productDescription,
                 GoodsDescription: productDescription,
                 Reference: "",
                 CommodityCode: parcel.commodityCode || "123456789",
               },
             ],
-            AdditionalProperties: additionalProperties.length > 0 ? additionalProperties : [
-              { CategoryName: "CustomsClearance", Name: "ShipperTaxIdVATEINNumber", Value: sender.taxId || "535453366" },
-              { CategoryName: "CustomsClearance", Name: "ConsigneeTaxIdVATEINNumber", Value: receiver.taxId || "P123456789012" },
-              { CategoryName: "CustomsClearance", Name: "TaxPaid", Value: "1" },
-              { CategoryName: "CustomsClearance", Name: "InvoiceDate", Value: new Date().toLocaleDateString("en-US") },
-              { CategoryName: "CustomsClearance", Name: "InvoiceNumber", Value: parcel.invoiceNumber || `Inv-${Date.now().toString().slice(-6)}` },
-              { CategoryName: "CustomsClearance", Name: "TaxAmount", Value: "0.00" },
-              { CategoryName: "CustomsClearance", Name: "ExporterType", Value: "UT" },
-            ],
+            AdditionalProperties: finalAdditionalProperties,
           },
           Attachments: [],
           ForeignHAWB: "",
@@ -225,13 +246,20 @@ export const createAramexShipment = async ({
         },
       ],
       Transaction: {
-        Reference1: "", Reference2: "", Reference3: "", Reference4: "", Reference5: ""
+        Reference1: "CreateShipment", Reference2: "", Reference3: "", Reference4: "", Reference5: ""
       },
     };
 
     const response = await axios.post(
-      "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreateShipments",
-      payload
+        "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreateShipments",
+        payload,
+        {
+          httpsAgent: aramexHttpsAgent,
+          headers: {
+            "Connection": "close" // Forces Aramex server to cleanly close the socket
+          },
+          timeout: 15000 // Prevents the request from hanging forever if Aramex is slow
+        }
     );
 
     if (response.data.HasErrors) {
@@ -240,6 +268,12 @@ export const createAramexShipment = async ({
     }
 
     const shipment = response.data.Shipments[0];
+
+    if (shipment.HasErrors) {
+      const shipmentError = shipment.Notifications?.[0]?.Message || "Error on shipment payload processing";
+      throw new Error(`Aramex Error: ${shipmentError}`);
+    }
+
     const trackingNumber = shipment.ID;
     const labelUrl = shipment.ShipmentLabel?.LabelURL || "";
 
@@ -265,17 +299,9 @@ export const createAramexShipment = async ({
       simulated: false,
     };
   } catch (err) {
-    console.error("Aramex Shipment Booking failed, falling back to simulated voucher:", err.message);
-    const awb = `ARM${Math.floor(100000000 + Math.random() * 900000000)}`;
-    return {
-      success: true,
-      courierShipmentId: `SHP-${awb}`,
-      courierTrackingNumber: awb,
-      courierStatus: "Booked",
-      labelBufferBase64: Buffer.from(`%PDF-1.4\n%... [Fallback Shipping Label for AWB: ${awb}] ...`).toString("base64"),
-      simulated: true,
-      error: err.message,
-    };
+    // FIX: Throw error back to controller instead of returning a fake tracking number
+    console.error("Aramex API Error in createAramexShipment:", err.message);
+    throw new Error(err.response?.data?.message || err.message);
   }
 };
 
@@ -303,12 +329,6 @@ export const checkAramexLocationServiceability = async ({ address, serviceDetail
         CountryCode: address.country || address.countryCode || "IN",
         Longitude: address.longitude || 0,
         Latitude: address.latitude || 0,
-        BuildingNumber: address.buildingNumber || null,
-        BuildingName: address.buildingName || null,
-        Floor: address.floor || null,
-        Apartment: address.apartment || null,
-        POBox: address.poBox || null,
-        Description: address.description || null,
       },
       ServiceDetails: serviceDetails || {
         ProductGroup: "EXP",
@@ -319,13 +339,20 @@ export const checkAramexLocationServiceability = async ({ address, serviceDetail
     };
 
     const response = await axios.post(
-      "https://ws.aramex.net/ShippingAPI.V2/Location/Service_1_0.svc/json/IsAddressServiced",
-      payload
+        "https://ws.aramex.net/ShippingAPI.V2/Location/Service_1_0.svc/json/IsAddressServiced",
+        payload,
+        {
+          httpsAgent: aramexHttpsAgent,
+          headers: {
+            "Connection": "close" // Forces Aramex server to cleanly close the socket
+          },
+          timeout: 15000 // Prevents the request from hanging forever if Aramex is slow
+        }
     );
 
     if (response.data.HasErrors) {
       const errorMsg = response.data.Notifications?.[0]?.Message || "Location serviceability check error";
-      return { success: false, isServiced: false, message: errorMsg };
+      throw new Error(errorMsg);
     }
 
     return {
@@ -336,7 +363,7 @@ export const checkAramexLocationServiceability = async ({ address, serviceDetail
     };
   } catch (err) {
     console.error("Aramex location serviceability error:", err.message);
-    return { success: true, isServiced: true, simulated: true, error: err.message };
+    throw new Error(err.response?.data?.message || err.message);
   }
 };
 
@@ -352,11 +379,11 @@ export const checkAramexServiceability = async (address) => {
  * Live Endpoint: https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreatePickup
  */
 export const createAramexPickup = async ({
-  pickupDate,
-  address,
-  contact,
-  pickupItems = [],
-}) => {
+                                           pickupDate,
+                                           address,
+                                           contact,
+                                           pickupItems = [],
+                                         }) => {
   const clientInfo = await getClientInfo();
 
   if (await checkIsSimulated()) {
@@ -372,7 +399,7 @@ export const createAramexPickup = async ({
   try {
     const pDate = pickupDate ? new Date(pickupDate) : new Date();
     const readyTime = pDate;
-    const closingTime = new Date(pDate.getTime() + 8 * 60 * 60 * 1000);
+    const closingTime = new Date(pDate.getTime() + 8 * 60 * 60 * 1000); // 8 hours after ready time
 
     const payload = {
       ClientInfo: clientInfo,
@@ -386,21 +413,18 @@ export const createAramexPickup = async ({
           StateOrProvinceCode: address.state || "",
           PostCode: address.pincode || address.postCode || "400093",
           CountryCode: address.country || "IN",
-          Longitude: 0,
-          Latitude: 0,
-          BuildingNumber: null, BuildingName: null, Floor: null, Apartment: null, POBox: null, Description: null
         },
         PickupContact: {
-          Department: contact.department || "",
-          PersonName: contact.name || contact.personName || "test",
+          Department: contact.department || "Logistics",
+          PersonName: contact.name || contact.personName || "Warehouse Manager",
           Title: contact.title || "",
-          CompanyName: contact.companyName || contact.name || "test",
-          PhoneNumber1: contact.mobile || "1111111111111",
+          CompanyName: contact.companyName || contact.name || "Store",
+          PhoneNumber1: contact.mobile || "9999999999",
           PhoneNumber1Ext: "",
           PhoneNumber2: "",
           PhoneNumber2Ext: "",
           FaxNumber: "",
-          CellPhone: contact.mobile || "111111111111",
+          CellPhone: contact.mobile || "9999999999",
           EmailAddress: contact.email || "test@test.com",
           Type: "",
         },
@@ -409,14 +433,14 @@ export const createAramexPickup = async ({
         ReadyTime: `/Date(${readyTime.getTime()}+0530)/`,
         LastPickupTime: `/Date(${closingTime.getTime()}+0530)/`,
         ClosingTime: `/Date(${closingTime.getTime()}+0530)/`,
-        Comments: contact.comments || "",
+        Comments: contact.comments || "Please call upon arrival",
         Reference1: contact.reference || "001",
         Reference2: "",
         Vehicle: "",
         Shipments: null,
         PickupItems: pickupItems.length > 0 ? pickupItems : [
           {
-            ProductGroup: "EXP",
+            ProductGroup: "EXP", // Permanently locked to International
             ProductType: "PPX",
             NumberOfShipments: 1,
             PackageType: "Box",
@@ -426,18 +450,25 @@ export const createAramexPickup = async ({
             NumberOfPieces: 1,
             CashAmount: null,
             ExtraCharges: null,
-            ShipmentDimensions: { Length: 0, Width: 0, Height: 0, Unit: "cm" },
+            ShipmentDimensions: null,
             Comments: "",
           },
         ],
         Status: "Ready",
       },
-      Transaction: { Reference1: "", Reference2: "", Reference3: "", Reference4: "", Reference5: "" },
+      Transaction: { Reference1: "CreatePickup", Reference2: "", Reference3: "", Reference4: "", Reference5: "" },
     };
 
     const response = await axios.post(
-      "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreatePickup",
-      payload
+        "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreatePickup",
+        payload,
+        {
+          httpsAgent: aramexHttpsAgent,
+          headers: {
+            "Connection": "close" // Forces Aramex server to cleanly close the socket
+          },
+          timeout: 15000 // Prevents the request from hanging forever if Aramex is slow
+        }
     );
 
     if (response.data.HasErrors) {
@@ -446,6 +477,7 @@ export const createAramexPickup = async ({
     }
 
     const pickupId = response.data.Pickup?.GUID || response.data.Pickup?.ID || `PKP${Math.floor(1000000 + Math.random() * 9000000)}`;
+
     return {
       success: true,
       pickupId,
@@ -454,15 +486,8 @@ export const createAramexPickup = async ({
       simulated: false,
     };
   } catch (err) {
-    console.error("Aramex Pickup scheduling failed, falling back to simulated pickup:", err.message);
-    const pickupId = `PKP${Math.floor(1000000 + Math.random() * 9000000)}`;
-    return {
-      success: true,
-      pickupId,
-      manifestCode: `MNF-${pickupId}`,
-      simulated: true,
-      error: err.message,
-    };
+    console.error("Aramex API Error in createAramexPickup:", err.message);
+    throw new Error(err.response?.data?.message || err.message);
   }
 };
 
@@ -471,11 +496,11 @@ export const createAramexPickup = async ({
  * Live Endpoint: https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/AddShipmentAttachment
  */
 export const addCommercialInvoiceAttachment = async ({
-  shipmentNumber,
-  productGroup = "EXP",
-  originEntity = "AMD",
-  attachmentInfo,
-}) => {
+                                                       shipmentNumber,
+                                                       productGroup = "EXP",
+                                                       originEntity = "AMD",
+                                                       attachmentInfo,
+                                                     }) => {
   const clientInfo = await getClientInfo();
 
   if (await checkIsSimulated()) {
@@ -498,8 +523,15 @@ export const addCommercialInvoiceAttachment = async ({
     };
 
     const response = await axios.post(
-      "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/AddShipmentAttachment",
-      payload
+        "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/AddShipmentAttachment",
+        payload,
+        {
+          httpsAgent: aramexHttpsAgent,
+          headers: {
+            "Connection": "close" // Forces Aramex server to cleanly close the socket
+          },
+          timeout: 15000 // Prevents the request from hanging forever if Aramex is slow
+        }
     );
 
     if (response.data.HasErrors) {
@@ -510,7 +542,7 @@ export const addCommercialInvoiceAttachment = async ({
     return { success: true, data: response.data, simulated: false };
   } catch (err) {
     console.error("Add Shipment Attachment error:", err.message);
-    return { success: false, error: err.message };
+    throw new Error(err.response?.data?.message || err.message);
   }
 };
 
@@ -540,15 +572,15 @@ export const manageCSBVRelatedInfo = async (csbData, authToken = "") => {
     };
 
     const response = await axios.post(
-      "https://export.in.aramex.net/webapi_v2.1/api/CSB/ManageCSB_V_RelatedInfo",
-      payload,
-      { headers }
+        "https://export.in.aramex.net/webapi_v2.1/api/CSB/ManageCSB_V_RelatedInfo",
+        payload,
+        { headers }
     );
 
     return { success: true, data: response.data, simulated: false };
   } catch (err) {
     console.error("CSB-V Related Info error:", err.message);
-    return { success: false, error: err.message };
+    throw new Error(err.response?.data?.message || err.message);
   }
 };
 
@@ -579,15 +611,15 @@ export const downloadShippingBill = async (hawbNumbers, authToken = "") => {
     };
 
     const response = await axios.post(
-      "https://export.in.aramex.net/webapi_v2.0/api/CSB/ShippingBillDownload",
-      payload,
-      { headers }
+        "https://export.in.aramex.net/webapi_v2.0/api/CSB/ShippingBillDownload",
+        payload,
+        { headers }
     );
 
     return { success: true, data: response.data, simulated: false };
   } catch (err) {
     console.error("Shipping Bill Download error:", err.message);
-    return { success: false, error: err.message };
+    throw new Error(err.response?.data?.message || err.message);
   }
 };
 
@@ -629,8 +661,15 @@ export const trackAramexShipment = async (trackingNumber) => {
     };
 
     const response = await axios.post(
-      "https://ws.aramex.net/ShippingAPI.V2/Tracking/Service_1_0.svc/json/TrackShipments",
-      payload
+        "https://ws.aramex.net/ShippingAPI.V2/Tracking/Service_1_0.svc/json/TrackShipments",
+        payload,
+        {
+          httpsAgent: aramexHttpsAgent,
+          headers: {
+            "Connection": "close" // Forces Aramex server to cleanly close the socket
+          },
+          timeout: 15000 // Prevents the request from hanging forever if Aramex is slow
+        }
     );
 
     if (response.data.HasErrors) {
@@ -639,11 +678,13 @@ export const trackAramexShipment = async (trackingNumber) => {
     }
 
     const trackingResults = response.data.TrackingResults?.[0]?.Value || [];
+
+    // APPLY THE PARSER HERE
     const events = trackingResults.map((ev) => ({
       status: ev.UpdateDescription || ev.UpdateAction,
       description: ev.UpdateDescription,
       location: ev.UpdateLocation,
-      eventTime: new Date(ev.UpdateDateTime),
+      eventTime: parseAramexDate(ev.UpdateDateTime),
     }));
 
     let currentStatus = "Booked";
@@ -663,21 +704,9 @@ export const trackAramexShipment = async (trackingNumber) => {
       simulated: false,
     };
   } catch (err) {
-    console.error("Aramex tracking failed, returning fallback events:", err.message);
-    return {
-      success: true,
-      status: "Booked",
-      events: [
-        {
-          status: "Booked",
-          description: "Voucher registered in local database. API sync pending.",
-          location: "Terminal",
-          eventTime: new Date(),
-        },
-      ],
-      simulated: true,
-      error: err.message,
-    };
+    console.log(err,"aramex srvice")
+    console.error("Aramex tracking API error:", err.message);
+    throw new Error(err.response?.data?.message || err.message);
   }
 };
 
@@ -686,18 +715,18 @@ export const trackAramexShipment = async (trackingNumber) => {
  * Live Endpoint: https://ws.aramex.net/ShippingAPI.V2/RateCalculator/Service_1_0.svc/json/CalculateRate
  */
 export const calculateAramexRate = async ({
-  originAddress,
-  destinationAddress,
-  originCountry,
-  destinationCountry,
-  weight,
-  length = 0,
-  width = 0,
-  height = 0,
-  isDocument = false,
-  productGroup = "EXP",
-  productType = "PPX",
-}) => {
+                                            originAddress,
+                                            destinationAddress,
+                                            originCountry,
+                                            destinationCountry,
+                                            weight,
+                                            length = 0,
+                                            width = 0,
+                                            height = 0,
+                                            isDocument = false,
+                                            productGroup = "DOM",
+                                            productType = "OND",
+                                          }) => {
   const chargeableWeight = Math.max(weight, (length * width * height) / 5000.0);
   const clientInfo = await getClientInfo();
 
@@ -723,48 +752,63 @@ export const calculateAramexRate = async ({
   }
 
   try {
+    const finalProductGroup = productGroup || "EXP";
+    const finalProductType = isDocument ? "PDX" : (productType || "PPX");
+
     const payload = {
       ClientInfo: clientInfo,
       OriginAddress: {
-        Line1: originAddress?.line1 || "testaddress1",
+        Line1: originAddress?.line1 || originAddress?.address || "Warehouse",
         Line2: originAddress?.line2 || "",
         Line3: originAddress?.line3 || "",
         City: originAddress?.city || "Mumbai",
-        StateOrProvinceCode: originAddress?.state || "",
-        PostCode: originAddress?.pincode || "400093",
+        StateOrProvinceCode: originAddress?.state || originAddress?.stateOrProvinceCode || "",
+        PostCode: originAddress?.postCode || originAddress?.pincode || "400093",
         CountryCode: origCountry,
       },
       DestinationAddress: {
-        Line1: destinationAddress?.line1 || "testaddessss",
-        Line2: destinationAddress?.line2 || "",
-        Line3: destinationAddress?.line3 || "",
+        Line1: destinationAddress?.line1 || destinationAddress?.addressLine1 || "Recipient",
+        Line2: destinationAddress?.line2 || destinationAddress?.addressLine2 || "",
+        Line3: destinationAddress?.line3 || destinationAddress?.addressLine3 || "",
         City: destinationAddress?.city || "Dubai",
-        StateOrProvinceCode: destinationAddress?.state || "",
-        PostCode: destinationAddress?.pincode || "",
+        StateOrProvinceCode: destinationAddress?.state || destinationAddress?.stateOrProvinceCode || "",
+        PostCode: destinationAddress?.postCode || destinationAddress?.pincode || "",
         CountryCode: destCountry,
       },
       ShipmentDetails: {
         Dimensions: (length && width && height) ? { Length: length, Width: width, Height: height, Unit: "cm" } : null,
         ActualWeight: { Unit: "KG", Value: weight },
         ChargeableWeight: { Unit: "KG", Value: chargeableWeight },
-        DescriptionOfGoods: "test",
+        DescriptionOfGoods: "Ecommerce Parcel",
         GoodsOriginCountry: origCountry,
         NumberOfPieces: 1,
-        ProductGroup: isDocument ? "DOC" : productGroup,
-        ProductType: isDocument ? "PDX" : productType,
+        ProductGroup: finalProductGroup,
+        ProductType: finalProductType,
         PaymentType: "P",
         PaymentOptions: "",
         Services: "",
       },
+      Transaction: { Reference1: "CalculateRate", Reference2: "", Reference3: "", Reference4: "", Reference5: "" }
     };
 
     const response = await axios.post(
-      "https://ws.aramex.net/ShippingAPI.V2/RateCalculator/Service_1_0.svc/json/CalculateRate",
-      payload
+        "https://ws.aramex.net/ShippingAPI.V2/RateCalculator/Service_1_0.svc/json/CalculateRate",
+        payload,
+        {
+          httpsAgent: aramexHttpsAgent,
+          headers: {
+            "Connection": "close" // Forces Aramex server to cleanly close the socket
+          },
+          timeout: 15000 // Prevents the request from hanging forever if Aramex is slow
+        }
     );
 
     if (response.data.HasErrors) {
+      const errorObj = response.data.Notifications?.[0];
       const errorMsg = response.data.Notifications?.[0]?.Message || "Aramex API Rate error";
+      if (errorObj?.Code === 'ERR61') {
+        throw new Error(`The selected courier service (${productType}) is not available for this specific weight or destination route.`);
+      }
       throw new Error(errorMsg);
     }
 
@@ -777,15 +821,9 @@ export const calculateAramexRate = async ({
       simulated: false,
     };
   } catch (err) {
-    console.error("Aramex Rate calculation failed, falling back to simulated rates:", err.message);
-    const fallbackRate = 400.0 + chargeableWeight * 90.0;
-    return {
-      success: true,
-      rate: parseFloat(fallbackRate.toFixed(2)),
-      chargeableWeight,
-      simulated: true,
-      error: err.message,
-    };
+    console.log(err)
+    console.error("Aramex Rate calculation API error:", err.message);
+    throw new Error(err.response?.data?.message || err.message);
   }
 };
 
@@ -823,14 +861,14 @@ export const submitAramexSellerKYC = async (kycData, authToken = "") => {
     };
 
     const response = await axios.post(
-      "https://export.in.aramex.net/webapi_v2.0/api/CSB/SellerKYCCollection",
-      payload,
-      { headers }
+        "https://export.in.aramex.net/webapi_v2.0/api/CSB/SellerKYCCollection",
+        payload,
+        { headers }
     );
 
     return { success: true, data: response.data, simulated: false };
   } catch (err) {
     console.error("Seller KYC Collection error:", err.message);
-    return { success: false, error: err.message };
+    throw new Error(err.response?.data?.message || err.message);
   }
 };
