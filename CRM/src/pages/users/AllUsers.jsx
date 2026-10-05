@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from "react";
 import API from "../../services/api";
+import Pagination from "../../components/Pagination";
 
 const AllUsers = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [paginationData, setPaginationData] = useState(null);
+  const itemsPerPage = 10; // You can adjust this or make it a dropdown state
 
   // Modal State
   const [selectedUser, setSelectedUser] = useState(null);
@@ -14,13 +20,16 @@ const AllUsers = () => {
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (page = 1) => {
+    setLoading(true);
     try {
-      const res = await API.get("/users");
-      setUsers(res.data);
+      const res = await API.get(`/users?page=${page}&limit=${itemsPerPage}`);
+      setUsers(res.data.users || []);
+      setPaginationData(res.data.pagination || null);
     } catch (error) {
       console.error("Express API user registry unreachable.", error.message);
       setUsers([]);
+      setPaginationData(null);
     } finally {
       setLoading(false);
     }
@@ -29,6 +38,10 @@ const AllUsers = () => {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+  };
 
   const handleOpenDetails = async (user) => {
     setSelectedUser(user);
@@ -247,6 +260,12 @@ const AllUsers = () => {
             </tbody>
           </table>
         </div>
+        {!loading &&
+            <Pagination
+                pagination={paginationData}
+                onPageChange={handlePageChange}
+            />
+        }
       </div>
 
       {/* User Details & Order Book Modal */}

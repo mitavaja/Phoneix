@@ -6,10 +6,44 @@ import WalletTransaction from "../models/WalletTransaction.js";
 // @access  Private/Admin/Moderator
 export const getCoupons = async (req, res) => {
   try {
-    const coupons = await Coupon.find().sort({ createdAt: -1 });
-    res.status(200).json(coupons);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const skip = (page - 1) * limit;
+
+    let query = {};
+
+    // Apply global search query
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      query.$or = [
+        { code: searchRegex },
+        { description: searchRegex }
+      ];
+    }
+
+    const totalItems = await Coupon.countDocuments(query);
+    const coupons = await Coupon.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+      coupons,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching coupons", error: error.message });
+    res.status(500).json({
+      message: "Error fetching coupons",
+      error: error.message
+    });
   }
 };
 

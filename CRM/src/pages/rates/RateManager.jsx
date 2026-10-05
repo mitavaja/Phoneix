@@ -191,12 +191,12 @@ const RateManager = () => {
           >
             Add Margin Markup Rule
           </button>
-          <button
-            onClick={() => setIsAddingSlab(true)}
-            className="px-4 py-2 bg-[#FF6A00] text-white hover:bg-orange-500 font-bold rounded-xl text-xs transition-all shadow-md flex items-center gap-1"
-          >
-            Add Base Rate Slab
-          </button>
+          {/*<button*/}
+          {/*  onClick={() => setIsAddingSlab(true)}*/}
+          {/*  className="px-4 py-2 bg-[#FF6A00] text-white hover:bg-orange-500 font-bold rounded-xl text-xs transition-all shadow-md flex items-center gap-1"*/}
+          {/*>*/}
+          {/*  Add Base Rate Slab*/}
+          {/*</button>*/}
         </div>
       </div>
 
@@ -206,53 +206,53 @@ const RateManager = () => {
         <div className="lg:col-span-2 space-y-8">
           
           {/* Base rates table */}
-          <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 space-y-4">
-            <h3 className="text-sm font-bold text-[#0A1F44] border-b border-[#687280]/10 pb-2">Active Carrier Base Tariff Tiers</h3>
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-[#687280]/20 text-[#687280] font-medium">
-                    <th className="pb-3 font-semibold">SLAB ID</th>
-                    <th className="pb-3 font-semibold">CARRIER</th>
-                    <th className="pb-3 font-semibold">WEIGHT LIMIT</th>
-                    <th className="pb-3 font-semibold text-center">ZONE A (₹)</th>
-                    <th className="pb-3 font-semibold text-center">ZONE B (₹)</th>
-                    <th className="pb-3 font-semibold text-center">ZONE C (₹)</th>
-                    <th className="pb-3 font-semibold text-center">ZONE D (₹)</th>
-                    <th className="pb-3 font-semibold text-right">OPERATIONS</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#687280]/10 text-[#687280]">
-                  {loading ? (
-                    <tr><td colSpan="8" className="py-4 text-center">Loading pricing slabs...</td></tr>
-                  ) : (
-                    rates.map((rate) => (
-                      <tr key={rate._id} className="hover:bg-[#E5E7EB]/30 transition-colors">
-                        <td className="py-3 font-mono font-bold text-[#FF6A00]/80">{rate.slabId}</td>
-                        <td className="py-3 font-semibold text-[#0A1F44]">{rate.carrier}</td>
-                        <td className="py-3 font-mono font-bold">≤ {rate.weightLimit} kg</td>
-                        <td className="py-3 text-center font-mono text-[#0A1F44]">₹{rate.zoneA}</td>
-                        <td className="py-3 text-center font-mono text-[#0A1F44]">₹{rate.zoneB}</td>
-                        <td className="py-3 text-center font-mono text-[#0A1F44]">₹{rate.zoneC}</td>
-                        <td className="py-3 text-center font-mono text-[#0A1F44]">₹{rate.zoneD}</td>
-                        <td className="py-3 text-right">
-                          <button
-                            onClick={() => handleDeleteSlab(rate._id)}
-                            className="p-1 px-2.5 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white rounded text-[10px] font-bold border border-red-500/10 hover:border-transparent transition-all"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                  {!loading && rates.length === 0 && (
-                    <tr><td colSpan="8" className="py-4 text-center text-gray-500">No base rate slabs configured.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          {/*<div className="glass-card p-6 rounded-2xl border border-[#687280]/20 space-y-4">*/}
+          {/*  <h3 className="text-sm font-bold text-[#0A1F44] border-b border-[#687280]/10 pb-2">Active Carrier Base Tariff Tiers</h3>*/}
+          {/*  <div className="overflow-x-auto custom-scrollbar">*/}
+          {/*    <table className="w-full text-left text-xs border-collapse">*/}
+          {/*      <thead>*/}
+          {/*        <tr className="border-b border-[#687280]/20 text-[#687280] font-medium">*/}
+          {/*          <th className="pb-3 font-semibold">SLAB ID</th>*/}
+          {/*          <th className="pb-3 font-semibold">CARRIER</th>*/}
+          {/*          <th className="pb-3 font-semibold">WEIGHT LIMIT</th>*/}
+          {/*          <th className="pb-3 font-semibold text-center">ZONE A (₹)</th>*/}
+          {/*          <th className="pb-3 font-semibold text-center">ZONE B (₹)</th>*/}
+          {/*          <th className="pb-3 font-semibold text-center">ZONE C (₹)</th>*/}
+          {/*          <th className="pb-3 font-semibold text-center">ZONE D (₹)</th>*/}
+          {/*          <th className="pb-3 font-semibold text-right">OPERATIONS</th>*/}
+          {/*        </tr>*/}
+          {/*      </thead>*/}
+          {/*      <tbody className="divide-y divide-[#687280]/10 text-[#687280]">*/}
+          {/*        {loading ? (*/}
+          {/*          <tr><td colSpan="8" className="py-4 text-center">Loading pricing slabs...</td></tr>*/}
+          {/*        ) : (*/}
+          {/*          rates.map((rate) => (*/}
+          {/*            <tr key={rate._id} className="hover:bg-[#E5E7EB]/30 transition-colors">*/}
+          {/*              <td className="py-3 font-mono font-bold text-[#FF6A00]/80">{rate.slabId}</td>*/}
+          {/*              <td className="py-3 font-semibold text-[#0A1F44]">{rate.carrier}</td>*/}
+          {/*              <td className="py-3 font-mono font-bold">≤ {rate.weightLimit} kg</td>*/}
+          {/*              <td className="py-3 text-center font-mono text-[#0A1F44]">₹{rate.zoneA}</td>*/}
+          {/*              <td className="py-3 text-center font-mono text-[#0A1F44]">₹{rate.zoneB}</td>*/}
+          {/*              <td className="py-3 text-center font-mono text-[#0A1F44]">₹{rate.zoneC}</td>*/}
+          {/*              <td className="py-3 text-center font-mono text-[#0A1F44]">₹{rate.zoneD}</td>*/}
+          {/*              <td className="py-3 text-right">*/}
+          {/*                <button*/}
+          {/*                  onClick={() => handleDeleteSlab(rate._id)}*/}
+          {/*                  className="p-1 px-2.5 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white rounded text-[10px] font-bold border border-red-500/10 hover:border-transparent transition-all"*/}
+          {/*                >*/}
+          {/*                  Delete*/}
+          {/*                </button>*/}
+          {/*              </td>*/}
+          {/*            </tr>*/}
+          {/*          ))*/}
+          {/*        )}*/}
+          {/*        {!loading && rates.length === 0 && (*/}
+          {/*          <tr><td colSpan="8" className="py-4 text-center text-gray-500">No base rate slabs configured.</td></tr>*/}
+          {/*        )}*/}
+          {/*      </tbody>*/}
+          {/*    </table>*/}
+          {/*  </div>*/}
+          {/*</div>*/}
 
           {/* Margins Priority Rules Table */}
           <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 space-y-4">

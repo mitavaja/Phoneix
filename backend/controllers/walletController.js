@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Wallet from "../models/Wallet.js";
 import WalletTransaction from "../models/WalletTransaction.js";
 import User from "../models/User.js";
@@ -10,6 +11,11 @@ import { sendWalletRechargeEmail } from "../services/emailService.js";
 // View own wallets and transactions (Merchant)
 export const getMyWallet = async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const currency = req.query.currency || "INR";
+    const skip = (page - 1) * limit;
+
     const supported = [
       { country: "India", currency: "INR" },
       { country: "UAE", currency: "AED" },
@@ -35,9 +41,27 @@ export const getMyWallet = async (req, res) => {
       wallets.push(wallet);
     }
 
-    const transactions = await WalletTransaction.find({ userId: req.user._id }).sort({ createdAt: -1 });
+    // Filter transactions specifically for the requested currency and apply pagination
+    const txQuery = { userId: req.user._id, currency: currency };
+    const totalItems = await WalletTransaction.countDocuments(txQuery);
 
-    res.status(200).json({ wallets, transactions });
+    const transactions = await WalletTransaction.find(txQuery)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+      wallets,
+      transactions,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: "Error retrieving wallet profile", error: error.message });
   }
@@ -75,22 +99,99 @@ export const getAllBalances = async (req, res) => {
 // Admin lists all transactions ledger with filtering (Admin/Moderator)
 export const getAllTransactions = async (req, res) => {
   try {
-    const { userId, currency, transactionType, startDate, endDate } = req.query;
-    let query = {};
-    if (userId) query.userId = userId;
-    if (currency) query.currency = currency;
-    if (transactionType) query.transactionType = transactionType;
+    const { userId, currency, transactionType, startDate, endDate, status, search } = req.query;
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    let initialMatch = {};
+    if (userId) initialMatch.userId = new mongoose.Types.ObjectId(userId);
+    if (currency) initialMatch.currency = currency;
+    if (transactionType) initialMatch.transactionType = transactionType;
+    if (status && status !== "all") initialMatch.status = status;
     if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate);
-      if (endDate) query.createdAt.$lte = new Date(endDate);
+      initialMatch.createdAt = {};
+      if (startDate) initialMatch.createdAt.$gte = new Date(startDate);
+      if (endDate) initialMatch.createdAt.$lte = new Date(endDate);
     }
-    const transactions = await WalletTransaction.find(query)
-      .populate("userId", "name email companyName")
-      .sort({ createdAt: -1 });
-    res.status(200).json(transactions);
+
+    const pipeline = [
+      { $match: initialMatch },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "userDoc"
+        }
+      },
+      {
+        $unwind: {
+          path: "$userDoc",
+          preserveNullAndEmptyArrays: true
+        }
+      }
+    ];
+
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      pipeline.push({
+        $match: {
+          $or: [
+            { referenceId: searchRegex },
+            { "userDoc.companyName": searchRegex },
+            { transactionType: searchRegex }
+          ]
+        }
+      });
+    }
+
+    pipeline.push(
+        { $sort: { createdAt: -1 } },
+        {
+          $facet: {
+            metadata: [{ $count: "total" }],
+            data: [
+              { $skip: skip },
+              { $limit: limit },
+              {
+                $addFields: {
+                  userId: {
+                    _id: "$userDoc._id",
+                    name: "$userDoc.name",
+                    email: "$userDoc.email",
+                    companyName: "$userDoc.companyName"
+                  }
+                }
+              },
+              { $project: { userDoc: 0 } }
+            ]
+          }
+        }
+    );
+
+    const result = await WalletTransaction.aggregate(pipeline);
+
+    const totalItems = result[0].metadata[0]?.total || 0;
+    const transactions = result[0].data;
+
+    res.status(200).json({
+      transactions,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving financial ledger records", error: error.message });
+    res.status(500).json({
+      message: "Error retrieving financial ledger records",
+      error: error.message
+    });
   }
 };
 

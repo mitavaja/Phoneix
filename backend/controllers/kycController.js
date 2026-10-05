@@ -53,30 +53,102 @@ export const submitKYC = async (req, res) => {
 // List Pending KYC (Admin)
 export const getPendingKYC = async (req, res) => {
   try {
-    const submissions = await KYC.find({ status: { $in: ["Pending", "Under Review", "Reupload Required"] } }).sort({ createdAt: -1 });
-    res.status(200).json(submissions);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = { status: { $in: ["Pending", "Under Review", "Reupload Required"] } };
+
+    const totalItems = await KYC.countDocuments(query);
+    const submissions = await KYC.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+      submissions,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving pending KYC folders", error: error.message });
+    res.status(500).json({
+      message: "Error retrieving pending KYC folders",
+      error: error.message
+    });
   }
 };
 
 // List Verified/Approved KYC (Admin)
 export const getVerifiedKYC = async (req, res) => {
   try {
-    const submissions = await KYC.find({ status: "Approved" }).sort({ createdAt: -1 });
-    res.status(200).json(submissions);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = { status: "Approved" };
+
+    const totalItems = await KYC.countDocuments(query);
+    const submissions = await KYC.find(query)
+        .sort({ createdAt: -1 }) // or updatedAt: -1 based on your preference
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+      submissions,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving approved KYC register", error: error.message });
+    res.status(500).json({
+      message: "Error retrieving approved KYC register",
+      error: error.message
+    });
   }
 };
 
 // List Rejected KYC (Admin)
 export const getRejectedKYC = async (req, res) => {
   try {
-    const submissions = await KYC.find({ status: "Rejected" }).sort({ createdAt: -1 });
-    res.status(200).json(submissions);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = { status: "Rejected" };
+
+    const totalItems = await KYC.countDocuments(query);
+    const submissions = await KYC.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+      submissions,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving rejected KYC applications", error: error.message });
+    res.status(500).json({
+      message: "Error retrieving rejected KYC applications",
+      error: error.message
+    });
   }
 };
 
