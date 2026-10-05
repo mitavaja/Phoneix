@@ -30,9 +30,11 @@ import {
   FileText,
   UserRoundKey,
   RefreshCw,
-  XCircle
+  XCircle,
+  LogOut
 } from "lucide-react";
 import { ARAMEX_SUPPORTED_COUNTRIES, ARAMEX_SUPPORTED_CURRENCIES } from "../../utils/countries";
+import Pagination from "../../components/Pagination";
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState(() => {
@@ -180,6 +182,10 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
+ // transaction pagination
+  const [txPage, setTxPage] = useState(1);
+  const [txPagination, setTxPagination] = useState(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -218,8 +224,8 @@ const Dashboard = () => {
 
       await fetchWalletData();
 
-      const shipmentsRes = await API.get("/shipments/list");
-      setShipments(shipmentsRes.data || []);
+      const {data: {shipments: shipmentList}} = await API.get("/shipments/list");
+      setShipments(shipmentList || []);
 
       const warehouseRes = await API.get("/warehouses/my-addresses");
       setWarehouses(warehouseRes.data || []);
@@ -257,11 +263,12 @@ const Dashboard = () => {
     }
   }, [selectedCurrency, wallets]);
 
-  const fetchWalletData = async () => {
+  const fetchWalletData = async (page = 1, currency = "INR") => {
     try {
-      const walletRes = await API.get("/wallet/me");
+      const walletRes = await API.get(`/wallet/me?page=${page}&limit=10&currency=${currency}`);
       setWallets(walletRes.data.wallets || []);
       setTransactions(walletRes.data.transactions || []);
+      setTxPagination(walletRes.data.pagination || null);
 
       setCouponLoading(true);
       const couponsRes = await API.get("/coupons/applicable");
@@ -274,10 +281,16 @@ const Dashboard = () => {
     }
   };
 
+  useEffect(() => {
+    if (!loading && user) {
+      fetchWalletData(txPage, selectedCurrency);
+    }
+  }, [txPage, selectedCurrency]);
+
   const refreshShipments = async () => {
     try {
       const shipmentsRes = await API.get("/shipments/list");
-      setShipments(shipmentsRes.data || []);
+      setShipments(shipmentsRes.data?.shipments || []);
     } catch (err) {
       console.error(err);
     }
@@ -884,6 +897,15 @@ const Dashboard = () => {
     );
   }
 
+  const handleTabNavigation = (currentTab) => {
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+
+    setActiveTab(currentTab);
+  };
+
   return (
       <div className="bg-[#0A1F44] text-white min-h-screen flex">
 
@@ -900,36 +922,57 @@ const Dashboard = () => {
             </div>
 
             <nav className="space-y-1">
-              <button onClick={() => setActiveTab("overview")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "overview" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
-                <LayoutDashboard size={18} /> Overview Stats
+              <button
+                  onClick={() => handleTabNavigation("overview")}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition 
+                  ${activeTab === "overview" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`
+                  }
+              >
+                <LayoutDashboard size={18}/> Overview Stats
               </button>
-              <button onClick={() => setActiveTab("shipments")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "shipments" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
+              <button
+                  onClick={() => handleTabNavigation("shipments")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "shipments" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
                 <Package size={18} /> Shipments Register
               </button>
-              <button onClick={() => setActiveTab("single")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "single" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
+              <button onClick={() => handleTabNavigation("single")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "single" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
                 <PlusCircle size={18} /> Single Booking
               </button>
-              <button onClick={() => setActiveTab("bulk")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "bulk" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
+              <button onClick={() => handleTabNavigation("bulk")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "bulk" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
                 <UploadCloud size={18} /> Bulk CSV Upload
               </button>
-              <button onClick={() => setActiveTab("wallet")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "wallet" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
+              <button onClick={() => handleTabNavigation("wallet")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "wallet" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
                 <Wallet size={18} /> Wallet & Ledger
               </button>
-              <button onClick={() => setActiveTab("warehouses")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "warehouses" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
+              <button onClick={() => handleTabNavigation("warehouses")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "warehouses" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
                 <Home size={18} /> Warehouses
               </button>
-              <button onClick={() => setActiveTab("recipientCustomer")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "recipientCustomer" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
+              <button onClick={() => handleTabNavigation("recipientCustomer")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "recipientCustomer" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
                 <UserRoundKey size={18} /> Recipient Customer
               </button>
-              <button onClick={() => setActiveTab("claims")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "claims" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
+              <button onClick={() => handleTabNavigation("claims")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "claims" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
                 <ShieldAlert size={18} /> Insurance Claims
               </button>
-              <button onClick={() => setActiveTab("tickets")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "tickets" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
+              <button onClick={() => handleTabNavigation("tickets")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "tickets" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
                 <HelpCircle size={18} /> Helpdesk Tickets
               </button>
             </nav>
           </div>
-          <div className="p-4 border-t border-[#687280]/20 text-xs text-gray-500">Phoenix Aggregator v1.1</div>
+          <div className="p-4 border-t border-[#687280]/20 space-y-4">
+            <button
+                onClick={() => {
+                  localStorage.removeItem("token");
+                  navigate("/login");
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-[#687280] transition hover:bg-red-500/10 hover:text-red-500"
+            >
+              <LogOut size={18} />
+              Secure Logout
+            </button>
+
+            <div className="text-xs text-gray-500 text-center font-medium">
+              Phoenix Aggregator v1.1
+            </div>
+          </div>
         </aside>
 
         {/* 🖥️ MAIN CONTENT CONTAINER */}
@@ -1918,6 +1961,10 @@ const Dashboard = () => {
                         </tbody>
                       </table>
                     </div>
+                    <Pagination
+                        pagination={txPagination}
+                        onPageChange={(newPage) => setTxPage(newPage)}
+                    />
                   </div>
 
                 </div>

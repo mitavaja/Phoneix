@@ -489,18 +489,34 @@ export const bookShipment = async (req, res) => {
 // List all shipments
 export const getAllShipments = async (req, res) => {
   try {
-    // 1. Build Match Stage (Filter by Seller)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const status = req.query.status || "all";
+    const skip = (page - 1) * limit;
+
     const matchStage = {};
-    if (req.user.role === "Seller") {
+    if (req.user && req.user.role === "Seller") {
       matchStage.user = new mongoose.Types.ObjectId(req.user._id);
     }
 
-    // 2. Execute Aggregation Pipeline
-    const shipments = await Shipment.aggregate([
+    if (status !== "all") {
+      if (status === "Picked Up") {
+        matchStage.status = { $in: ["Picked Up", "In Transit", "Delivered"] };
+      } else if (status === "Dispatched") {
+        matchStage.status = { $in: ["Pickup Requested", "Pickup Scheduled"] };
+      } else if (status === "Exception") {
+        matchStage.status = { $in: ["Failed Delivery", "Cancelled"] };
+      } else if (status === "Scheduled") {
+        matchStage.status = { $in: ["Booked", "Pending", "Label Generated"] };
+      }
+    }
+
+    const pipeline = [
       { $match: matchStage },
       {
         $lookup: {
-          from: "warehouses", // Note: Ensure this matches your actual MongoDB collection name for PickupAddress
+          from: "warehouses",
           localField: "pickupAddressId",
           foreignField: "_id",
           as: "pickupDetails"
@@ -509,47 +525,71 @@ export const getAllShipments = async (req, res) => {
       {
         $unwind: {
           path: "$pickupDetails",
-          preserveNullAndEmptyArrays: true // Prevents crashing if a warehouse was deleted
+          preserveNullAndEmptyArrays: true
         }
       },
       {
-        $sort: {
-          createdAt: -1
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "userDetails"
         }
       },
       {
-        $project: {
-          _id: 1,
-          shipmentId: 1,
-          createdAt: 1,
-          customer: 1,
-          to: 1,
-          courierTrackingNumber: 1,
-          weight: 1,
-          chargeableWeight: 1,
-          invoiceTotal: 1,
-          shippingCharge: 1,
-          gstAmount: 1,
-          status: 1,
-          statusHistory: 1,
-          labelUrl: 1,
-          labelPdfPath: 1,
-          manifestCode: 1,        // <-- ADD THIS LINE
-          pickupReferenceId: 1,   // <-- ADD THIS LINE
-          weightDiscrepancy: 1,
-          scannedWeight: 1,
-          deltaCost: 1,
-          discrepancyStatus: 1,
-          discrepancyDetails: 1,
-          pickupAddressId: 1,
-          "pickupDetails.addressName": 1,
-          "pickupDetails.city": 1,
-          "pickupDetails.country": 1
+        $unwind: {
+          path: "$userDetails",
+          preserveNullAndEmptyArrays: true
         }
       }
-    ]);
+    ];
 
-    res.status(200).json(shipments);
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      pipeline.push({
+        $match: {
+          $or: [
+            { shipmentId: searchRegex },
+            { manifestCode: searchRegex },
+            { pickupReferenceId: searchRegex },
+            { "userDetails.companyName": searchRegex },
+            { "userDetails.name": searchRegex },
+            { "pickupDetails.addressName": searchRegex },
+            { "pickupDetails.city": searchRegex }
+          ]
+        }
+      });
+    }
+
+    pipeline.push(
+        { $sort: { createdAt: -1 } },
+        {
+          $facet: {
+            metadata: [{ $count: "total" }],
+            data: [
+              { $skip: skip },
+              { $limit: limit }
+            ]
+          }
+        }
+    );
+
+    const result = await Shipment.aggregate(pipeline);
+
+    const totalItems = result[0].metadata[0]?.total || 0;
+    const shipments = result[0].data;
+
+    res.status(200).json({
+      shipments,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
     console.error("Shipment Aggregation Error:", error.message);
     res.status(500).json({ message: "Error retrieving shipments list", error: error.message });
@@ -559,43 +599,153 @@ export const getAllShipments = async (req, res) => {
 // List for CRM side
 export const getAdminShipments = async (req, res) => {
   try {
-    // Admin needs to see all shipments with complete data schemas
-    const shipments = await Shipment.find()
-        .populate("user", "name email companyName status") // Populate merchant details
-        .sort({ createdAt: -1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const status = req.query.status || "";
+    const skip = (page - 1) * limit;
 
-    res.status(200).json(shipments);
+    let query = {};
+
+    if (status && status !== "all") {
+      query.status = new RegExp(`^${status}$`, "i");
+    }
+
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      query.$or = [
+        { shipmentId: searchRegex },
+        { courierTrackingNumber: searchRegex },
+        { store: searchRegex },
+        { customer: searchRegex }
+      ];
+    }
+
+    const totalItems = await Shipment.countDocuments(query);
+
+    const shipments = await Shipment.find(query)
+        .populate("user", "name email companyName status")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+      shipments,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
     console.error("Admin Shipment Fetch Error:", error.message);
-    res.status(500).json({ message: "Error retrieving admin shipments", error: error.message });
+    res.status(500).json({
+      message: "Error retrieving admin shipments",
+      error: error.message
+    });
   }
 };
 
 // List delivered shipments
 export const getDeliveredShipments = async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const skip = (page - 1) * limit;
+
     let query = { status: "Delivered" };
-    if (req.user.role === "Seller") {
+
+    // Scope data if the requester is a Seller instead of an Admin
+    if (req.user && req.user.role === "Seller") {
       query.user = req.user._id;
     }
-    const shipments = await Shipment.find(query).sort({ dateDelivered: -1 });
-    res.status(200).json(shipments);
+
+    // Apply global search query
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      query.$or = [
+        { shipmentId: searchRegex },
+        { store: searchRegex },
+        { customer: searchRegex },
+        { podRef: searchRegex }
+      ];
+    }
+
+    const totalItems = await Shipment.countDocuments(query);
+    const shipments = await Shipment.find(query)
+        .sort({ dateDelivered: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+      shipments,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving delivered shipments register", error: error.message });
+    res.status(500).json({
+      message: "Error retrieving delivered shipments register",
+      error: error.message
+    });
   }
 };
 
 // List cancelled shipments
 export const getCancelledShipments = async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const skip = (page - 1) * limit;
+
     let query = { status: "Cancelled" };
-    if (req.user.role === "Seller") {
+
+    if (req.user && req.user.role === "Seller") {
       query.user = req.user._id;
     }
-    const shipments = await Shipment.find(query).sort({ dateCancelled: -1 });
-    res.status(200).json(shipments);
+
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      query.$or = [
+        { shipmentId: searchRegex },
+        { store: searchRegex },
+        { customer: searchRegex },
+        { discrepancyDetails: searchRegex }
+      ];
+    }
+
+    const totalItems = await Shipment.countDocuments(query);
+    const shipments = await Shipment.find(query)
+        .sort({ dateCancelled: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+      shipments,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving RTO shipments archive", error: error.message });
+    res.status(500).json({
+      message: "Error retrieving RTO shipments archive",
+      error: error.message
+    });
   }
 };
 
@@ -1274,10 +1424,53 @@ export const refundShipment = async (req, res) => {
 // List Weight Discrepancies
 export const getDiscrepancies = async (req, res) => {
   try {
-    const list = await WeightDiscrepancy.find({}).populate("shipmentId").populate("userId", "name email companyName").sort({ createdAt: -1 });
-    res.status(200).json(list);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const status = req.query.status || "all";
+    const skip = (page - 1) * limit;
+
+    let query = {};
+
+    if (status === "Pending") {
+      query.discrepancyStatus = "Pending";
+    } else if (status === "Resolved") {
+      query.discrepancyStatus = { $ne: "Pending" };
+    }
+
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      query.$or = [
+        { shipmentId: searchRegex },
+        { store: searchRegex },
+        { discrepancyDetails: searchRegex }
+      ];
+    }
+
+    const totalItems = await WeightDiscrepancy.countDocuments(query);
+    const discrepancies = await WeightDiscrepancy.find(query)
+        .populate("shipmentId")
+        .populate("userId", "name email companyName")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+      discrepancies,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error loading weight discrepancies", error: error.message });
+    res.status(500).json({
+      message: "Error loading weight discrepancies",
+      error: error.message
+    });
   }
 };
 

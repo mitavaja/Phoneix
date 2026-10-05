@@ -50,33 +50,113 @@ const enrichUsersWithData = async (users) => {
 // List all users
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({}).select("-password").sort({ createdAt: -1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    const skip = (page - 1) * limit;
+
+    const totalUsers = await User.countDocuments({});
+
+    const users = await User.find({})
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
     const enrichedUsers = await enrichUsersWithData(users);
-    res.status(200).json(enrichedUsers);
+
+    res.status(200).json({
+      users: enrichedUsers,
+      pagination: {
+        totalUsers,
+        totalPages: Math.ceil(totalUsers / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalUsers,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving users roster", error: error.message });
+    res.status(500).json({
+      message: "Error retrieving users roster",
+      error: error.message
+    });
   }
 };
 
 // List pending users (if they are registered as pending or similar)
 export const getPendingUsers = async (req, res) => {
   try {
-    const users = await User.find({ status: "Pending" }).select("-password").sort({ createdAt: -1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = { status: "Pending" };
+
+    const totalItems = await User.countDocuments(query);
+
+    const users = await User.find(query)
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
     const enrichedUsers = await enrichUsersWithData(users);
-    res.status(200).json(enrichedUsers);
+
+    res.status(200).json({
+      users: enrichedUsers,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving pending users list", error: error.message });
+    res.status(500).json({
+      message: "Error retrieving pending users list",
+      error: error.message
+    });
   }
 };
 
 // List blocked users
 export const getBlockedUsers = async (req, res) => {
   try {
-    const users = await User.find({ status: "Blocked" }).select("-password").sort({ createdAt: -1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = { status: "Blocked" };
+
+    const totalItems = await User.countDocuments(query);
+
+    const users = await User.find(query)
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
     const enrichedUsers = await enrichUsersWithData(users);
-    res.status(200).json(enrichedUsers);
+
+    res.status(200).json({
+      users: enrichedUsers,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error retrieving blocked users list", error: error.message });
+    res.status(500).json({
+      message: "Error retrieving blocked users list",
+      error: error.message
+    });
   }
 };
 

@@ -322,7 +322,11 @@ const Register = () => {
                         name="ownerName"
                         placeholder="John Doe"
                         value={form.ownerName}
-                        onChange={handleChange}
+                        onChange={(e) => {
+                          if (/^[a-zA-Z\s'-]*$/.test(e.target.value)) {
+                            handleChange(e);
+                          }
+                        }}
                         required
                         className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300"
                       />

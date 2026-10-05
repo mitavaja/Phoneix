@@ -199,10 +199,118 @@ export const getMyClaims = async (req, res) => {
 // List All platform claims (Admin/Operations)
 export const getAllClaims = async (req, res) => {
   try {
-    const claims = await Claim.find({}).populate("userId", "name email companyName").populate("shipmentId").sort({ createdAt: -1 });
-    res.status(200).json(claims);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const status = req.query.status || "all";
+    const skip = (page - 1) * limit;
+
+    const matchStage = {};
+    if (status !== "all") {
+      matchStage.status = new RegExp(`^${status}$`, "i");
+    }
+
+    const pipeline = [
+      {$match: matchStage},
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "userDoc"
+        }
+      },
+      {
+        $unwind: {
+          path: "$userDoc",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $lookup: {
+          from: "shipments",
+          localField: "shipmentId",
+          foreignField: "_id",
+          as: "shipmentDoc"
+        }
+      },
+      {
+        $unwind: {
+          path: "$shipmentDoc",
+          preserveNullAndEmptyArrays: true
+        }
+      }
+    ];
+
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      pipeline.push({
+        $match: {
+          $or: [
+            {"shipmentDoc.shipmentId": searchRegex},
+            {"shipmentDoc.courierTrackingNumber": searchRegex},
+            {"userDoc.companyName": searchRegex},
+            {"userDoc.name": searchRegex},
+            {"userDoc.email": searchRegex}
+          ]
+        }
+      });
+    }
+
+    pipeline.push(
+        {$sort: {createdAt: -1}}, {
+          $facet: {
+            metadata: [{$count: "total"}],
+            data: [
+              {$skip: skip},
+              {$limit: limit},
+              {
+                $addFields: {
+                  userId: {
+                    _id: "$userDoc._id",
+                    name: "$userDoc.name",
+                    email: "$userDoc.email",
+                    companyName: "$userDoc.companyName"
+                  },
+                  shipmentId: {
+                    _id: "$shipmentDoc._id",
+                    shipmentId: "$shipmentDoc.shipmentId",
+                    courierTrackingNumber: "$shipmentDoc.courierTrackingNumber"
+                  }
+                }
+              },
+              {
+                $project: {
+                  userDoc: 0,
+                  shipmentDoc: 0
+                }
+              }
+            ]
+          }
+        }
+    );
+
+    const result = await Claim.aggregate(pipeline);
+
+    const totalItems = result[0].metadata[0]?.total || 0;
+    const claims = result[0].data;
+
+    res.status(200).json({
+      claims,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error loading platform claims", error: error.message });
+    res.status(500).json({
+      message: "Error loading platform claims",
+      error: error.message
+    });
   }
 };
 
