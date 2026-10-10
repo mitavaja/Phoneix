@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -180,3 +181,138 @@ export const getMe = async (req, res) => {
     res.status(500).json({ message: "Internal server error retrieving user profile", error: error.message });
   }
 };
+
+export const getProfile = async (req, res) => {
+  try {
+    const {
+      user: {
+        _id
+      }
+    } = req;
+
+    const profile = await User.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(_id),
+        }
+      },
+      {
+        $lookup: {
+          from: "kycs",
+          localField: "_id",
+          foreignField: "user",
+          as: "kyc"
+        }
+      },
+      {
+        $unwind: {
+          path: "$kyc",
+          preserveNullAndEmptyArrays: true
+        }
+      }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile retrieved successfully",
+      data: profile
+    })
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal server error during getProfile",
+      error: error.message
+    });
+  }
+}
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, email, mobileNumber } = req.body;
+    const userId = req.user._id;
+
+    if (email) {
+      const existingEmail = await User.findOne({ email, _id: { $ne: userId } });
+      if (existingEmail) {
+        return res.status(400).json({
+          message: "This email is already associated with another account."
+        });
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { name, email, mobileNumber },
+        { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Profile details updated successfully.",
+      user: updatedUser
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update profile", error: error.message });
+  }
+};
+
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({
+      message: "User account not found."
+    });
+
+    const hashedCurrentPassword = hashPassword(currentPassword);
+    if (hashedCurrentPassword !== user.password) {
+      return res.status(400).json({
+        message: "Incorrect current password."
+      });
+    }
+
+    user.password = hashPassword(newPassword);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Account password changed successfully."
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to change password",
+      error: error.message
+    });
+  }
+};
+
+export const usersList = async (req, res) => {
+  try {
+    const users = await User.aggregate([
+      {
+        $match: {
+          role: "Seller"
+        }
+      },
+      {
+        $project : {
+          label : "$name",
+          value : "$_id",
+          _id: 0
+        }
+      }
+    ]);
+
+    return res.status(200).json({
+      status: "Success",
+      message: "Successfully retrieved users list",
+      list: users,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal server error users list",
+      error: error.message
+    });
+  }
+}

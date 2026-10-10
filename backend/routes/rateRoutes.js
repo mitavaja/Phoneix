@@ -14,7 +14,7 @@ import roleMiddleware from "../middleware/roleMiddleware.js";
 const router = express.Router();
 
 // Merchant or Guest calculation (public-facing)
-router.post("/calculate", calculateShippingCost);
+router.post("/calculate", authMiddleware, calculateShippingCost);
 
 // Secured list view
 router.get("/", authMiddleware, getAllRates);

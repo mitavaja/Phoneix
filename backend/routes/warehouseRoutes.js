@@ -1,6 +1,7 @@
 import express from "express";
 import {
   createAddress,
+  editAddress,
   getMyAddresses,
   deleteAddress,
   setDefaultAddress,
@@ -14,6 +15,7 @@ router.use(authMiddleware);
 router.post("/add", createAddress);
 router.get("/my-addresses", getMyAddresses);
 router.delete("/:id", deleteAddress);
+router.post("/:id", editAddress);
 router.put("/:id/default", setDefaultAddress);
 
 export default router;

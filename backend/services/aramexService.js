@@ -666,9 +666,9 @@ export const trackAramexShipment = async (trackingNumber) => {
         {
           httpsAgent: aramexHttpsAgent,
           headers: {
-            "Connection": "close" // Forces Aramex server to cleanly close the socket
+            "Connection": "close"
           },
-          timeout: 15000 // Prevents the request from hanging forever if Aramex is slow
+          timeout: 15000
         }
     );
 
@@ -776,9 +776,20 @@ export const calculateAramexRate = async ({
         CountryCode: destCountry,
       },
       ShipmentDetails: {
-        Dimensions: (length && width && height) ? { Length: length, Width: width, Height: height, Unit: "cm" } : null,
-        ActualWeight: { Unit: "KG", Value: weight },
-        ChargeableWeight: { Unit: "KG", Value: chargeableWeight },
+        Dimensions: (length && width && height) ? {
+          Length: length,
+          Width: width,
+          Height: height,
+          Unit: "cm"
+        } : null,
+        ActualWeight: {
+          Unit: "KG",
+          Value: weight
+        },
+        ChargeableWeight: {
+          Unit: "KG",
+          Value: chargeableWeight
+        },
         DescriptionOfGoods: "Ecommerce Parcel",
         GoodsOriginCountry: origCountry,
         NumberOfPieces: 1,
@@ -788,7 +799,13 @@ export const calculateAramexRate = async ({
         PaymentOptions: "",
         Services: "",
       },
-      Transaction: { Reference1: "CalculateRate", Reference2: "", Reference3: "", Reference4: "", Reference5: "" }
+      Transaction: {
+        Reference1: "CalculateRate",
+        Reference2: "",
+        Reference3: "",
+        Reference4: "",
+        Reference5: ""
+      }
     };
 
     const response = await axios.post(
@@ -797,9 +814,9 @@ export const calculateAramexRate = async ({
         {
           httpsAgent: aramexHttpsAgent,
           headers: {
-            "Connection": "close" // Forces Aramex server to cleanly close the socket
+            "Connection": "close"
           },
-          timeout: 15000 // Prevents the request from hanging forever if Aramex is slow
+          timeout: 15000
         }
     );
 

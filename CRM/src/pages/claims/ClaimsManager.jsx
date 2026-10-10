@@ -148,7 +148,7 @@ const ClaimsManager = () => {
                             <th className="pb-3 font-semibold">SHIPMENT ID / AWB</th>
                             <th className="pb-3 font-semibold">MERCHANT STORE</th>
                             <th className="pb-3 font-semibold">DISPUTE CLASS</th>
-                            <th className="pb-3 font-semibold text-right">REQUESTED</th>
+                            {/*<th className="pb-3 font-semibold text-right">REQUESTED</th>*/}
                             <th className="pb-3 font-semibold text-center">STATUS</th>
                             <th className="pb-3 font-semibold text-right">OPERATIONS</th>
                         </tr>
@@ -187,26 +187,26 @@ const ClaimsManager = () => {
                                             className="block text-[10px] text-gray-500">{claim.userId?.name} ({claim.userId?.email})</span>
                                     </td>
                                     <td className="py-4">
-                      <span
-                          className="inline-flex px-2.5 py-0.5 rounded bg-[#E5E7EB]/40 border border-[#687280]/20 text-[10px] text-[#687280] font-semibold">
-                        {claim.claimType}
-                      </span>
+                                        <span
+                                            className="inline-flex px-2.5 py-0.5 rounded bg-[#E5E7EB]/40 border border-[#687280]/20 text-[10px] text-[#687280] font-semibold">
+                                            {claim.claimType}
+                                        </span>
                                     </td>
-                                    <td className="py-4 text-right font-extrabold text-[#0A1F44]">
-                                        ₹{claim.claimAmount?.toFixed(2) || "0.00"}
-                                    </td>
+                                    {/*<td className="py-4 text-right font-extrabold text-[#0A1F44]">*/}
+                                    {/*    ₹{claim.claimAmount?.toFixed(2) || "0.00"}*/}
+                                    {/*</td>*/}
                                     <td className="py-4 text-center">
-                      <span
-                          className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
-                              claim.status === "Approved"
-                                  ? "bg-green-100 text-green-600"
-                                  : claim.status === "Pending"
-                                      ? "bg-[#FF6A00]/10 text-[#FF6A00]"
-                                      : "bg-red-100 text-red-600"
-                          }`}
-                      >
-                        {claim.status}
-                      </span>
+                                        <span
+                                            className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
+                                                claim.status === "Approved"
+                                                ? "bg-green-100 text-green-600"
+                                                : claim.status === "Pending"
+                                                    ? "bg-[#FF6A00]/10 text-[#FF6A00]"
+                                                    : "bg-red-100 text-red-600"
+                                            }`}
+                                        >
+                                            {claim.status}
+                                        </span>
                                     </td>
                                     <td className="py-4 text-right">
                                         <button

@@ -17,7 +17,7 @@ const CTASection = ({ data }) => {
 
         {/* Subtext */}
         <p className="text-gray-400 mb-8">
-          {data?.description || "Join thousands of merchants using Phreight to automate their shipping pipeline."}
+          {data?.description || "Join thousands of merchants using phreights to automate their shipping pipeline."}
         </p>
 
         {/* Buttons */}

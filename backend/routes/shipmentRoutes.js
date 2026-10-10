@@ -1,21 +1,22 @@
 import express from "express";
 import multer from "multer";
-import { 
-  bookShipment, 
+import {
+  bookShipment,
   getAllShipments,
   getAdminShipments,
-  getDeliveredShipments, 
-  getCancelledShipments, 
-  updateShipmentStatus, 
-  refundShipment, 
-  getDiscrepancies, 
+  getDeliveredShipments,
+  getCancelledShipments,
+  updateShipmentStatus,
+  refundShipment,
+  getDiscrepancies,
   resolveDiscrepancy,
   getAdminMetrics,
   schedulePickup,
   downloadInvoicePdf,
   validateBulkUpload,
   confirmBulkUpload,
-  cancelShipment
+  cancelShipment,
+  shipmentDropDownList
 } from "../controllers/shipmentController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import roleMiddleware from "../middleware/roleMiddleware.js";
@@ -28,6 +29,7 @@ router.use(authMiddleware);
 // Merchant operations
 router.post("/book", bookShipment);
 router.get("/list", getAllShipments);
+router.get("/drop-down-list", shipmentDropDownList);
 router.get("/delivered", getDeliveredShipments);
 router.get("/cancelled", getCancelledShipments);
 router.post("/pickup/schedule", schedulePickup);

@@ -25,7 +25,7 @@ const defaultSteps = [
 
 const HowItWorksSection = ({ data }) => {
   const title = data?.title || "How It Works";
-  const description = data?.description || "Simple steps to start shipping with Phreight";
+  const description = data?.description || "Simple steps to start shipping with phreights";
   const items = data?.items || defaultSteps;
 
   return (

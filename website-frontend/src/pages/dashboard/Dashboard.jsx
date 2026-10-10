@@ -31,7 +31,8 @@ import {
   UserRoundKey,
   RefreshCw,
   XCircle,
-  LogOut
+  LogOut,
+  Calculator // Added Calculator icon
 } from "lucide-react";
 import { ARAMEX_SUPPORTED_COUNTRIES, ARAMEX_SUPPORTED_CURRENCIES } from "../../utils/countries";
 import Pagination from "../../components/Pagination";
@@ -59,6 +60,22 @@ const Dashboard = () => {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Rate Calculator State
+  const [calcForm, setCalcForm] = useState({
+    pickupAddressId: "",
+    customerId: "",
+    courier: "aramex",
+    productGroup: "EXP",
+    productType: "PPX",
+    weight: "",
+    length: "",
+    width: "",
+    height: "",
+  });
+  const [calcResult, setCalcResult] = useState(null);
+  const [calcLoading, setCalcLoading] = useState(false);
+  const [calcError, setCalcError] = useState("");
 
   // Single Shipment Form
   const [singleForm, setSingleForm] = useState({
@@ -91,9 +108,12 @@ const Dashboard = () => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingSuccess, setBookingSuccess] = useState("");
+  const [isManualRecipient, setIsManualRecipient] = useState(false);
+  const [saveManualRecipient, setSaveManualRecipient] = useState(false);
 
   // Warehouse Add Form
   const [showAddWarehouse, setShowAddWarehouse] = useState(false);
+  const [isEditingWarehouse, setIsEditingWarehouse] = useState(false);
   const [warehouseForm, setWarehouseForm] = useState({
     addressName: "",
     contactPerson: "",
@@ -182,7 +202,7 @@ const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
- // transaction pagination
+  // transaction pagination
   const [txPage, setTxPage] = useState(1);
   const [txPagination, setTxPagination] = useState(null);
 
@@ -232,6 +252,7 @@ const Dashboard = () => {
       if (warehouseRes.data && warehouseRes.data.length > 0) {
         const defaultWh = warehouseRes.data.find(w => w.isDefault) || warehouseRes.data[0];
         setSingleForm(prev => ({ ...prev, pickupAddressId: defaultWh._id }));
+        setCalcForm(prev => ({ ...prev, pickupAddressId: defaultWh._id }));
       }
 
       const recipientCustomerRes = await API.get("/recipient-customer");
@@ -348,17 +369,19 @@ const Dashboard = () => {
     }
   };
 
-  const handleEstimateSingle = async () => {
-    const { courier, pickupAddressId, customerId, weight, length, width, height, productGroup, productType } = singleForm;
+  // 🧮 Standalone Calculator Function
+  const handleCalculateRate = async (e) => {
+    e.preventDefault();
+    const { courier, pickupAddressId, customerId, weight, length, width, height, productGroup, productType } = calcForm;
 
     if (!weight || !pickupAddressId || !customerId) {
-      setBookingError("Please provide weight, origin warehouse, and destination recipient.");
+      setCalcError("Please provide weight, origin warehouse, and destination recipient.");
       return;
     }
 
-    setBookingError("");
-    setEstimateResult(null);
-    setEstimating(true);
+    setCalcError("");
+    setCalcResult(null);
+    setCalcLoading(true);
 
     try {
       const res = await API.post("/rates/calculate", {
@@ -370,16 +393,96 @@ const Dashboard = () => {
         width: width ? parseFloat(width) : 0,
         height: height ? parseFloat(height) : 0,
         productGroup,
-        productType: courier === "aramex" ? productType : undefined // Clear product type for initial Phreight quote
+        productType: courier === "aramex" ? productType : undefined
       });
+      setCalcResult(res.data);
+
+      if (courier === "phreights" && res.data.services?.length > 0) {
+        setCalcForm(prev => ({ ...prev, productType: res.data.services[0].serviceName }));
+      }
+    } catch (err) {
+      setCalcError(err.response?.data?.message || "Rate estimation failed.");
+    } finally {
+      setCalcLoading(false);
+    }
+  };
+
+  const processManualRecipient = async () => {
+    if (!isManualRecipient) return singleForm.customerId;
+
+    if (!singleForm.receiverName || !singleForm.receiverMobile || !singleForm.receiverAddress || !singleForm.receiverCity || !singleForm.receiverState || !singleForm.receiverCountry || !singleForm.receiverPincode) {
+      throw new Error("Please fill out all mandatory manual recipient fields.");
+    }
+
+    if (saveManualRecipient) {
+      const res = await API.post("/recipient-customer", {
+        name: singleForm.receiverName,
+        mobile: singleForm.receiverMobile,
+        countryCode: singleForm.receiverCountry,
+        addressLine1: singleForm.receiverAddress,
+        city: singleForm.receiverCity,
+        stateOrProvinceCode: singleForm.receiverState,
+        postCode: singleForm.receiverPincode
+      });
+      // Extract the new ID (adjust fallback depending on your API's exact response shape)
+      const newCustomerId = res.data?.customer?._id || res.data?._id || res.data?.data?._id;
+      await refreshCustomers();
+      return newCustomerId;
+    }
+    return null; // Not saved, backend will process raw data
+  };
+
+  const handleEstimateSingle = async () => {
+    setBookingError("");
+    setEstimateResult(null);
+    setEstimating(true);
+
+    try {
+      let finalCustomerId = singleForm.customerId;
+
+      if (isManualRecipient) {
+        finalCustomerId = await processManualRecipient();
+        if (finalCustomerId) {
+          setSingleForm(prev => ({ ...prev, customerId: finalCustomerId }));
+        }
+      }
+
+      const { courier, pickupAddressId, weight, length, width, height, productGroup, productType } = singleForm;
+
+      if (!weight || !pickupAddressId || (!finalCustomerId && !isManualRecipient)) {
+        setBookingError("Please provide weight, origin warehouse, and destination recipient.");
+        setEstimating(false);
+        return;
+      }
+
+      const payload = {
+        courier,
+        pickupAddressId,
+        customerId: finalCustomerId, // Will be null if not saved, allowing backend to use raw fields
+        weight: parseFloat(weight),
+        length: length ? parseFloat(length) : 0,
+        width: width ? parseFloat(width) : 0,
+        height: height ? parseFloat(height) : 0,
+        productGroup,
+        productType: courier === "aramex" ? productType : undefined,
+        // Pass raw data just in case it wasn't saved
+        receiverName: singleForm.receiverName,
+        receiverMobile: singleForm.receiverMobile,
+        receiverAddress: singleForm.receiverAddress,
+        receiverCity: singleForm.receiverCity,
+        receiverState: singleForm.receiverState,
+        receiverCountry: singleForm.receiverCountry,
+        receiverPincode: singleForm.receiverPincode,
+      };
+
+      const res = await API.post("/rates/calculate", payload);
       setEstimateResult(res.data);
 
-      // Auto-select the first Phreight service if one isn't currently set
-      if (courier === "phreight" && res.data.services?.length > 0) {
+      if (courier === "phreights" && res.data.services?.length > 0) {
         setSingleForm(prev => ({ ...prev, productType: res.data.services[0].serviceName }));
       }
     } catch (err) {
-      setBookingError(err.response?.data?.message || "Rate estimation failed.");
+      setBookingError(err.response?.data?.message || err.message || "Rate estimation failed.");
     } finally {
       setEstimating(false);
     }
@@ -395,51 +498,63 @@ const Dashboard = () => {
       return;
     }
 
-    const {
-      customerId,
-      pickupAddressId,
-      weight,
-      productDescription,
-      courier,
-      customsValue,
-      customsCurrency,
-      productType
-    } = singleForm;
-
-    if (!courier || !customerId || !pickupAddressId || !weight || !productDescription || !customsValue || !customsCurrency) {
-      setBookingError("Please fill out recipient details, weight, pickup warehouse, and all customs values.");
-      return;
-    }
-
-    if (courier === "phreight" && !productType) {
-      setBookingError("Please calculate the cost quote and select a Phreight service plan before booking.");
-      return;
-    }
-
     setBookingLoading(true);
     try {
-      const res = await API.post("/shipments/book", singleForm);
+      let finalCustomerId = singleForm.customerId;
+
+      if (isManualRecipient) {
+        finalCustomerId = await processManualRecipient();
+        if (finalCustomerId) {
+          setSingleForm(prev => ({ ...prev, customerId: finalCustomerId }));
+        }
+      }
+
+      const {
+        pickupAddressId,
+        weight,
+        productDescription,
+        courier,
+        customsValue,
+        customsCurrency,
+        productType
+      } = singleForm;
+
+      if (!courier || (!finalCustomerId && !isManualRecipient) || !pickupAddressId || !weight || !productDescription || !customsValue || !customsCurrency) {
+        setBookingError("Please fill out recipient details, weight, pickup warehouse, and all customs values.");
+        setBookingLoading(false);
+        return;
+      }
+
+      if (courier === "phreights" && !productType) {
+        setBookingError("Please calculate the cost quote and select a phreights service plan before booking.");
+        setBookingLoading(false);
+        return;
+      }
+
+      const payload = {
+        ...singleForm,
+        customerId: finalCustomerId,
+      };
+
+      const res = await API.post("/shipments/book", payload);
       setBookingSuccess(res.data.message || "Shipment successfully booked!");
 
-      // Reset Form
+      // Reset Form completely
       setSingleForm({
         ...singleForm,
         customerId: "",
         pickupAddressId: warehouses[0]?._id || "",
-        weight: "",
-        length: "",
-        width: "",
-        height: "",
-        productDescription: "",
-        customsValue: "",
-        customsCurrency: "USD",
+        weight: "", length: "", width: "", height: "",
+        productDescription: "", customsValue: "", customsCurrency: "USD",
         productType: courier === "aramex" ? "PPX" : "",
+        receiverName: "", receiverMobile: "", receiverAddress: "", receiverCity: "", receiverState: "", receiverCountry: "AE", receiverPincode: "",
       });
+      setIsManualRecipient(false);
       setEstimateResult(null);
       await fetchWalletData();
       await refreshShipments();
     } catch (err) {
-      setBookingError(err.response?.data?.message || "Booking request failed.");
+      setBookingError(err.response?.data?.message || err.message || "Booking request failed.");
     } finally {
       setBookingLoading(false);
     }
@@ -596,11 +711,44 @@ const Dashboard = () => {
     }
   };
 
-  const handleAddWarehouse = async (e) => {
+  const handleEditWarehouseClick = (w) => {
+    setWarehouseForm({
+      _id: w._id,
+      addressName: w.addressName,
+      contactPerson: w.contactPerson,
+      mobile: w.mobile,
+      address: w.address,
+      city: w.city,
+      state: w.state,
+      country: w.country,
+      pincode: w.pincode,
+      isDefault: w.isDefault
+    });
+    setIsEditingWarehouse(true);
+    setShowAddWarehouse(true);
+  };
+
+  const handleSaveWarehouse = async (e) => {
     e.preventDefault();
     try {
-      await API.post("/warehouses/add", warehouseForm);
+      if (isEditingWarehouse) {
+        // Send PUT request to update existing warehouse
+        await API.post(`/warehouses/${warehouseForm._id}`, {
+          addressName: warehouseForm.addressName,
+          contactPerson: warehouseForm.contactPerson,
+          mobile: warehouseForm.mobile,
+          address: warehouseForm.address,
+          pincode: warehouseForm.pincode
+        });
+        alert("Warehouse details updated successfully.");
+      } else {
+        await API.post("/warehouses/add", warehouseForm);
+        alert("Warehouse saved successfully.");
+      }
+
+      // Reset and close form
       setShowAddWarehouse(false);
+      setIsEditingWarehouse(false);
       setWarehouseForm({
         addressName: "", contactPerson: "", mobile: "", address: "",
         city: "", state: "", country: "IN", pincode: "", isDefault: false
@@ -611,14 +759,13 @@ const Dashboard = () => {
     }
   };
 
-  const handleDeleteWarehouse = async (id) => {
-    if (!confirm("Are you sure you want to remove this warehouse location?")) return;
-    try {
-      await API.delete(`/warehouses/${id}`);
-      await refreshWarehouses();
-    } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete warehouse.");
-    }
+  const handleCancelWarehouseForm = () => {
+    setShowAddWarehouse(false);
+    setIsEditingWarehouse(false);
+    setWarehouseForm({
+      addressName: "", contactPerson: "", mobile: "", address: "",
+      city: "", state: "", country: "IN", pincode: "", isDefault: false
+    });
   };
 
   const handleSaveCustomer = async (e) => {
@@ -934,6 +1081,12 @@ const Dashboard = () => {
                   onClick={() => handleTabNavigation("shipments")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "shipments" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
                 <Package size={18} /> Shipments Register
               </button>
+
+              {/* RATE CALCULATOR TAB BUTTON */}
+              <button onClick={() => handleTabNavigation("calculator")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "calculator" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
+                <Calculator size={18} /> Rate Calculator
+              </button>
+
               <button onClick={() => handleTabNavigation("single")} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition ${activeTab === "single" ? "bg-[#FF6A00] text-white" : "text-[#687280] hover:bg-white/5"}`}>
                 <PlusCircle size={18} /> Single Booking
               </button>
@@ -1323,6 +1476,192 @@ const Dashboard = () => {
                 </div>
             )}
 
+            {/* 2. RATE CALCULATOR TAB */}
+            {activeTab === "calculator" && (
+                <div className="bg-[#E5E7EB]/5 border border-[#687280]/20 rounded-3xl p-6 space-y-6 animate-fade-in">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2 border-b border-[#687280]/20 pb-4 mb-4">
+                    <Calculator size={22} className="text-[#FF6A00]" />
+                    Shipping Rate Calculator
+                  </h3>
+
+                  <form onSubmit={handleCalculateRate} className="space-y-6">
+                    {/* Courier Selection */}
+                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-3">
+                      <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Select Courier Partner</h4>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${calcForm.courier === "aramex" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
+                          <input
+                              type="radio"
+                              name="calcCourier"
+                              value="aramex"
+                              checked={calcForm.courier === "aramex"}
+                              onChange={(e) => {
+                                setCalcForm({ ...calcForm, courier: "aramex", productType: "PPX" });
+                                setCalcResult(null);
+                              }}
+                              className="hidden"
+                          />
+                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${calcForm.courier === "aramex" ? "border-[#FF6A00]" : "border-gray-500"}`}>
+                            {calcForm.courier === "aramex" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                          </div>
+                          <span className="text-white font-bold text-sm">Aramex</span>
+                        </label>
+
+                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${calcForm.courier === "phreights" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
+                          <input
+                              type="radio"
+                              name="calcCourier"
+                              value="phreights"
+                              checked={calcForm.courier === "phreights"}
+                              onChange={(e) => {
+                                setCalcForm({ ...calcForm, courier: "phreights", productType: "" });
+                                setCalcResult(null);
+                              }}
+                              className="hidden"
+                          />
+                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${calcForm.courier === "phreights" ? "border-[#FF6A00]" : "border-gray-500"}`}>
+                            {calcForm.courier === "phreights" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                          </div>
+                          <span className="text-white font-bold text-sm">phreights</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Warehouse Origin & Destination */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-3">
+                        <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Origin Warehouse</h4>
+                        <div>
+                          <select
+                              value={calcForm.pickupAddressId}
+                              onChange={(e) => setCalcForm({ ...calcForm, pickupAddressId: e.target.value })}
+                              required
+                              className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                          >
+                            <option value="">-- Choose Warehouse --</option>
+                            {warehouses.map(w => (
+                                <option key={w._id} value={w._id}>{w.addressName} ({w.city}, {w.country})</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-3">
+                        <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Destination Customer</h4>
+                        <div>
+                          <select
+                              value={calcForm.customerId}
+                              onChange={(e) => setCalcForm({ ...calcForm, customerId: e.target.value })}
+                              required
+                              className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                          >
+                            <option value="">-- Choose Recipient --</option>
+                            {customers.map(c => (
+                                <option key={c._id} value={c._id}>{c.name} ({c.city}, {c.countryCode})</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Package Specs */}
+                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
+                      <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Package Specifications</h4>
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] text-gray-400 block mb-1">Dead Weight (kg)</label>
+                          <input type="number" step="0.01" placeholder="1.5" value={calcForm.weight} onChange={(e) => setCalcForm({ ...calcForm, weight: e.target.value })} required className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                        </div>
+
+                        {/* Aramex Product Type Selector */}
+                        {calcForm.courier === "aramex" && (
+                            <div>
+                              <label className="text-[10px] text-gray-400 block mb-1">International Product Type</label>
+                              <select value={calcForm.productType} onChange={(e) => setCalcForm({ ...calcForm, productType: e.target.value })} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs">
+                                <option value="PPX">Priority Parcel Express (PPX)</option>
+                                <option value="EPX">Economy Parcel Express (EPX)</option>
+                                <option value="PDX">Priority Document Express (PDX)</option>
+                              </select>
+                            </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-gray-400 block mb-1">Dimensions (L x W x H cm)</label>
+                        <div className="grid grid-cols-3 gap-3">
+                          <input type="number" placeholder="Length" value={calcForm.length} onChange={(e) => setCalcForm({ ...calcForm, length: e.target.value })} className="p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white text-center outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                          <input type="number" placeholder="Width" value={calcForm.width} onChange={(e) => setCalcForm({ ...calcForm, width: e.target.value })} className="p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white text-center outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                          <input type="number" placeholder="Height" value={calcForm.height} onChange={(e) => setCalcForm({ ...calcForm, height: e.target.value })} className="p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white text-center outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {calcError && <div className="bg-red-500/10 border border-red-500/30 text-red-500 text-xs p-3.5 rounded-xl flex items-center gap-2"><AlertTriangle size={14} className="shrink-0" /><span>{calcError}</span></div>}
+
+                    {/* Calculate Button */}
+                    <button
+                        type="submit"
+                        disabled={calcLoading || !calcForm.weight || !calcForm.customerId || !calcForm.pickupAddressId}
+                        className="w-full bg-[#FF6A00] text-[#0A1F44] font-extrabold py-3.5 rounded-xl text-xs hover:brightness-110 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                    >
+                      {calcLoading ?
+                          <span className="w-5 h-5 border-2 border-[#0A1F44] border-t-transparent rounded-full animate-spin"></span> :
+                          <><Calculator size={16} /> Calculate Shipping Cost</>
+                      }
+                    </button>
+
+                    {/* Estimate Result Block (Aramex vs ShipGlobal Multi-Plan UI) */}
+                    {calcResult && (
+                        <>
+                          {/* ShipGlobal Multi-Service Cards */}
+                          {calcForm.courier === "phreights" && calcResult.services && calcResult.services.length > 0 ? (
+                              <div className="bg-black/30 p-5 rounded-2xl border border-[#FF6A00]/30 space-y-4">
+                                <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Available phreights Service Plans</h4>
+                                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                  {calcResult.services.map((svc, idx) => {
+                                    return (
+                                        <div
+                                            key={idx}
+                                            className="p-4 rounded-xl border border-white/10 bg-[#0A1F44] transition-all"
+                                        >
+                                          <div className="flex justify-between items-start mb-2">
+                                            <span className="font-bold text-xs text-white">{svc.title}</span>
+                                          </div>
+                                          <p className="text-[10px] text-gray-400 mb-2">{svc.transitTime} {svc.notes ? `| ${svc.notes}` : ''}</p>
+                                          <div className="flex justify-between items-center mt-3 border-t border-white/10 pt-2">
+                                            <span className="text-[10px] text-gray-500">Estimated Cost</span>
+                                            <span className="font-black text-[#FF6A00] text-sm">₹{svc.invoiceTotal.toFixed(2)}</span>
+                                          </div>
+                                        </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                          ) : (
+                              /* Aramex Single Plan Block */
+                              <div className="bg-black/30 p-5 rounded-2xl border border-[#FF6A00]/30 space-y-3">
+                                <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Dynamic Shipping Quotation Breakdown</h4>
+                                <div className="grid md:grid-cols-3 gap-4 text-xs">
+                                  <div><span className="text-gray-500 block">Courier Name:</span><span className="font-bold text-white capitalize">{calcResult.courierName}</span></div>
+                                  <div><span className="text-gray-500 block">Chargeable Weight:</span><span className="font-bold text-[#FF6A00]">{calcResult.chargeableWeight}</span></div>
+                                  <div><span className="text-gray-500 block">Volumetric weight:</span><span className="text-gray-400 font-semibold">{calcResult.volumetricWeight}</span></div>
+                                </div>
+                                <div className="border-t border-white/10 pt-3 flex flex-wrap justify-between items-center text-sm gap-2">
+                                  <div className="space-x-4">
+                                    <span className="text-[#687280]">Shipping Charge: <strong>₹{calcResult.shippingCharge}</strong></span>
+                                    <span className="text-[#687280]">GST (18%): <strong>₹{calcResult.gstAmount}</strong></span>
+                                  </div>
+                                  <span className="text-lg font-black text-[#FF6A00]">Total Payable: ₹{calcResult.invoiceTotal}</span>
+                                </div>
+                              </div>
+                          )}
+                        </>
+                    )}
+                  </form>
+                </div>
+            )}
+
             {/* 3. SINGLE BOOKING TAB */}
             {activeTab === "single" && (
                 <div className="bg-[#E5E7EB]/5 border border-[#687280]/20 rounded-3xl p-6 space-y-6 animate-fade-in">
@@ -1355,22 +1694,22 @@ const Dashboard = () => {
                           <span className="text-white font-bold text-sm">Aramex</span>
                         </label>
 
-                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${singleForm.courier === "phreight" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
+                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${singleForm.courier === "phreights" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
                           <input
                               type="radio"
                               name="courier"
-                              value="phreight"
-                              checked={singleForm.courier === "phreight"}
+                              value="phreights"
+                              checked={singleForm.courier === "phreights"}
                               onChange={(e) => {
-                                setSingleForm({ ...singleForm, courier: "phreight", productType: "" });
+                                setSingleForm({ ...singleForm, courier: "phreights", productType: "" });
                                 setEstimateResult(null);
                               }}
                               className="hidden"
                           />
-                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleForm.courier === "phreight" ? "border-[#FF6A00]" : "border-gray-500"}`}>
-                            {singleForm.courier === "phreight" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleForm.courier === "phreights" ? "border-[#FF6A00]" : "border-gray-500"}`}>
+                            {singleForm.courier === "phreights" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
                           </div>
-                          <span className="text-white font-bold text-sm">Phreight</span>
+                          <span className="text-white font-bold text-sm">phreights</span>
                         </label>
                       </div>
                     </div>
@@ -1409,26 +1748,78 @@ const Dashboard = () => {
 
                     {/* Recipient Details */}
                     <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
-                      <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">2. Recipient Customer Details</h4>
-                      <div className="grid md:grid-cols-2 gap-4 items-end">
-                        <div>
-                          <label className="text-[10px] text-gray-400 block mb-1">Saved Customer Directory</label>
-                          <select
-                              value={singleForm.customerId}
-                              onChange={(e) => setSingleForm({ ...singleForm, customerId: e.target.value })}
-                              required
-                              className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
-                          >
-                            <option value="">-- Choose Recipient --</option>
-                            {customers.map(c => (
-                                <option key={c._id} value={c._id}>{c.name} ({c.city}, {c.countryCode})</option>
-                            ))}
-                          </select>
-                        </div>
-                        <button type="button" onClick={() => { setActiveTab("recipientCustomer"); setShowCustomerForm(true); }} className="px-4 py-3 bg-white/5 border border-white/10 hover:border-[#FF6A00] text-white text-xs font-semibold rounded-xl transition inline-flex items-center gap-2">
-                          <Plus size={14}/> Add New Recipient
+                      <div className="flex justify-between items-center">
+                        <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">2. Recipient Customer Details</h4>
+                        <button
+                            type="button"
+                            onClick={() => setIsManualRecipient(!isManualRecipient)}
+                            className="text-[10px] text-[#FF6A00] hover:text-white transition flex items-center gap-1 bg-[#FF6A00]/10 px-2 py-1 rounded"
+                        >
+                          {isManualRecipient ? "Use Saved Directory" : <><Plus size={12}/> Add New Recipient Inline</>}
                         </button>
                       </div>
+
+                      {!isManualRecipient ? (
+                          <div className="grid md:grid-cols-2 gap-4 items-end">
+                            <div className="md:col-span-2">
+                              <label className="text-[10px] text-gray-400 block mb-1">Saved Customer Directory</label>
+                              <select
+                                  value={singleForm.customerId}
+                                  onChange={(e) => setSingleForm({ ...singleForm, customerId: e.target.value })}
+                                  className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                              >
+                                <option value="">-- Choose Recipient --</option>
+                                {customers.map(c => (
+                                    <option key={c._id} value={c._id}>{c.name} ({c.city}, {c.countryCode})</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                      ) : (
+                          <div className="space-y-4 border-t border-white/5 pt-4">
+                            <div className="grid md:grid-cols-3 gap-4">
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">Contact Name <span className="text-red-500">*</span></label>
+                                <input type="text" placeholder="Jane Smith" value={singleForm.receiverName} onChange={(e) => setSingleForm({...singleForm, receiverName: e.target.value})} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">Mobile <span className="text-red-500">*</span></label>
+                                <input type="text" placeholder="+91 98765 43210" value={singleForm.receiverMobile} onChange={(e) => setSingleForm({...singleForm, receiverMobile: e.target.value})} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">Country Code <span className="text-red-500">*</span></label>
+                                <input type="text" placeholder="AE, US, IN" maxLength={2} value={singleForm.receiverCountry} onChange={(e) => setSingleForm({...singleForm, receiverCountry: e.target.value.toUpperCase()})} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs uppercase" />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] text-gray-400 block mb-1">Full Address <span className="text-red-500">*</span></label>
+                              <input type="text" placeholder="Street Address, Building, Floor..." value={singleForm.receiverAddress} onChange={(e) => setSingleForm({...singleForm, receiverAddress: e.target.value})} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                            </div>
+
+                            <div className="grid md:grid-cols-3 gap-4">
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">City <span className="text-red-500">*</span></label>
+                                <input type="text" placeholder="Dubai" value={singleForm.receiverCity} onChange={(e) => setSingleForm({...singleForm, receiverCity: e.target.value})} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">State / Province <span className="text-red-500">*</span></label>
+                                <input type="text" placeholder="DU" value={singleForm.receiverState} onChange={(e) => setSingleForm({...singleForm, receiverState: e.target.value.toUpperCase()})} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs uppercase" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-gray-400 block mb-1">Pincode / Zipcode <span className="text-red-500">*</span></label>
+                                <input type="text" placeholder="00000" value={singleForm.receiverPincode} onChange={(e) => setSingleForm({...singleForm, receiverPincode: e.target.value})} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 pt-2">
+                              <input type="checkbox" id="saveRecipient" checked={saveManualRecipient} onChange={(e) => setSaveManualRecipient(e.target.checked)} className="accent-[#FF6A00] w-4 h-4 cursor-pointer" />
+                              <label htmlFor="saveRecipient" className="text-xs text-gray-300 font-semibold cursor-pointer select-none">
+                                Save this recipient to Customer Directory for future use
+                              </label>
+                            </div>
+                          </div>
+                      )}
                     </div>
 
                     {/* Package Specs */}
@@ -1504,9 +1895,9 @@ const Dashboard = () => {
                     {estimateResult && (
                         <>
                           {/* ShipGlobal Multi-Service Cards */}
-                          {singleForm.courier === "phreight" && estimateResult.services && estimateResult.services.length > 0 ? (
+                          {singleForm.courier === "phreights" && estimateResult.services && estimateResult.services.length > 0 ? (
                               <div className="bg-black/30 p-5 rounded-2xl border border-[#FF6A00]/30 space-y-4">
-                                <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Select Phreight Service Plan</h4>
+                                <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Select phreights Service Plan</h4>
                                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
                                   {estimateResult.services.map((svc, idx) => {
                                     const isSelected = singleForm.productType === svc.serviceName;
@@ -1566,7 +1957,7 @@ const Dashboard = () => {
 
                       <button
                           type="submit"
-                          disabled={bookingLoading || user?.status !== "Active" || (singleForm.courier === "phreight" && !singleForm.productType)}
+                          disabled={bookingLoading || user?.status !== "Active" || (singleForm.courier === "phreights" && !singleForm.productType)}
                           className="flex-1 bg-[#FF6A00] text-[#0A1F44] font-extrabold py-3.5 rounded-xl text-xs hover:brightness-110 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
                       >
                         {bookingLoading ?
@@ -1689,7 +2080,10 @@ const Dashboard = () => {
                     {["INR", "AED", "USD", "GBP"].map((curr) => (
                         <button
                             key={curr}
-                            onClick={() => setSelectedCurrency(curr)}
+                            onClick={() => {
+                              setSelectedCurrency(curr);
+                              setTxPage(1); // Reset to page 1 when switching wallets
+                            }}
                             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
                                 selectedCurrency === curr
                                     ? "bg-[#FF6A00] text-[#0A1F44] shadow-lg"
@@ -1927,7 +2321,8 @@ const Dashboard = () => {
                         </tr>
                         </thead>
                         <tbody className="divide-y divide-[#687280]/10">
-                        {transactions.filter(tx => (tx.currency || "INR") === selectedCurrency).map(tx => {
+                        {/* Direct mapping (Client-side filtering removed as backend handles it per currency) */}
+                        {transactions.map(tx => {
                           const symbol = selectedCurrency === "INR" ? "₹" : selectedCurrency === "AED" ? "AED " : selectedCurrency === "USD" ? "$" : "£";
                           return (
                               <tr key={tx._id} className="hover:bg-white/5 transition-colors">
@@ -1961,10 +2356,13 @@ const Dashboard = () => {
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Global Pagination Integration */}
                     <Pagination
                         pagination={txPagination}
                         onPageChange={(newPage) => setTxPage(newPage)}
                     />
+
                   </div>
 
                 </div>
@@ -1979,18 +2377,24 @@ const Dashboard = () => {
                       Pickup Warehouses Manager
                     </h3>
 
-                    <button
-                        onClick={() => setShowAddWarehouse(!showAddWarehouse)}
-                        className="bg-[#FF6A00] text-[#0A1F44] font-extrabold py-2 px-4 rounded-xl text-xs hover:brightness-110 transition flex items-center gap-1"
-                    >
-                      <Plus size={14} /> Add New Warehouse
-                    </button>
+                    {/* Only show the Add button if the user hasn't created a warehouse yet */}
+                    {warehouses.length === 0 && !showAddWarehouse && (
+                        <button
+                            onClick={() => setShowAddWarehouse(true)}
+                            className="bg-[#FF6A00] text-[#0A1F44] font-extrabold py-2 px-4 rounded-xl text-xs hover:brightness-110 transition flex items-center gap-1"
+                        >
+                          <Plus size={14}/> Add New Warehouse
+                        </button>
+                    )}
                   </div>
 
-                  {/* Add warehouse form */}
+                  {/* Add / Edit warehouse form */}
                   {showAddWarehouse && (
-                      <form onSubmit={handleAddWarehouse} className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
-                        <h4 className="text-xs font-bold uppercase text-[#FF6A00]">Save New Warehouse Location</h4>
+                      <form onSubmit={handleSaveWarehouse}
+                            className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
+                        <h4 className="text-xs font-bold uppercase text-[#FF6A00]">
+                          {isEditingWarehouse ? "Edit Warehouse Details" : "Save New Warehouse Location"}
+                        </h4>
 
                         <div className="grid md:grid-cols-3 gap-4">
                           <div>
@@ -1999,7 +2403,7 @@ const Dashboard = () => {
                                 type="text"
                                 placeholder="Mumbai Main Hub"
                                 value={warehouseForm.addressName}
-                                onChange={(e) => setWarehouseForm({ ...warehouseForm, addressName: e.target.value })}
+                                onChange={(e) => setWarehouseForm({...warehouseForm, addressName: e.target.value})}
                                 required
                                 className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
                             />
@@ -2010,7 +2414,7 @@ const Dashboard = () => {
                                 type="text"
                                 placeholder="John Manager"
                                 value={warehouseForm.contactPerson}
-                                onChange={(e) => setWarehouseForm({ ...warehouseForm, contactPerson: e.target.value })}
+                                onChange={(e) => setWarehouseForm({...warehouseForm, contactPerson: e.target.value})}
                                 required
                                 className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
                             />
@@ -2021,7 +2425,7 @@ const Dashboard = () => {
                                 type="text"
                                 placeholder="+91 99999 88888"
                                 value={warehouseForm.mobile}
-                                onChange={(e) => setWarehouseForm({ ...warehouseForm, mobile: e.target.value })}
+                                onChange={(e) => setWarehouseForm({...warehouseForm, mobile: e.target.value})}
                                 required
                                 className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
                             />
@@ -2034,7 +2438,7 @@ const Dashboard = () => {
                               type="text"
                               placeholder="Plot No 22, MIDC Industrial Area"
                               value={warehouseForm.address}
-                              onChange={(e) => setWarehouseForm({ ...warehouseForm, address: e.target.value })}
+                              onChange={(e) => setWarehouseForm({...warehouseForm, address: e.target.value})}
                               required
                               className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
                           />
@@ -2047,9 +2451,10 @@ const Dashboard = () => {
                                 type="text"
                                 placeholder="Mumbai"
                                 value={warehouseForm.city}
-                                onChange={(e) => setWarehouseForm({ ...warehouseForm, city: e.target.value })}
+                                onChange={(e) => setWarehouseForm({...warehouseForm, city: e.target.value})}
                                 required
-                                className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                                disabled={isEditingWarehouse}
+                                className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                           <div>
@@ -2058,9 +2463,10 @@ const Dashboard = () => {
                                 type="text"
                                 placeholder="Maharashtra"
                                 value={warehouseForm.state}
-                                onChange={(e) => setWarehouseForm({ ...warehouseForm, state: e.target.value })}
+                                onChange={(e) => setWarehouseForm({...warehouseForm, state: e.target.value})}
                                 required
-                                className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                                disabled={isEditingWarehouse}
+                                className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                           <div>
@@ -2068,9 +2474,10 @@ const Dashboard = () => {
                             <input
                                 type="text"
                                 value={warehouseForm.country}
-                                onChange={(e) => setWarehouseForm({ ...warehouseForm, country: e.target.value })}
+                                onChange={(e) => setWarehouseForm({...warehouseForm, country: e.target.value})}
                                 required
-                                className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                                disabled={isEditingWarehouse}
+                                className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                           </div>
                           <div>
@@ -2079,7 +2486,7 @@ const Dashboard = () => {
                                 type="text"
                                 placeholder="400001"
                                 value={warehouseForm.pincode}
-                                onChange={(e) => setWarehouseForm({ ...warehouseForm, pincode: e.target.value })}
+                                onChange={(e) => setWarehouseForm({...warehouseForm, pincode: e.target.value})}
                                 required
                                 className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
                             />
@@ -2091,11 +2498,11 @@ const Dashboard = () => {
                               type="submit"
                               className="flex-1 bg-gradient-to-r from-[#FF6A00] to-orange-500 text-white font-bold py-3 rounded-xl text-xs hover:brightness-110 transition"
                           >
-                            Save Location
+                            {isEditingWarehouse ? "Update Details" : "Save Location"}
                           </button>
                           <button
                               type="button"
-                              onClick={() => setShowAddWarehouse(false)}
+                              onClick={handleCancelWarehouseForm}
                               className="flex-1 bg-white/5 border border-white/10 text-white font-bold py-3 rounded-xl text-xs hover:bg-white/10 transition"
                           >
                             Cancel
@@ -2108,44 +2515,49 @@ const Dashboard = () => {
                   {/* Warehouse Listing */}
                   <div className="grid md:grid-cols-2 gap-6">
                     {warehouses.map(w => (
-                        <div key={w._id} className="bg-black/20 border border-white/5 hover:border-[#FF6A00]/30 rounded-2xl p-5 flex flex-col justify-between space-y-4 transition">
+                        <div key={w._id}
+                             className="bg-black/20 border border-white/5 hover:border-[#FF6A00]/30 rounded-2xl p-5 flex flex-col justify-between space-y-4 transition">
                           <div>
                             <div className="flex justify-between items-start">
                               <div>
                                 <h4 className="font-bold text-white text-sm">{w.addressName}</h4>
-                                <span className="text-[10px] text-gray-500">Contact: {w.contactPerson} ({w.mobile})</span>
+                                <span
+                                    className="text-[10px] text-gray-500">Contact: {w.contactPerson} ({w.mobile})</span>
                               </div>
                               {w.isDefault ? (
-                                  <span className="px-2 py-0.5 rounded text-[9px] bg-green-500/10 text-green-500 border border-green-500/20 font-bold uppercase">Default Origin</span>
+                                  <span
+                                      className="px-2 py-0.5 rounded text-[9px] bg-green-500/10 text-green-500 border border-green-500/20 font-bold uppercase">Default Origin</span>
                               ) : (
-                                  <button
-                                      onClick={() => handleSetDefaultWarehouse(w._id)}
-                                      className="text-[9px] text-[#FF6A00] hover:underline"
-                                  >
-                                    Set Default
-                                  </button>
+                                  <span
+                                      className="px-2 py-0.5 rounded text-[9px] bg-gray-500/10 text-gray-400 border border-gray-500/20 font-bold uppercase">Secondary</span>
                               )}
                             </div>
 
                             <p className="text-xs text-gray-400 mt-3 flex items-start gap-1">
-                              <MapPin size={12} className="shrink-0 text-[#FF6A00] mt-0.5" />
+                              <MapPin size={12} className="shrink-0 text-[#FF6A00] mt-0.5"/>
                               {w.address}, {w.city}, {w.state}, {w.country} - {w.pincode}
                             </p>
                           </div>
 
                           <div className="flex justify-end border-t border-white/5 pt-3">
                             <button
-                                onClick={() => handleDeleteWarehouse(w._id)}
-                                className="text-red-400 hover:text-red-600 transition flex items-center gap-1 text-[10px]"
+                                onClick={() => handleEditWarehouseClick(w)}
+                                className="text-blue-400 hover:text-blue-600 transition flex items-center gap-1 text-[10px]"
                             >
-                              <Trash2 size={12} />
-                              Remove Warehouse
+                              <Edit2 size={12}/>
+                              Edit Details
                             </button>
                           </div>
                         </div>
                     ))}
-                    {warehouses.length === 0 && (
-                        <p className="text-gray-500 text-sm md:col-span-2 text-center py-10">No warehouse pickup locations registered.</p>
+                    {warehouses.length === 0 && !showAddWarehouse && (
+                        <div className="md:col-span-2 text-center py-10 bg-black/20 border border-white/5 rounded-2xl">
+                          <Home size={32} className="mx-auto text-gray-600 mb-3"/>
+                          <p className="text-gray-400 text-sm font-semibold">No warehouse pickup location
+                            registered.</p>
+                          <p className="text-gray-500 text-xs mt-1">Please add a warehouse to begin booking
+                            shipments.</p>
+                        </div>
                     )}
                   </div>
                 </div>

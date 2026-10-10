@@ -11,12 +11,12 @@ const Footer = () => {
       description: "Smart global courier platform helping businesses deliver faster, cheaper, and with reliable international logistics."
     },
     contact: {
-      email: "support@phreight.com",
+      email: "support@phreights.com",
       phone: "+91 98765 43210",
       address: "Global Headquarters, India"
     },
     copyright: {
-      text: "Phreight International Courier Company. All rights reserved."
+      text: "phreights International Courier Company. All rights reserved."
     }
   });
 

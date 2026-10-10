@@ -152,7 +152,7 @@ const DashboardPreviewSection = () => {
           <div className="w-full md:w-56 bg-[#0A1F44] border-b md:border-b-0 md:border-r border-[#687280]/20 p-5 flex flex-row md:flex-col gap-2 shrink-0 overflow-x-auto">
             <div className="flex items-center gap-2 mb-4 hidden md:flex">
               <div className="w-7 h-7 bg-[#FF6A00] text-white rounded-full flex items-center justify-center font-bold text-xs">P</div>
-              <span className="font-extrabold text-white tracking-wide text-sm">PHREIGHT CONSOLE</span>
+              <span className="font-extrabold text-white tracking-wide text-sm">phreights CONSOLE</span>
             </div>
 
             <button
@@ -409,7 +409,7 @@ const DashboardPreviewSection = () => {
 
             {/* FOOTER AUDIT NOTE */}
             <div className="mt-4 pt-3 border-t border-[#687280]/10 flex items-center justify-between text-[9px] text-[#687280]">
-              <span>Phreight Sandbox Simulator v2.1</span>
+              <span>phreights Sandbox Simulator v2.1</span>
               <span>Secure Cryptographic Ledger Hash Verified</span>
             </div>
 

@@ -46,29 +46,55 @@ export const convertFromINR = (amountInINR, targetCurrency) => {
 };
 
 // Helper to evaluate priority margin
-const evaluatePriorityMargin = async (countryCode, weight) => {
+const evaluatePriorityMargin = async (countryCode, weight, userId) => {
   const rules = await MarginRule.find({});
-  if (rules.length === 0) return { type: "Fixed", value: 100.0 };
-  const cleanCountry = (countryCode || "").toLowerCase().trim();
+  if (rules.length === 0) return {
+    type: "Fixed",
+    value: 100.0,
+    ruleId: "Default"
+  };
 
-  // Priority 1: Country + Weight
-  let matched = rules.find((r) => {
-    if (!r.country || r.country.toLowerCase().trim() !== cleanCountry) return false;
-    return weight >= r.weightMin && (r.weightMax === 0 || weight <= r.weightMax);
-  });
-  // Priority 2: Country
-  if (!matched) {
-    matched = rules.find((r) => r.country && r.country.toLowerCase().trim() === cleanCountry && r.weightMin === 0 && r.weightMax === 0);
+  const cleanCountry = (countryCode || "").toLowerCase().trim();
+  const uidString = userId ? userId.toString() : null;
+
+  let validRules = [];
+
+  for (const r of rules) {
+    const rUser = r.userId ? r.userId.toString() : null;
+    if (rUser && rUser !== uidString) continue;
+
+    const rCountry = (r.country || "").toLowerCase().trim();
+    if (rCountry && rCountry !== cleanCountry) continue;
+
+    const hasWeightRule = r.weightMin > 0 || r.weightMax > 0;
+    if (hasWeightRule) {
+      if (weight < r.weightMin) continue;
+      if (r.weightMax > 0 && weight > r.weightMax) continue;
+    }
+
+    let score = 0;
+    if (rUser) score += 100;
+    if (rCountry) score += 10;
+    if (hasWeightRule) score += 1;
+
+    validRules.push({ rule: r, score });
   }
-  // Priority 3: Weight
-  if (!matched) {
-    matched = rules.find((r) => !r.country && weight >= r.weightMin && (r.weightMax === 0 || weight <= r.weightMax));
+
+  if (validRules.length > 0) {
+    validRules.sort((a, b) => b.score - a.score);
+    const matched = validRules[0].rule;
+    return {
+      type: matched.type,
+      value: matched.value,
+      ruleId: matched._id
+    };
   }
-  // Priority 4: Global
-  if (!matched) {
-    matched = rules.find((r) => !r.country && r.weightMin === 0 && r.weightMax === 0);
-  }
-  return matched ? { type: matched.type, value: matched.value } : { type: "Fixed", value: 100.0 };
+
+  return {
+    type: "Fixed",
+    value: 100.0,
+    ruleId: "Default"
+  };
 };
 
 // Book Shipment (Merchant) with HOLD Flow
@@ -97,27 +123,42 @@ export const bookShipment = async (req, res) => {
     } = req.body;
 
     // 1. Strict Validation
-    if (!pickupAddressId || !customerId || !weight || !customsValue || !customsCurrency) {
+    if (!pickupAddressId || (!customerId && !req.body.receiverCountry) || !weight || !customsValue || !customsCurrency) {
       return res.status(400).json({
-        message: "Warehouse origin, recipient, weight, and customs declarations are strictly required."
+        message: "Warehouse origin, recipient details, weight, and customs declarations are strictly required."
       });
     }
 
     const numericWeight = parseFloat(weight);
     if (isNaN(numericWeight) || numericWeight <= 0) {
-      return res.status(400).json({
-        message: "Weight must be a positive number greater than 0."
-      });
+      return res.status(400).json({ message: "Weight must be a positive number greater than 0." });
     }
 
     const originWarehouse = await PickupAddress.findById(pickupAddressId);
-    const dest = await RecipientCustomers.findById(customerId);
+    if (!originWarehouse) return res.status(404).json({ message: "Origin warehouse not found." });
 
-    if (!originWarehouse || !dest) {
-      return res.status(404).json({
-        message: "Origin warehouse or destination customer not found."
-      });
+    // Handle Destination (DB Lookup vs Guest Details)
+    let dest = null;
+    if (customerId) {
+      dest = await RecipientCustomers.findById(customerId);
+    } else if (req.body.receiverCountry && req.body.receiverName) {
+      dest = {
+        name: req.body.receiverName,
+        mobile: req.body.receiverMobile,
+        addressLine1: req.body.receiverAddressLine1,
+        addressLine2: req.body.receiverAddressLine2 || "",
+        addressLine3: req.body.receiverAddressLine3 || "",
+        city: req.body.receiverCity,
+        stateOrProvinceCode: req.body.receiverState,
+        countryCode: req.body.receiverCountry,
+        postCode: req.body.receiverPincode,
+        email: req.body.receiverEmail || (req.user ? req.user.email : "")
+      };
     }
+
+    if (!dest) return res.status(404).json({
+      message: "Destination recipient details are incomplete."
+    });
 
     // 2. Weight Calculations
     const l = parseFloat(length || 0);
@@ -170,8 +211,9 @@ export const bookShipment = async (req, res) => {
       });
     }
 
-    // 4. Financial Calculations
-    const marginRule = await evaluatePriorityMargin(dest.countryCode, chargeableWeight);
+    const userId = req.user ? req.user._id : null;
+    const marginRule = await evaluatePriorityMargin(dest.countryCode, chargeableWeight, userId);
+
     let shippingCharge = baseRate;
     let marginAmount = 0;
 
@@ -280,7 +322,6 @@ export const bookShipment = async (req, res) => {
       labelBufferBase64 = bookingResult.labelBufferBase64;
 
     } else if (courier.toLowerCase() === "phreight" || courier.toLowerCase() === "shipglobal") {
-      // Prepare ShipGlobal Data
       const nameParts = dest.name.split(" ");
       const firstName = nameParts[0] || dest.name;
       const lastName = nameParts.slice(1).join(" ") || "Customer";
@@ -323,13 +364,9 @@ export const bookShipment = async (req, res) => {
         ]
       };
 
-      console.dir({ payload : sgPayload}, { depth: 3 });
-
-      // 1. Add Order
       const sgOrderResult = await createShipGlobalOrder(sgPayload);
       const orderId = sgOrderResult.order_id || sgOrderResult.data?.order_id;
 
-      // 2. Pay & Get Label
       try {
         const sgLabelResult = await getShipGlobalLabel({ order_id: [orderId] });
         courierShipmentId = String(orderId);
@@ -363,7 +400,6 @@ export const bookShipment = async (req, res) => {
     adminWallet.gstPayables += gstAmount;
     adminWallet.netProfit += marginAmount;
 
-    // Split the carrier liability buckets
     if (courier.toLowerCase() === "aramex") {
       adminWallet.aramexPayables += baseRate;
     } else {
@@ -402,8 +438,8 @@ export const bookShipment = async (req, res) => {
       receiverCountry: dest.countryCode,
       receiverPincode: dest.postCode,
       pickupAddressId: originWarehouse._id,
-      customerId: customerId,
-      aramexBaseCost: baseRate, // Retained for backward compatibility
+      customerId: customerId || null,
+      aramexBaseCost: baseRate,
       marginApplied: marginRule,
       marginAmount: parseFloat(marginAmount.toFixed(2)),
       shippingCharge: parseFloat(shippingCharge.toFixed(2)),
@@ -419,7 +455,7 @@ export const bookShipment = async (req, res) => {
       statusHistory: [{ status: "Booked", time: new Date() }],
     });
 
-    // 10. Save PDF locally (if base64 is provided by Aramex)
+    // 10. Save PDF locally
     if (labelBufferBase64) {
       const labelFilename = `label-${courierTrackingNumber}.pdf`;
       const uploadDir = path.join(process.cwd(), "uploads");
@@ -453,10 +489,6 @@ export const bookShipment = async (req, res) => {
       message: `Shipment ${shipmentId} booked via ${courier}. AWB: ${courierTrackingNumber}`,
       type: "Shipment Booked",
     });
-
-    if (req.user.email) {
-      await sendShipmentBookedEmail(req.user.email, courierTrackingNumber, dest.name, dest.addressLine1).catch(e => console.warn("Email error:", e.message));
-    }
 
     return res.status(201).json({
       success: true,
@@ -1057,189 +1089,366 @@ export const validateBulkUpload = async (req, res) => {
 
 // Stage 2: Confirm & Create Bulk Shipments
 export const confirmBulkUpload = async (req, res) => {
+  let holdTransaction = null;
+  let wallet = null;
+  let totalEstimatedCost = 0;
+
   try {
     const { validRows } = req.body;
     if (!validRows || !Array.isArray(validRows) || validRows.length === 0) {
       return res.status(400).json({ message: "A validated rows list is required to confirm bookings." });
     }
 
-    const firstRow = validRows[0];
-    const { country: destCountry, currency: destCurrency } = getCurrencyForCountry(firstRow.receiverCountry);
+    // 1. Initial Trust & Wallet Check
+    // Calculate frontend's estimated cost to place the initial wallet HOLD
+    totalEstimatedCost = validRows.reduce((sum, r) => sum + (parseFloat(r.invoiceTotal) || 0), 0);
 
-    let wallet = await Wallet.findOne({ user: req.user._id, currency: destCurrency });
-    if (!wallet) {
-      wallet = await Wallet.create({
-        user: req.user._id,
-        storeName: req.user.companyName || `${req.user.name}'s Store`,
-        country: destCountry,
-        currency: destCurrency,
-        balance: 0.0,
-        totalBalance: 0.0,
-        availableBalance: 0.0,
-        holdBalance: 0.0,
-      });
-    }
+    const billingCurrency = "INR";
+    wallet = await Wallet.findOne({ user: req.user._id, currency: billingCurrency });
 
-    // Convert totalCost to target currency
-    const totalCostINR = validRows.reduce((sum, r) => sum + r.invoiceTotal, 0);
-    const totalCost = convertFromINR(totalCostINR, destCurrency);
+    if (!wallet) return res.status(400).json({ message: "Wallet not found. Please initialize your wallet." });
 
-    if (wallet.availableBalance < totalCost) {
+    if (wallet.availableBalance < totalEstimatedCost) {
       return res.status(400).json({
-        message: `Insufficient wallet balance in ${destCurrency}. Total batch cost is ${destCurrency} ${totalCost.toFixed(2)}, available balance is ${destCurrency} ${wallet.availableBalance.toFixed(2)}.`,
+        message: `Insufficient wallet balance. Batch cost is ₹${totalEstimatedCost.toFixed(2)}, available balance is ₹${wallet.availableBalance.toFixed(2)}.`
       });
     }
 
-    // 1. PLACE HOLD on total batch amount
+    // 2. Place Wallet HOLD
     const openingBalance = wallet.availableBalance;
-    wallet.availableBalance = openingBalance - totalCost;
-    wallet.holdBalance = wallet.holdBalance + totalCost;
+    wallet.availableBalance -= totalEstimatedCost;
+    wallet.holdBalance += totalEstimatedCost;
     wallet.balance = wallet.availableBalance;
     await wallet.save();
 
     const batchId = `BTCH-${Date.now().toString().slice(-6)}`;
-    const holdTransaction = await WalletTransaction.create({
+    holdTransaction = await WalletTransaction.create({
       walletId: wallet._id,
       userId: req.user._id,
       transactionType: "Hold",
-      amount: -totalCost,
-      currency: destCurrency,
+      amount: -totalEstimatedCost,
+      currency: billingCurrency,
       openingBalance,
       closingBalance: wallet.availableBalance,
       referenceId: batchId,
       remarks: `Reserved funds for Bulk Batch ${batchId} (${validRows.length} shipments)`,
-      description: `Reserved funds for Bulk Batch ${batchId} (${validRows.length} shipments)`,
       status: "HOLD",
     });
 
     const successBookings = [];
     const failedBookings = [];
-    let processedCost = 0.0;
 
-    // 2. Loop and book shipments
+    let actualProcessedCost = 0.0;
+    let totalMargin = 0.0;
+    let totalGst = 0.0;
+    let totalAramexPayable = 0.0;
+    let totalShipGlobalPayable = 0.0;
+
+    // 3. Loop and Book Each Shipment
     for (const row of validRows) {
-      const shipmentId = `PHX-SH-${Math.floor(100000 + Math.random() * 900000)}`;
+      try {
+        const originWarehouse = await PickupAddress.findById(row.pickupAddressId);
+        if (!originWarehouse) throw new Error(`Origin warehouse not found.`);
 
-      // Create Draft Shipment
-      const shipment = await Shipment.create({
-        shipmentId,
-        user: req.user._id,
-        store: wallet.storeName,
-        customer: row.customer,
-        courierName: "Aramex",
-        courier: "Aramex",
-        weight: row.weight,
-        length: row.length,
-        width: row.width,
-        height: row.height,
-        volumetricWeight: row.volumetricWeight,
-        chargeableWeight: row.chargeableWeight,
-        shipmentType: "Parcel",
-        productDescription: row.productDescription,
-        shipmentValue: row.shipmentValue,
-        from: `Pickup Warehouse: ${row.pickupWarehouseName}`,
-        to: row.receiverAddress,
-        receiverName: row.customer,
-        receiverMobile: row.receiverMobile,
-        receiverAddress: row.receiverAddress,
-        receiverCity: row.receiverCity,
-        receiverState: row.receiverState,
-        receiverCountry: row.receiverCountry,
-        receiverPincode: row.receiverPincode,
-        pickupAddressId: row.pickupAddressId,
-        shippingCharge: row.shippingCharge,
-        gstAmount: row.gstAmount,
-        invoiceTotal: row.invoiceTotal,
-        charge: row.invoiceTotal,
-        status: "Draft",
-        statusHistory: [{ status: "Draft", time: new Date() }],
-      });
-
-      const aramexPayload = {
-        sender: {
-          id: req.user._id,
-          companyName: wallet.storeName,
-          contactPerson: req.user.name,
-          mobile: req.user.mobileNumber || "9999999999",
-          email: req.user.email,
-          address: row.receiverAddress, // generic fallback
-          city: row.receiverCity || "Delhi",
-          state: row.receiverState || "Delhi",
-          country: "IN",
-          pincode: "110001",
-        },
-        receiver: {
-          name: row.customer,
+        const dest = {
+          name: row.receiverName,
           mobile: row.receiverMobile,
-          address: row.receiverAddress,
+          addressLine1: row.receiverAddressLine1,
+          addressLine2: row.receiverAddressLine2 || "",
+          addressLine3: row.receiverAddressLine3 || "",
           city: row.receiverCity,
-          state: row.receiverState,
-          country: row.receiverCountry,
-          pincode: row.receiverPincode,
-        },
-        parcel: {
-          referenceId: shipmentId,
-          weight: row.weight,
-          length: row.length,
-          width: row.width,
-          height: row.height,
+          stateOrProvinceCode: row.receiverState,
+          countryCode: row.receiverCountry,
+          postCode: row.receiverPincode,
+          email: row.receiverEmail || req.user.email
+        };
+
+        const numericWeight = parseFloat(row.weight);
+        const l = parseFloat(row.length || 0);
+        const w = parseFloat(row.width || 0);
+        const h = parseFloat(row.height || 0);
+        const numberOfPieces = parseInt(row.numberOfPieces || 1);
+        const volumetricWeight = (l * w * h) / 5000.0;
+        const chargeableWeight = Math.max(numericWeight, volumetricWeight);
+
+        const courier = (row.courier || "aramex").toLowerCase();
+        const productType = row.productType || "PPX";
+        const isTestMode = row.isTestMode === true;
+        const customsValue = parseFloat(row.customsValue);
+        const customsCurrency = row.customsCurrency || "USD";
+
+        // Security Check: Server-Side Rate Validation
+        let baseRate = 0;
+
+        if (courier === "aramex") {
+          const rateRes = await calculateAramexRate({
+            originAddress: originWarehouse,
+            destinationAddress: dest,
+            originCountry: originWarehouse.country || "IN",
+            destinationCountry: dest.countryCode,
+            weight: numericWeight,
+            length: l, width: w, height: h,
+            isDocument: false,
+            productGroup: "EXP",
+            productType
+          });
+          baseRate = parseFloat(rateRes.rate);
+
+        } else if (courier === "phreight" || courier === "shipglobal") {
+          const sgRateRes = await calculateShipGlobalRate({
+            weight: numericWeight,
+            destinationCountry: dest.countryCode,
+            postalCode: dest.postCode || "00000"
+          }, isTestMode);
+
+          if (!sgRateRes.services || sgRateRes.services.length === 0) {
+            throw new Error("No Phreight services available for this route.");
+          }
+
+          const matchedService = sgRateRes.services.find(s => s.title.toLowerCase() === productType.toLowerCase() || s.serviceName === productType);
+          if (!matchedService) throw new Error(`Selected service '${productType}' is not available.`);
+
+          baseRate = parseFloat(matchedService.price?.logistic_fee || matchedService.subtotal_fee);
+        } else {
+          throw new Error(`Courier '${courier}' is not currently active for booking.`);
+        }
+
+        // Apply Margin Rules
+        const userId = req.user ? req.user._id : null;
+        const marginRule = await evaluatePriorityMargin(dest.countryCode, chargeableWeight, userId);
+
+        let shippingCharge = baseRate;
+        let marginAmount = 0;
+
+        if (marginRule.type === "Fixed") {
+          marginAmount = marginRule.value;
+          shippingCharge = baseRate + marginAmount;
+        } else if (marginRule.type === "Percentage") {
+          marginAmount = (baseRate * marginRule.value) / 100.0;
+          shippingCharge = baseRate + marginAmount;
+        }
+
+        const gstAmount = parseFloat((shippingCharge * 0.18).toFixed(2));
+        const invoiceTotal = parseFloat((shippingCharge + gstAmount).toFixed(2));
+
+        // Generate IDs
+        const shipmentId = `PHX-SH-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
+        const invoiceNumber = `INV-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
+
+        let courierShipmentId = "";
+        let courierTrackingNumber = "";
+        let labelUrl = "";
+        let labelBufferBase64 = null;
+
+        // Invoke Carrier API
+        if (courier === "aramex") {
+          const aramexPayload = {
+            sender: {
+              id: req.user._id,
+              companyName: wallet.storeName,
+              contactPerson: originWarehouse.contactPerson || req.user.name,
+              mobile: originWarehouse.mobile || "9876543210",
+              email: req.user.email,
+              address: originWarehouse.address,
+              city: originWarehouse.city,
+              state: originWarehouse.state,
+              country: originWarehouse.country || "IN",
+              pincode: originWarehouse.pincode,
+            },
+            receiver: {
+              name: dest.name,
+              contactPerson: dest.name,
+              mobile: dest.mobile,
+              address: dest.addressLine1,
+              city: dest.city,
+              state: dest.stateOrProvinceCode,
+              country: dest.countryCode,
+              postCode: dest.postCode,
+              email: dest.email,
+            },
+            parcel: {
+              referenceId: shipmentId,
+              weight: numericWeight,
+              length: l, width: w, height: h,
+              pieces: numberOfPieces,
+              productGroup: "EXP",
+              productType,
+              paymentType: "P",
+              productDescription: row.productDescription,
+              goodsOriginCountry: "IN",
+              shipmentValue: customsValue,
+              currency: customsCurrency,
+              type: "Parcel",
+            },
+          };
+
+          const bookingResult = await createAramexShipment(aramexPayload);
+          courierShipmentId = bookingResult.courierShipmentId;
+          courierTrackingNumber = bookingResult.courierTrackingNumber;
+          labelUrl = bookingResult.labelUrl;
+          labelBufferBase64 = bookingResult.labelBufferBase64;
+
+        } else if (courier === "phreight" || courier === "shipglobal") {
+          const nameParts = dest.name.split(" ");
+          const firstName = nameParts[0] || dest.name;
+          const lastName = nameParts.slice(1).join(" ") || "Customer";
+          const invoiceDate = new Date().toISOString().split('T')[0];
+
+          const sgPayload = {
+            invoice_no: invoiceNumber,
+            invoice_date: invoiceDate,
+            order_reference: shipmentId,
+            service: productType,
+            package_weight: String(numericWeight),
+            package_length: String(l || 10),
+            package_breadth: String(w || 10),
+            package_height: String(h || 10),
+            currency_code: customsCurrency || "USD",
+            csb5_status: 1,
+            customer_shipping_firstname: firstName,
+            customer_shipping_lastname: lastName,
+            customer_shipping_mobile: dest.mobile,
+            customer_shipping_email: dest.email,
+            customer_shipping_company: "",
+            customer_shipping_address: dest.addressLine1,
+            customer_shipping_address_2: dest.addressLine2,
+            customer_shipping_address_3: dest.addressLine3,
+            customer_shipping_city: dest.city,
+            customer_shipping_postcode: dest.postCode || "00000",
+            customer_shipping_country_code: dest.countryCode,
+            customer_shipping_state: dest.stateOrProvinceCode || dest.city,
+            ioss_number: "",
+            customer_nickname: "",
+            vendor_order_items: [
+              {
+                vendor_order_item_name: row.productDescription,
+                vendor_order_item_sku: "ITEM-01",
+                vendor_order_item_quantity: String(numberOfPieces),
+                vendor_order_item_unit_price: String((customsValue / numberOfPieces).toFixed(2)),
+                vendor_order_item_hsn: "61112000",
+                vendor_order_item_tax_rate: "0"
+              }
+            ]
+          };
+
+          const sgOrderResult = await createShipGlobalOrder(sgPayload, isTestMode);
+          const orderId = sgOrderResult.order_id || sgOrderResult.data?.order_id;
+
+          try {
+            const sgLabelResult = await getShipGlobalLabel({ order_id: [orderId] }, isTestMode);
+            courierShipmentId = String(orderId);
+            courierTrackingNumber = sgLabelResult.awb || sgLabelResult.data?.[0]?.awb || sgOrderResult.awb || `SG-${Date.now()}`;
+            labelUrl = sgLabelResult.label_url || sgLabelResult.data?.[0]?.label || "";
+          } catch (labelErr) {
+            courierShipmentId = String(orderId);
+            courierTrackingNumber = sgOrderResult.awb || `SG-${Date.now()}`;
+          }
+        }
+
+        // Save DB Shipment Record
+        const shipment = await Shipment.create({
+          shipmentId,
+          user: req.user._id,
+          store: wallet.storeName,
+          customer: dest.name,
+          courierName: courier === "aramex" ? "Aramex" : "Phreight",
+          courier: courier === "aramex" ? "Aramex" : "Phreight",
+          weight: numericWeight,
+          length: l, width: w, height: h,
+          volumetricWeight: parseFloat(volumetricWeight.toFixed(2)),
+          chargeableWeight: parseFloat(chargeableWeight.toFixed(2)),
+          numberOfPieces,
+          productGroup: "EXP",
+          productType,
+          paymentType: "P",
+          shipmentType: "Parcel",
           productDescription: row.productDescription,
-          shipmentValue: row.shipmentValue,
-          type: "Parcel",
-        },
-      };
+          goodsOriginCountry: "IN",
+          shipmentValue: customsValue,
+          currency: customsCurrency,
+          from: originWarehouse.addressName || originWarehouse.city,
+          to: `${dest.addressLine1}, ${dest.city}`,
+          receiverName: dest.name,
+          receiverMobile: dest.mobile,
+          receiverAddress: dest.addressLine1,
+          receiverCity: dest.city,
+          receiverState: dest.stateOrProvinceCode,
+          receiverCountry: dest.countryCode,
+          receiverPincode: dest.postCode,
+          pickupAddressId: originWarehouse._id,
+          customerId: null, // Guest checkout via bulk
+          aramexBaseCost: baseRate,
+          marginApplied: marginRule,
+          marginAmount: parseFloat(marginAmount.toFixed(2)),
+          shippingCharge: parseFloat(shippingCharge.toFixed(2)),
+          gstAmount,
+          invoiceTotal,
+          charge: invoiceTotal,
+          courierShipmentId,
+          courierTrackingNumber,
+          courierStatus: "Booked",
+          status: "Booked",
+          invoiceNumber,
+          labelUrl,
+          statusHistory: [{ status: "Booked", time: new Date() }],
+        });
 
-      const bookingResult = await createAramexShipment(aramexPayload);
+        if (labelBufferBase64) {
+          const labelFilename = `label-${courierTrackingNumber}.pdf`;
+          const uploadDir = path.join(process.cwd(), "uploads");
+          if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+          fs.writeFileSync(path.join(uploadDir, labelFilename), Buffer.from(labelBufferBase64, "base64"));
+          shipment.labelPdfPath = `/uploads/${labelFilename}`;
+          await shipment.save();
+        }
 
-      if (bookingResult.success) {
-        shipment.courierShipmentId = bookingResult.courierShipmentId;
-        shipment.courierTrackingNumber = bookingResult.courierTrackingNumber;
-        shipment.courierStatus = "Booked";
-        shipment.status = "Booked";
-        shipment.invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
-        shipment.statusHistory.push({ status: "Booked", time: new Date() });
-
-        // Save label locally
-        const labelFilename = `label-${bookingResult.courierTrackingNumber}.pdf`;
-        const uploadDir = path.join(process.cwd(), "uploads");
-        if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-        fs.writeFileSync(path.join(uploadDir, labelFilename), Buffer.from(bookingResult.labelBufferBase64, "base64"));
-        shipment.labelPdfPath = `/uploads/${labelFilename}`;
-
-        await shipment.save();
-
-        // Create Initial Tracking timeline
         await TrackingHistory.create({
           shipmentId: shipment._id,
           status: "Booked",
-          location: row.receiverCity || "Hub",
-          description: "Bulk uploaded consignment registered. Ready for pickup scheduler.",
+          location: originWarehouse.city,
+          description: `Shipment registered with ${courier}. Ready for dispatch.`,
           eventTime: new Date(),
         });
 
-        const targetCost = convertFromINR(row.invoiceTotal, destCurrency);
-        processedCost += targetCost;
+        // Accumulate exactly validated financials
+        actualProcessedCost += invoiceTotal;
+        totalMargin += marginAmount;
+        totalGst += gstAmount;
+        if (courier === "aramex") totalAramexPayable += baseRate;
+        else totalShipGlobalPayable += baseRate;
+
         successBookings.push(shipment);
-      } else {
-        await Shipment.findByIdAndDelete(shipment._id);
-        failedBookings.push({ row, error: bookingResult.error || "Aramex API error" });
+
+      } catch (err) {
+        failedBookings.push({ row, error: err.message });
       }
     }
 
-    // 3. FINAL DEBIT COMMIT
-    const remainingHoldRelease = totalCost - processedCost;
+    // 4. Final Ledger Adjustments
+    const unusedHoldDifference = totalEstimatedCost - actualProcessedCost;
 
-    wallet.holdBalance = wallet.holdBalance - totalCost;
-    wallet.totalBalance = wallet.totalBalance - processedCost;
-    wallet.availableBalance = wallet.availableBalance + remainingHoldRelease; // restore any failed booking holds
+    wallet.holdBalance -= totalEstimatedCost; // Remove full hold
+    wallet.totalBalance -= actualProcessedCost; // Deduct only what processed
+    wallet.availableBalance += unusedHoldDifference; // Add back any unused held funds
     wallet.balance = wallet.availableBalance;
     await wallet.save();
 
-    if (processedCost > 0) {
+    // 5. Update Admin Wallet Liabilities
+    if (actualProcessedCost > 0) {
+      let adminWallet = await AdminWallet.findOne({ currency: billingCurrency });
+      if (!adminWallet) adminWallet = await AdminWallet.create({ currency: billingCurrency });
+
+      adminWallet.totalGrossRevenue += actualProcessedCost;
+      adminWallet.gstPayables += totalGst;
+      adminWallet.netProfit += totalMargin;
+      adminWallet.aramexPayables += totalAramexPayable;
+      adminWallet.shipglobalPayables += totalShipGlobalPayable;
+      await adminWallet.save();
+
       holdTransaction.transactionType = "Debit";
       holdTransaction.status = "Completed";
-      holdTransaction.remarks = `Bulk Debit: Completed ${successBookings.length} shipments. Debited ${destCurrency} ${processedCost.toFixed(2)}`;
-      holdTransaction.amount = -processedCost;
+      holdTransaction.remarks = `Bulk Debit: Completed ${successBookings.length} shipments. Debited ₹${actualProcessedCost.toFixed(2)}`;
+      holdTransaction.amount = -actualProcessedCost;
       await holdTransaction.save();
     } else {
       holdTransaction.status = "Released";
@@ -1247,7 +1456,6 @@ export const confirmBulkUpload = async (req, res) => {
       await holdTransaction.save();
     }
 
-    // Write Audit Log
     await AuditLog.create({
       userId: req.user._id,
       action: "Merchant Completed Bulk Shipments Booking",
@@ -1258,11 +1466,23 @@ export const confirmBulkUpload = async (req, res) => {
     });
 
     res.status(200).json({
-      message: `Batch complete: ${successBookings.length} shipments booked, ${failedBookings.length} failed. Total debited ${destCurrency} ${processedCost.toFixed(2)}.`,
+      message: `Batch complete: ${successBookings.length} booked, ${failedBookings.length} failed. Total debited ₹${actualProcessedCost.toFixed(2)}.`,
       successBookings,
       failedBookings,
     });
   } catch (error) {
+    // Failsafe Release
+    if (wallet && holdTransaction && holdTransaction.status === "HOLD") {
+      wallet.availableBalance += totalEstimatedCost;
+      wallet.holdBalance -= totalEstimatedCost;
+      wallet.balance = wallet.availableBalance;
+      await wallet.save();
+
+      holdTransaction.status = "Released";
+      holdTransaction.remarks = `Hold released: Batch Error - ${error.message}`;
+      await holdTransaction.save();
+    }
+
     res.status(500).json({ message: "Error confirming bulk upload batch", error: error.message });
   }
 };
@@ -1686,3 +1906,35 @@ export const cancelShipment = async (req, res) => {
     res.status(500).json({ message: "Failed to cancel shipment.", error: error.message });
   }
 };
+
+export const shipmentDropDownList = async (req, res) => {
+  try{
+    const { user : { _id } } = req;
+    const shipments = await Shipment.aggregate([
+      {
+        $match : {
+          user : new mongoose.Types.ObjectId(_id)
+        }
+      },
+      {
+        $project : {
+          _id: 0,
+          label : "$shipmentId",
+          value : "$_id"
+        }
+      }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Retrieved shipment drop-down list.",
+      list: shipments
+    });
+  }catch(error){
+    console.log(error);
+    return res.status(500).json({
+      success: false,
+      message: "Error while retrieving shipment drop-dwon list."
+    })
+  }
+}

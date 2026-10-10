@@ -37,6 +37,53 @@ export const createAddress = async (req, res) => {
   }
 };
 
+export const editAddress = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { addressName, contactPerson, mobile, address, pincode, city, state, country } = req.body;
+
+    // Verify the address exists and belongs to the requesting user
+    const existingAddress = await PickupAddress.findOne({ _id: id, userId: req.user._id });
+
+    if (!existingAddress) {
+      return res.status(404).json({ message: "Warehouse location not found or unauthorized." });
+    }
+
+    // Always explicitly allow updates to these permitted fields
+    existingAddress.addressName = addressName || existingAddress.addressName;
+    existingAddress.contactPerson = contactPerson || existingAddress.contactPerson;
+    existingAddress.mobile = mobile || existingAddress.mobile;
+    existingAddress.address = address || existingAddress.address;
+    existingAddress.pincode = pincode || existingAddress.pincode;
+
+    // 90-Days Location Update Logic based on updatedAt
+    const lastUpdated = new Date(existingAddress.updatedAt || existingAddress.createdAt);
+    const currentDate = new Date();
+    const diffTime = Math.abs(currentDate - lastUpdated);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    // If 90 days or more have passed, update the restricted location fields
+    if (diffDays >= 90) {
+      existingAddress.city = city || existingAddress.city;
+      existingAddress.state = state || existingAddress.state;
+      existingAddress.country = country || existingAddress.country;
+    }
+
+    // Saving will automatically update the `updatedAt` timestamp in MongoDB
+    await existingAddress.save();
+
+    res.status(200).json({
+      message: "Warehouse details updated successfully.",
+      updatedAddress: existingAddress
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error updating warehouse location",
+      error: error.message
+    });
+  }
+};
+
 // View own addresses
 export const getMyAddresses = async (req, res) => {
   try {
