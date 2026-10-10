@@ -217,6 +217,7 @@ const RateCalculator = () => {
                                         pickupAddressId: val,
                                     });
                                 }}
+                                disabled={true}
                                 placeholder="-- Choose Warehouse --"
                             />
                         </div>
@@ -260,7 +261,7 @@ const RateCalculator = () => {
                                     <div>
                                         <Select
                                             placeholder="Country (AE) *"
-                                            options={ARAMEX_SUPPORTED_COUNTRIES.map(c => ({ label: c.name, value: c.code }))}
+                                            options={ARAMEX_SUPPORTED_COUNTRIES}
                                             value={calcForm.receiverCountry}
                                             onChange={(val) => setCalcForm({ ...calcForm, receiverCountry: val.toUpperCase() })}
                                         />

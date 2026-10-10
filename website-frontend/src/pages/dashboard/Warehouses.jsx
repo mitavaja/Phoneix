@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import API from "../../services/api";
 import { Home, Plus, MapPin, Edit2, AlertTriangle } from "lucide-react";
 import moment from "moment";
+import {ARAMEX_SUPPORTED_COUNTRIES} from "../../utils/countries";
+import {Select} from "../../components/ui/Select";
+import {toast} from "react-toastify";
 
 const Warehouses = () => {
     const [warehouses, setWarehouses] = useState([]);
@@ -70,7 +73,7 @@ const Warehouses = () => {
         e.preventDefault();
         try {
             if (isEditingWarehouse) {
-                await API.put(`/warehouses/${warehouseForm._id}`, {
+                await API.post(`/warehouses/${warehouseForm._id}`, {
                     addressName: warehouseForm.addressName,
                     contactPerson: warehouseForm.contactPerson,
                     mobile: warehouseForm.mobile,
@@ -83,10 +86,10 @@ const Warehouses = () => {
                         country: warehouseForm.country
                     })
                 });
-                alert("Warehouse details updated successfully.");
+                toast.success("Warehouse details updated successfully.");
             } else {
                 await API.post("/warehouses/add", warehouseForm);
-                alert("Warehouse saved successfully.");
+                toast.success("Warehouse saved successfully.");
             }
 
             setShowAddWarehouse(false);
@@ -97,7 +100,7 @@ const Warehouses = () => {
             });
             await fetchWarehouses();
         } catch (err) {
-            alert(err.response?.data?.message || "Failed to save warehouse.");
+            toast.error(err.response?.data?.message || "Failed to save warehouse.");
         }
     };
 
@@ -213,13 +216,14 @@ const Warehouses = () => {
                         </div>
                         <div>
                             <label className="text-[10px] text-gray-400 block mb-1">Country</label>
-                            <input
-                                type="text"
+                            <Select
+                                placeholder="Country (AE) *"
+                                options={ARAMEX_SUPPORTED_COUNTRIES}
                                 value={warehouseForm.country}
-                                onChange={(e) => setWarehouseForm({...warehouseForm, country: e.target.value})}
-                                required
+                                onChange={(val) => setWarehouseForm({
+                                    ...warehouseForm, receiverCountrycountry: val.toUpperCase()
+                                })}
                                 disabled={isEditingWarehouse && !canEditLocation}
-                                className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                             />
                         </div>
                         <div>
