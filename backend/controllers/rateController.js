@@ -58,51 +58,57 @@ export const deleteRateSlab = async (req, res) => {
 /**
  * Margin Rule Priority Evaluator helper
  */
-const evaluatePriorityMargin = async (countryCode, weight) => {
+const evaluatePriorityMargin = async (countryCode, weight, userId) => {
   const rules = await MarginRule.find({});
   if (rules.length === 0) {
-    return { type: "Fixed", value: 100.0, ruleId: "Default" }; // ₹100 fallback
+    return {
+      type: "Fixed",
+      value: 100.0,
+      ruleId: "Default"
+    }; // ₹100 fallback
   }
 
   const cleanCountry = (countryCode || "").toLowerCase().trim();
+  const uidString = userId ? userId.toString() : null;
 
-  // Priority 1: Country + Weight
-  let matched = rules.find((r) => {
-    if (!r.country || r.country.toLowerCase().trim() !== cleanCountry) return false;
-    const matchesMin = weight >= r.weightMin;
-    const matchesMax = r.weightMax === 0 || weight <= r.weightMax;
-    return matchesMin && matchesMax;
-  });
+  let validRules = [];
 
-  // Priority 2: Country Rule
-  if (!matched) {
-    matched = rules.find((r) => {
-      return (
-        r.country &&
-        r.country.toLowerCase().trim() === cleanCountry &&
-        r.weightMin === 0 &&
-        r.weightMax === 0
-      );
-    });
+  for (const r of rules) {
+    // 1. Validate User Match (If rule has a user, it MUST match the current user)
+    const rUser = r.userId ? r.userId.toString() : null;
+    if (rUser && rUser !== uidString) continue;
+
+    // 2. Validate Country Match (If rule has a country, it MUST match destination)
+    const rCountry = (r.country || "").toLowerCase().trim();
+    if (rCountry && rCountry !== cleanCountry) continue;
+
+    // 3. Validate Weight Match (If rule has bounds, shipment weight MUST fall inside)
+    const hasWeightRule = r.weightMin > 0 || r.weightMax > 0;
+    if (hasWeightRule) {
+      if (weight < r.weightMin) continue;
+      if (r.weightMax > 0 && weight > r.weightMax) continue;
+    }
+
+    // 4. Calculate Specificity Score
+    // User Match = +100, Country Match = +10, Weight Match = +1
+    let score = 0;
+    if (rUser) score += 100;
+    if (rCountry) score += 10;
+    if (hasWeightRule) score += 1;
+
+    validRules.push({ rule: r, score });
   }
 
-  // Priority 3: Weight Rule
-  if (!matched) {
-    matched = rules.find((r) => {
-      if (r.country) return false;
-      const matchesMin = weight >= r.weightMin;
-      const matchesMax = r.weightMax === 0 || weight <= r.weightMax;
-      return matchesMin && matchesMax;
-    });
-  }
+  if (validRules.length > 0) {
+    // Sort by highest score first (Most specific rule wins)
+    validRules.sort((a, b) => b.score - a.score);
+    const matched = validRules[0].rule;
 
-  // Priority 4: Global Rule
-  if (!matched) {
-    matched = rules.find((r) => !r.country && r.weightMin === 0 && r.weightMax === 0);
-  }
-
-  if (matched) {
-    return { type: matched.type, value: matched.value, ruleId: matched._id };
+    return {
+      type: matched.type,
+      value: matched.value,
+      ruleId: matched._id
+    };
   }
 
   return { type: "Fixed", value: 100.0, ruleId: "Default" };
@@ -146,10 +152,9 @@ export const calculateShippingCost = async (req, res) => {
       productType // e.g., 'PPX' for Aramex, or 'ShipGlobal Direct' for Phreight
     } = req.body;
 
-    // 1. Validation
-    if (!pickupAddressId || !customerId || !weight) {
+    if (!pickupAddressId || (!customerId && !req.body.receiverCountry) || !weight) {
       return res.status(400).json({
-        message: "Origin warehouse, destination customer, and weight are required."
+        message: "Origin warehouse, destination recipient details, and weight are required."
       });
     }
 
@@ -161,13 +166,29 @@ export const calculateShippingCost = async (req, res) => {
     }
 
     const origin = await PickupAddress.findById(pickupAddressId);
-    const destination = await RecipientCustomers.findById(customerId);
+    if (!origin) return res.status(404).json({ message: "Origin warehouse not found." });
 
-    if (!origin) return res.status(404).json({
-      message: "Origin warehouse not found."
-    });
+
+    let destination = null;
+    if (customerId) {
+      destination = await RecipientCustomers.findById(customerId);
+    } else if (req.body.receiverCountry) {
+      destination = {
+        name: req.body.receiverName || "Guest User",
+        mobile: req.body.receiverMobile || "0000000000",
+        addressLine1: req.body.receiverAddressLine1 || "N/A",
+        addressLine2: req.body.receiverAddressLine2 || "",
+        addressLine3: req.body.receiverAddressLine3 || "",
+        city: req.body.receiverCity || "N/A",
+        stateOrProvinceCode: req.body.receiverState || "N/A",
+        countryCode: req.body.receiverCountry,
+        postCode: req.body.receiverPincode || "00000",
+        email: req.body.receiverEmail || (req.user ? req.user.email : "")
+      };
+    }
+
     if (!destination) return res.status(404).json({
-      message: "Destination recipient not found."
+      message: "Destination recipient details are incomplete."
     });
 
     // 2. Volumetric & Chargeable Weight
@@ -178,8 +199,8 @@ export const calculateShippingCost = async (req, res) => {
     const volumetricWeight = (l * w * h) / 5000.0;
     const chargeableWeight = Math.max(numericWeight, volumetricWeight);
 
-    // 3. Margin Rule for Destination & Weight
-    const marginRule = await evaluatePriorityMargin(destination.countryCode, chargeableWeight);
+    const userId = req.user ? req.user._id : null;
+    const marginRule = await evaluatePriorityMargin(destination.countryCode, chargeableWeight, userId);
 
     let formattedServices = [];
     let selectedPlan = null;
@@ -231,35 +252,23 @@ export const calculateShippingCost = async (req, res) => {
 
       // Compute pricing for every plan returned by ShipGlobal
       formattedServices = shipGlobalResult.services.map((plan) => {
-        const baseRate = parseFloat(
-            plan.subtotal_fee ?? plan.price?.subtotal_fee ?? plan.price?.logistic_fee ?? 0
-        );
+        const baseRate = parseFloat(plan.subtotal_fee ?? plan.price?.subtotal_fee ?? plan.price?.logistic_fee ?? 0);
         const financials = computePlanFinancials(baseRate, marginRule);
 
         return {
           title: plan.title,
           serviceName: plan.title,
-          serviceCode: plan.title, // Exact title used when dispatching order/add
+          serviceCode: plan.title,
           transitTime: plan.transit_time || "N/A",
           notes: plan.notes || "",
           ...financials,
         };
       });
 
-      // Default selection: User choice if provided, otherwise the first plan
-      if (productType) {
-        selectedPlan = formattedServices.find(
-            (s) => s.serviceName.toLowerCase() === productType.toLowerCase()
-        );
-      }
-      if (!selectedPlan) {
-        selectedPlan = formattedServices[0];
-      }
-    }
-    else {
-      return res.status(400).json({
-        message: `Unsupported courier '${courier}' selected.`
-      });
+      if (productType) selectedPlan = formattedServices.find((s) => s.serviceName.toLowerCase() === productType.toLowerCase());
+      if (!selectedPlan) selectedPlan = formattedServices[0];
+    } else {
+      return res.status(400).json({ message: `Unsupported courier '${courier}' selected.` });
     }
 
     // ============================================================
@@ -296,25 +305,67 @@ export const calculateShippingCost = async (req, res) => {
  */
 export const getMargins = async (req, res) => {
   try {
-    const rules = await MarginRule.find({}).sort({ createdAt: -1 });
-    res.status(200).json(rules);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || "";
+    const userIdFilter = req.query.userId || "all";
+    const skip = (page - 1) * limit;
+
+    let query = {};
+
+    // Filter by specific target user or global rules
+    if (userIdFilter !== "all") {
+      if (userIdFilter === "global") {
+        query.userId = null; // Only rules that apply globally
+      } else {
+        query.userId = userIdFilter; // Rules for a specific merchant
+      }
+    }
+
+    // Apply global text search (e.g., country code or markup type)
+    if (search) {
+      const searchRegex = new RegExp(search, "i");
+      query.$or = [
+        { country: searchRegex },
+        { type: searchRegex }
+      ];
+    }
+
+    const totalItems = await MarginRule.countDocuments(query);
+    const rules = await MarginRule.find(query)
+        .populate("userId", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    res.status(200).json({
+      rules,
+      pagination: {
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        currentPage: page,
+        pageSize: limit,
+        hasNextPage: page * limit < totalItems,
+        hasPrevPage: page > 1,
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: "Error loading margin rules", error: error.message });
   }
 };
-
 /**
  * Create a new Margin Rule (Admin)
  */
 export const addMarginRule = async (req, res) => {
   try {
-    const { type, value, country, weightMin, weightMax } = req.body;
+    const { type, value, country, weightMin, weightMax, userId } = req.body;
 
     if (!type || value === undefined || isNaN(value)) {
       return res.status(400).json({ message: "Rule type and numeric markup value are required" });
     }
 
     const rule = await MarginRule.create({
+      userId: userId ? userId : null,
       type,
       value: parseFloat(value),
       country: country || "",

@@ -147,7 +147,7 @@ const HeroSection = ({ data }) => {
           </h1>
 
           <p className="text-gray-300 text-base md:text-lg max-w-lg leading-relaxed">
-            {data?.description || "Phreight International Courier Company helps you automate logistics booking, reconcile weight discrepancies, and ship smarter with real-time dynamic pricing rates."}
+            {data?.description || "phreights International Courier Company helps you automate logistics booking, reconcile weight discrepancies, and ship smarter with real-time dynamic pricing rates."}
           </p>
 
           <div className="flex flex-wrap gap-4 pt-2">

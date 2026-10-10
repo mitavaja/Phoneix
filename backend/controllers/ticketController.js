@@ -143,8 +143,10 @@ export const createClaim = async (req, res) => {
   try {
     const { shipmentId, claimType, description, claimAmount, attachment } = req.body;
 
-    if (!shipmentId || !claimType || !claimAmount) {
-      return res.status(400).json({ message: "Shipment target, claim type, and claim amount are required." });
+    if (!shipmentId || !claimType) {
+      return res.status(400).json({
+        message: "Shipment target, claim type, and claim amount are required."
+      });
     }
 
     const queryConditions = [{ shipmentId }, { courierTrackingNumber: shipmentId }];
@@ -189,7 +191,9 @@ export const createClaim = async (req, res) => {
 // Get Seller Claims list
 export const getMyClaims = async (req, res) => {
   try {
-    const claims = await Claim.find({ userId: req.user._id }).populate("shipmentId").sort({ createdAt: -1 });
+    const claims = await Claim.find({
+      userId: req.user._id
+    }).populate("shipmentId").sort({ createdAt: -1 });
     res.status(200).json(claims);
   } catch (error) {
     res.status(500).json({ message: "Error loading claims", error: error.message });

@@ -99,8 +99,7 @@ const Sidebar = () => {
       <div>
         {/* Brand Header */}
         <div className="mb-8 mt-2 px-2 pb-4 border-b border-[#687280]/20">
-          <Logo showText={true} theme="navy" size="sm" />
-          <div className="mt-2 text-[10px] text-[#FF6A00] font-semibold tracking-wider uppercase">Admin Control</div>
+          <Logo showText={true} theme="navy" size="md" />
         </div>
 
         {/* Sidebar Nav */}

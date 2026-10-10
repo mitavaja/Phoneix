@@ -4,7 +4,7 @@ import { Star } from "lucide-react";
 const defaultTestimonials = [
   {
     name: "Rahul Sharma",
-    feedback: "Phreight made shipping super easy and affordable!",
+    feedback: "phreights made shipping super easy and affordable!",
   },
   {
     name: "Priya Patel",

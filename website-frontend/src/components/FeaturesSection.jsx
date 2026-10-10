@@ -32,7 +32,7 @@ const defaultFeatures = [
 ];
 
 const FeaturesSection = ({ data }) => {
-  const title = data?.title || "Why Choose Phreight";
+  const title = data?.title || "Why Choose phreights";
   const description = data?.description || "Powerful features designed to simplify your shipping experience";
   const items = data?.items || defaultFeatures;
 
