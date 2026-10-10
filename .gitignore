@@ -6,7 +6,6 @@
 **/.vite
 
 # Environment
-**/.env
 
 # Logs
 *.log
@@ -16,3 +15,4 @@
 Thumbs.db
 
 **/uploads
+config.bat
