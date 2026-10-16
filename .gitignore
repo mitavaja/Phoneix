@@ -1,0 +1,21 @@
+# Local DB Data
+mongodb_data/
+
+# Dependencies
+**/node_modules/
+
+# Build artifacts
+**/dist/
+**/.vite/
+
+# Secret Environment Files
+**/.env
+**/.env*.local
+backend/.env
+Phoneix-main/backend/.env
+
+# Uploads & Logs
+**/uploads/
+*.log
+.DS_Store
+Thumbs.db

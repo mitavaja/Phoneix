@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#E5E7EB] text-[#0A1F44] antialiased selection:bg-[#FF6A00] selection:text-white;
+    font-family: 'Plus Jakarta Sans', 'Inter', 'Roboto', sans-serif;
+  }
+}
+
+@layer components {
+  .nav-link {
+    @apply relative text-white font-medium transition-colors duration-300 hover:text-blue-200;
+  }
+  .nav-link::after {
+    @apply content-[''] absolute w-0 h-[2px] bg-blue-200 bottom-[-4px] left-0 transition-all duration-300;
+  }
+  .nav-link:hover::after {
+    @apply w-full;
+  }
+}
+
+/* Custom premium theme for React Toastify */
+:root {
+  --toastify-color-success: #FF6A00;
+  --toastify-color-info: #0A1F44;
+  --toastify-color-error: #EF4444;
+  --toastify-color-warning: #F59E0B;
+}
+
+.Toastify__toast {
+  border-radius: 16px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  border: 1px solid rgba(104, 114, 128, 0.2) !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+}
+
+.Toastify__toast--success {
+  background: #0A1F44 !important;
+  color: #FFFFFF !important;
+  border-left: 5px solid #FF6A00 !important;
+}
+
+.Toastify__toast--error {
+  background: #0A1F44 !important;
+  color: #FFFFFF !important;
+  border-left: 5px solid #EF4444 !important;
+}
+
+.Toastify__toast--info {
+  background: #0A1F44 !important;
+  color: #FFFFFF !important;
+  border-left: 5px solid #3B82F6 !important;
+}
+
+.Toastify__toast--warning {
+  background: #0A1F44 !important;
+  color: #FFFFFF !important;
+  border-left: 5px solid #F59E0B !important;
+}
+
+.Toastify__close-button {
+  color: #FFFFFF !important;
+  opacity: 0.6;
+}
+
+.Toastify__close-button:hover {
+  opacity: 1;
+}

@@ -1,0 +1,398 @@
+import mongoose from "mongoose";
+import crypto from "crypto";
+import fs from "fs";
+import path from "path";
+import User from "../models/User.js";
+import Wallet from "../models/Wallet.js";
+import KYC from "../models/KYC.js";
+import { generateToken } from "../utils/generateToken.js";
+import { isValidEmail, isValidPhone, isValidPassword } from "../utils/validation.js";
+
+// Helper to hash password with salt
+export const hashPassword = (password) => {
+  return crypto.createHash("sha256").update(password + "phreight-salt-90382").digest("hex");
+};
+
+// Helper to save buffer to disk
+const saveUploadedFile = (fileArray) => {
+  if (!fileArray || fileArray.length === 0) return "";
+  const file = fileArray[0];
+  const filename = `${Date.now()}-${file.originalname.replace(/\s+/g, "_")}`;
+  const uploadDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+  fs.writeFileSync(path.join(uploadDir, filename), file.buffer);
+  return filename;
+};
+
+export const registerUser = async (req, res) => {
+  try {
+    const { name, email, password, role, companyName, ownerName, mobileNumber, gstType } = req.body;
+
+    if (!name || !email || !password || !mobileNumber) {
+      return res.status(400).json({ message: "Name, email, password, and mobileNumber parameters are required" });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: "Enter a valid email address." });
+    }
+
+    if (!isValidPhone(mobileNumber)) {
+      return res.status(400).json({ message: "Enter a valid phone number." });
+    }
+
+    if (!isValidPassword(password)) {
+      return res.status(400).json({ message: "Password must contain at least 8 characters, including uppercase, lowercase, number, and special character." });
+    }
+
+    const userExists = await User.findOne({ email });
+    if (userExists) {
+      return res.status(400).json({ message: "Email already exists." });
+    }
+
+    const hashedPassword = hashPassword(password);
+    const userRole = role || "Seller";
+    
+    // Sellers start as Pending; Admin, Operations, Moderators default to Active
+    const userStatus = userRole === "Seller" ? "Pending" : "Active";
+
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: userRole,
+      status: userStatus,
+      companyName: companyName || name,
+      ownerName: ownerName || name,
+      mobileNumber: mobileNumber || "",
+      gstType: gstType === "GST Registered" ? "GST Registered" : "Non-GST",
+    });
+
+    // Create a wallet entry for the new merchant/user
+    const initialBalance = userRole === "Seller" ? 0.0 : 1000000.0;
+    const wallet = await Wallet.create({
+      user: user._id,
+      storeName: companyName || `${name}'s Store`,
+      balance: initialBalance,
+      totalBalance: initialBalance,
+      availableBalance: initialBalance,
+      holdBalance: 0.0,
+    });
+
+    // Create KYC submission if Seller
+    if (userRole === "Seller") {
+      const files = req.files || {};
+      const panCard = saveUploadedFile(files.panCard);
+      const aadhaarCard = saveUploadedFile(files.aadhaarCard);
+      const gstCertificate = saveUploadedFile(files.gstCertificate);
+      const addressProof = saveUploadedFile(files.addressProof);
+      const companyRegistration = saveUploadedFile(files.companyRegistration);
+      const lightbill = saveUploadedFile(files.lightbill);
+      
+      // Backward compatibility document field
+      const documentName = saveUploadedFile(files.document) || panCard || "GST_Certificate.pdf";
+
+      await KYC.create({
+        kycId: `KYC-${Math.floor(100 + Math.random() * 900)}`,
+        user: user._id,
+        store: companyName || `${name}'s Store`,
+        owner: ownerName || name,
+        taxId: gstType || "Non-GST",
+        document: documentName,
+        panCard,
+        aadhaarCard,
+        gstCertificate,
+        addressProof,
+        companyRegistration,
+        lightbill,
+        status: "Pending",
+      });
+    }
+
+    res.status(201).json({
+      message: userStatus === "Pending" 
+        ? "Registration successful. Awaiting KYC approval." 
+        : "Registration successful",
+      token: generateToken({ id: user._id, role: user.role }),
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error during registration", error: error.message });
+  }
+};
+
+export const loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password parameters are required" });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: "Enter a valid email address." });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password combination" });
+    }
+
+    if (user.status === "Pending") {
+      return res.status(403).json({ message: "Access forbidden: Account pending compliance review" });
+    }
+
+    if (user.status === "Blocked") {
+      return res.status(403).json({ message: "Access forbidden: Account suspended" });
+    }
+
+    const hashedInput = hashPassword(password);
+    if (user.password !== hashedInput) {
+      return res.status(401).json({ message: "Invalid email or password combination" });
+    }
+
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.status(200).json({
+      message: "Login successful",
+      token: generateToken({ id: user._id, role: user.role }),
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        lastLogin: user.lastLogin,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error during login", error: error.message });
+  }
+};
+
+export const pinLogin = async (req, res) => {
+  try {
+    const { email, pin } = req.body;
+
+    if (!pin) {
+      return res.status(400).json({ message: "Security PIN is required" });
+    }
+
+    let user;
+    if (email && email.trim()) {
+      user = await User.findOne({ email: email.trim().toLowerCase() });
+    }
+    if (!user) {
+      user = await User.findOne({ role: "Admin" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "Admin user account not found" });
+    }
+
+    if (user.status === "Pending") {
+      return res.status(403).json({ message: "Access forbidden: Account pending compliance review" });
+    }
+
+    if (user.status === "Blocked") {
+      return res.status(403).json({ message: "Access forbidden: Account suspended" });
+    }
+
+    // Check PIN against user.pin or SystemSetting
+    const SystemSetting = (await import("../models/SystemSetting.js")).default;
+    const settings = await SystemSetting.findOne({});
+    const expectedPin = user.pin || settings?.adminPin || settings?.aramexAccountPin || "1234";
+
+    if (pin.toString().trim() !== expectedPin.toString().trim()) {
+      return res.status(401).json({ message: "Invalid Security PIN" });
+    }
+
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.status(200).json({
+      message: "PIN authentication successful",
+      token: generateToken({ id: user._id, role: user.role }),
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        lastLogin: user.lastLogin,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error during PIN login", error: error.message });
+  }
+};
+
+export const checkLoginMode = async (req, res) => {
+  try {
+    const email = req.query.email || "admin@phreight.com";
+    const user = await User.findOne({ email: email.trim().toLowerCase() }) || await User.findOne({ role: "Admin" });
+    if (!user || !user.lastLogin) {
+      return res.status(200).json({ within48Hours: false });
+    }
+    const elapsed = Date.now() - new Date(user.lastLogin).getTime();
+    const within48Hours = elapsed < 48 * 60 * 60 * 1000;
+    res.status(200).json({
+      within48Hours,
+      lastLogin: user.lastLogin,
+      email: user.email,
+    });
+  } catch (error) {
+    res.status(200).json({ within48Hours: false });
+  }
+};
+
+export const getMe = async (req, res) => {
+  try {
+    res.status(200).json(req.user);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error retrieving user profile", error: error.message });
+  }
+};
+
+export const getProfile = async (req, res) => {
+  try {
+    const {
+      user: {
+        _id
+      }
+    } = req;
+
+    const profile = await User.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(_id),
+        }
+      },
+      {
+        $lookup: {
+          from: "kycs",
+          localField: "_id",
+          foreignField: "user",
+          as: "kyc"
+        }
+      },
+      {
+        $unwind: {
+          path: "$kyc",
+          preserveNullAndEmptyArrays: true
+        }
+      }
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile retrieved successfully",
+      data: profile
+    })
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal server error during getProfile",
+      error: error.message
+    });
+  }
+}
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, email, mobileNumber } = req.body;
+    const userId = req.user._id;
+
+    if (email) {
+      const existingEmail = await User.findOne({ email, _id: { $ne: userId } });
+      if (existingEmail) {
+        return res.status(400).json({
+          message: "This email is already associated with another account."
+        });
+      }
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { name, email, mobileNumber },
+        { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Profile details updated successfully.",
+      user: updatedUser
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update profile", error: error.message });
+  }
+};
+
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({
+      message: "User account not found."
+    });
+
+    const hashedCurrentPassword = hashPassword(currentPassword);
+    if (hashedCurrentPassword !== user.password) {
+      return res.status(400).json({
+        message: "Incorrect current password."
+      });
+    }
+
+    user.password = hashPassword(newPassword);
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Account password changed successfully."
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to change password",
+      error: error.message
+    });
+  }
+};
+
+export const usersList = async (req, res) => {
+  try {
+    const users = await User.aggregate([
+      {
+        $match: {
+          role: "Seller"
+        }
+      },
+      {
+        $project : {
+          label : "$name",
+          value : "$_id",
+          _id: 0
+        }
+      }
+    ]);
+
+    return res.status(200).json({
+      status: "Success",
+      message: "Successfully retrieved users list",
+      list: users,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Internal server error users list",
+      error: error.message
+    });
+  }
+}
