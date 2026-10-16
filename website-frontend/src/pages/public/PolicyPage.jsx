@@ -17,29 +17,65 @@ const policiesList = [
 const policyContent = {
   terms: {
     title: "Terms & Conditions",
-    lastUpdated: "June 16, 2026",
+    lastUpdated: "October 2026",
     sections: [
       {
-        heading: "1. Agreement to Terms",
-        text: "By accessing or using the Phreight International Courier Company logistics platform, you agree to be bound by these Terms and Conditions. If you do not agree, you must immediately cease all use of our services."
+        heading: "1. Acceptance",
+        text: "By registering, booking or using PHREIGHTS services, the customer agrees to these Terms & Conditions and applicable PHREIGHTS policies."
       },
       {
-        heading: "2. Services Offered",
-        text: "Phreight provides an international courier aggregation service. We do not operate our own fleet of transport vehicles; instead, we partner with premium global carriers (e.g. BlueDart Express, Delhivery Air, FedEx, DHL) to coordinate pickups and shipping services."
+        heading: "2. Customer Responsibility",
+        text: "The customer is responsible for providing accurate: Shipper information, Consignee information, Commodity description, Quantity, Weight, Dimensions, Declared value, Customs information, and Required documentation."
       },
       {
-        heading: "3. Wallet and Payments",
-        text: "Sellers must maintain a positive prepaid balance in their Phreight Wallet to book consignments. Charges are calculated dynamically based on weight, dimensions, and destination zone. Auto-debits occur upon booking verification."
+        heading: "3. Shipment Acceptance",
+        text: "PHREIGHTS reserves the right to refuse, cancel, hold or discontinue a shipment where: The shipment contains prohibited/restricted goods, Required documentation is missing, Information is inaccurate, The applicable carrier cannot accept the shipment, Customs/regulatory requirements are not satisfied, The shipment violates applicable laws or regulations, or Operational or security restrictions prevent transportation."
       },
       {
-        heading: "4. Weight Discrepancies",
-        text: "All packages are subject to audit and weight reconciliation by the partner carriers. In the event of a weight discrepancy, Phreight reserves the right to deduct the adjustment amount directly from the seller's wallet balance."
+        heading: "4. Weight & Dimensions",
+        text: "Chargeable weight is calculated using the higher of Actual/Dead Weight OR Volumetric Weight (Volumetric Weight: L × B × H ÷ 5000, where dimensions are measured in centimetres).\n\nIf carrier-measured weight/dimensions differ from the booking information, applicable additional charges may be debited from the customer's PHREIGHTS Wallet."
+      },
+      {
+        heading: "5. Pricing",
+        text: "Shipment pricing may depend on: Destination, Weight, Dimensions/volume, Commodity, Service type, Destination-country requirements, Applicable logistics charges, and other shipment-specific factors."
+      },
+      {
+        heading: "6. DDU / DDP",
+        text: "Customers must select the applicable service during booking.\n\nDDP: Applicable duty/tax-related charges are collected from the shipper.\n\nDDU: Applicable duty/tax/destination charges are payable by the consignee. If the consignee does not pay applicable charges within three delivery attempts, the applicable amount may be debited from the shipper's PHREIGHTS Wallet."
+      },
+      {
+        heading: "7. Customs",
+        text: "Customs authorities independently determine whether duties, taxes, examination, documentation, clearance or other charges apply. PHREIGHTS may assist with follow-up and documentation, but customs clearance timelines are outside PHREIGHTS's control."
+      },
+      {
+        heading: "8. Cancellation",
+        text: "Before pickup: 100% refund to PHREIGHTS Wallet.\n\nAfter pickup: Cancellation is not permitted."
+      },
+      {
+        heading: "9. Return",
+        text: "A return requested after pickup is not guaranteed. Where a return is successfully arranged, applicable domestic return, transportation, customs or other charges may apply."
+      },
+      {
+        heading: "10. Wallet",
+        text: "PHREIGHTS Wallet: Has no expiry, is used for PHREIGHTS bookings/services, is not refundable to a bank account/cash, and may be debited for applicable shipment adjustments."
+      },
+      {
+        heading: "11. Claims",
+        text: "Claims are governed by the separate Shipment Protection & Claim Policy."
+      },
+      {
+        heading: "12. Damage",
+        text: "PHREIGHTS does not provide compensation for shipment damage. Customers are responsible for adequate packaging suitable for transportation."
+      },
+      {
+        heading: "13. Governing / Legal Terms",
+        text: "This section is governed by the legal framework of Phoenix Commerce under applicable Indian jurisdiction and laws."
       }
     ]
   },
   privacy: {
     title: "Privacy Policy",
-    lastUpdated: "June 16, 2026",
+    lastUpdated: "October 2026",
     sections: [
       {
         heading: "1. Information We Collect",
@@ -51,102 +87,171 @@ const policyContent = {
       },
       {
         heading: "3. Data Sharing",
-        text: "We only share delivery details with corresponding logistics carrier partners (e.g. BlueDart, Delhivery) to facilitate package dispatching. We never sell seller or customer database entries to third-party advertisers."
+        text: "We only share delivery details with corresponding logistics carrier partners to facilitate package dispatching. We never sell seller or customer database entries to third-party advertisers."
       }
     ]
   },
   shipping: {
     title: "Shipping Policy",
-    lastUpdated: "June 16, 2026",
+    lastUpdated: "October 2026",
     sections: [
       {
-        heading: "1. Pick-up Schedules",
-        text: "Pickups are triggered automatically within 24 hours of consignment booking, subject to carrier availability. Cutoff time for same-day pickup dispatching is 14:00 local warehouse time."
+        heading: "Booking",
+        text: "Customers can book eligible international shipments through PHREIGHTS. Shipment acceptance remains subject to applicable carrier, aviation, customs, country and regulatory requirements."
       },
       {
-        heading: "2. Delivery SLAs",
-        text: "Delivery timelines depend on the chosen shipping tier. Express Air shipments are delivered in 1-3 business days regionally/nationally, while economy surface shipping slabs range from 3-7 business days."
+        heading: "Pickup",
+        text: "Pickup is automatically allocated by PHREIGHTS. The customer does not select the underlying pickup logistics provider."
       },
       {
-        heading: "3. Address Compliance",
-        text: "Sellers are responsible for providing correct address tokens. Remote, rural, or inaccessible destinations may incur surcharge supplements (Zone D slabs) or require pickup at carrier destination offices."
+        heading: "Chargeable Weight",
+        text: "Chargeable Weight = Higher of Dead Weight and Volumetric Weight (Volumetric Weight = L × B × H ÷ 5000, dimensions must be provided in centimetres)."
+      },
+      {
+        heading: "Shipping Charges",
+        text: "The applicable shipping quotation is determined based on shipment-specific factors including volume, weight, destination and service."
+      },
+      {
+        heading: "Delivered Duty Paid (DDP)",
+        text: "The applicable DDP charges are collected from the shipper at booking."
+      },
+      {
+        heading: "Delivered Duty Unpaid (DDU)",
+        text: "Applicable duties/taxes/destination charges are collected from the consignee. If the consignee fails to pay within three delivery attempts, applicable charges may be debited from the shipper's PHREIGHTS Wallet."
+      },
+      {
+        heading: "Delivery Timelines",
+        text: "Delivery timelines are estimates and may be affected by: Customs, Weather, Airline capacity, Local delivery conditions, Documentation, Regulatory requirements, Consignee availability, Remote-area delivery, and other events outside PHREIGHTS's control."
+      },
+      {
+        heading: "Tracking",
+        text: "Customers receive PHREIGHTS tracking and applicable last-mile tracking information."
       }
     ]
   },
   refund: {
     title: "Refund & Cancellation Policy",
-    lastUpdated: "June 16, 2026",
+    lastUpdated: "October 2026",
     sections: [
       {
-        heading: "1. Booking Cancellations",
-        text: "Sellers can cancel a booked shipment anytime prior to the carrier pickup team executing dispatch. Once the shipment barcode has been scanned at the warehouse or origin hub, the booking cannot be cancelled."
+        heading: "Cancellation Before Pickup",
+        text: "A booking cancelled before pickup is eligible for 100% refund to PHREIGHTS Wallet immediately."
       },
       {
-        heading: "2. Wallet Credits",
-        text: "Upon successful cancellation, the exact deducted tariff charge is immediately credited back to the seller's Phreight Wallet. No cancellation penalties are applied for pre-pickup requests."
+        heading: "Cancellation After Pickup",
+        text: "Cancellation is not permitted after pickup has occurred."
       },
       {
-        heading: "3. Failed Deliveries",
-        text: "consignments that fail delivery due to address issues, refusal, or custom locks will be returned to origin (RTO). RTO tariff charges are debited according to the carrier's standard return rates and are non-refundable."
+        heading: "Return Request",
+        text: "A customer may request a return after pickup. However: Return is not guaranteed. PHREIGHTS may attempt to coordinate the return where operationally possible. If successfully returned, applicable charges may include: Domestic return transportation, Customs charges, Handling charges, Storage charges, and other applicable logistics charges."
+      },
+      {
+        heading: "Wallet Refund",
+        text: "Approved refunds are credited to the PHREIGHTS Wallet.\n\nWallet balance: Does not expire, cannot be withdrawn as cash, cannot be transferred to a bank account, and can be used for eligible PHREIGHTS bookings/services."
+      },
+      {
+        heading: "Customs / Duty Payments",
+        text: "Customs duties and taxes are not automatically refundable merely because a shipment is delayed, refused or returned. Treatment depends on the relevant customs authority/carrier and shipment circumstances."
       }
     ]
   },
   claims: {
-    title: "Claims & Compensation Policy",
-    lastUpdated: "June 16, 2026",
+    title: "Shipment Protection & Claim Policy",
+    lastUpdated: "October 2026",
     sections: [
       {
-        heading: "1. Lost or Damaged Goods",
-        text: "Sellers are eligible to file compensation claims for lost or physically damaged consignments while under the carrier's possession. All claims must be accompanied by photos of package damage or carrier-confirmed lost declarations."
+        heading: "Maximum Claim Liability",
+        text: "Maximum claim liability: ₹10,000 per shipment under eligible loss scenarios."
       },
       {
-        heading: "2. Insurance Limits",
-        text: "Standard shipments are covered up to a liability limit of $50 or the declared package value (whichever is lower). Premium insurance coverage can be purchased during voucher booking for high-value merchandise."
+        heading: "Lost Within India",
+        text: "100% of verified declared value, subject to ₹10,000 maximum."
       },
       {
-        heading: "3. Discrepancy Windows",
-        text: "All claims for shipment damage must be filed in writing via the support desk ticketing system within 7 days of package delivery or scheduled delivery date. Claims filed after this window will be rejected."
+        heading: "Lost During International Transit",
+        text: "50% of verified declared value, subject to ₹10,000 maximum."
+      },
+      {
+        heading: "Lost in Destination Country",
+        text: "50% of verified declared value, subject to ₹10,000 maximum."
+      },
+      {
+        heading: "No Damage Claim",
+        text: "PHREIGHTS does not provide compensation for damaged shipments. Customers are responsible for adequate packaging suitable for transportation."
+      },
+      {
+        heading: "No Claim for Customs / Regulatory Issues",
+        text: "Claims do not apply where the shipment is: Held by Customs, Detained, Seized, Confiscated, Destroyed/disposed by authorities, Affected by incorrect documentation, Misdeclared, Incorrectly valued/classified, Prohibited/restricted, Abandoned due to consignee non-payment, Refused due to duties/taxes, or Returned/disposed due to consignee non-payment."
+      },
+      {
+        heading: "Investigation",
+        text: "Claim investigations may take up to 10 working days after all required information and supporting documents have been received."
+      },
+      {
+        heading: "Settlement",
+        text: "Approved claims are credited directly to the customer's PHREIGHTS Wallet."
       }
     ]
   },
   "prohibited-items": {
     title: "Prohibited & Restricted Items Policy",
-    lastUpdated: "June 16, 2026",
+    lastUpdated: "October 2026",
     sections: [
       {
-        heading: "1. Hazardous Materials",
-        text: "Sellers must never ship explosives, fireworks, flammable liquids, pressurized aerosols, corrosives, batteries, or bio-hazards via Phreight logistics partners. Non-compliance results in immediate account suspension."
+        heading: "Policy Statement",
+        text: "PHREIGHTS does not accept prohibited or restricted commodities that cannot be legally transported through the applicable international air-courier network."
       },
       {
-        heading: "2. Restricted Commodities",
-        text: "Currency notes, bearer bonds, gold, precious stones, firearms, drugs, prescription medicines, alcohol, tobacco, and perishable food products are strictly banned across all carrier partners."
+        heading: "Prohibited Categories",
+        text: "The following categories are strictly prohibited:\n• Explosives and fireworks\n• Ammunition\n• Firearms/weapons\n• Flammable gases\n• Toxic gases\n• Flammable liquids\n• Flammable solids\n• Oxidizing substances\n• Organic peroxides\n• Toxic/poisonous substances\n• Corrosive substances\n• Radioactive materials\n• Infectious/biological materials\n• Dangerous lithium-battery shipments\n• Certain magnetized materials\n• Illegal drugs/narcotics\n• Counterfeit goods\n• Illegal goods\n• Protected wildlife/wildlife products\n• Human remains/body parts\n• Restricted biological materials\n• Other dangerous goods\n• Any commodity prohibited by origin/transit/destination country\n• Any commodity prohibited by the applicable logistics partner"
       },
       {
-        heading: "3. Inspection Rights",
-        text: "Logistics carriers reserve the right to inspect package contents at any hub under security guidelines. Non-compliant parcels will be seized and reported to appropriate regulatory bodies without liability."
+        heading: "Critical Disclaimer",
+        text: "This list is a baseline and is not an exhaustive list of all commodities restricted by every country, carrier or regulatory authority. Additional restrictions may apply based on origin, destination, transit country, carrier, service type and applicable law. PHREIGHTS reserves the right to refuse or hold any shipment that does not satisfy applicable transportation, customs, safety or regulatory requirements."
       }
     ]
   },
   customs: {
     title: "Customs & Duties Policy",
-    lastUpdated: "June 16, 2026",
+    lastUpdated: "October 2026",
     sections: [
       {
-        heading: "1. Customs Declarations",
-        text: "International dispatches require correct HS Code declarations and invoice bills. Sellers must provide complete description logs detailing products, quantity, unit value, and materials."
+        heading: "Customs Assessment",
+        text: "Customs authorities in the destination country independently determine whether a shipment is subject to: Import duty, Tax, Customs examination, Brokerage/clearance charges, Storage charges, Other government or destination charges."
       },
       {
-        heading: "2. Duty Responsibilities",
-        text: "International shipments are subject to local customs taxes, import duties, and clearing fees. Unless explicitly marked as DDP (Delivery Duty Paid), the recipient/consignee is liable to pay all local duties."
+        heading: "Customs Duty Applicability",
+        text: "Customs duty is not applicable to every shipment or every country. The applicable amount can vary based on: Destination, Commodity, HS classification, Declared value, Country of origin, Quantity, Import regulations, and Customs assessment."
       },
       {
-        heading: "3. Customs Clearance Clearance delays due to missing paperwork, security audits, or unpaid import duties by the consignee are outside Phreight's service SLA commitments."
+        heading: "Delivered Duty Paid (DDP)",
+        text: "For DDP shipments, applicable duty/tax-related charges are collected from the shipper according to the applicable booking/service terms."
+      },
+      {
+        heading: "Delivered Duty Unpaid (DDU)",
+        text: "For DDU shipments, applicable duty/tax/destination charges are collected from the consignee. If the consignee fails to pay within three delivery attempts, applicable charges may be automatically debited from the shipper's PHREIGHTS Wallet."
+      },
+      {
+        heading: "Customer & Shipper Responsibility",
+        text: "The shipper is responsible for providing accurate: Product description, Quantity, Value, Weight, Dimensions, HS code/classification where required, Country of origin, Invoice, and Other required customs documents."
+      },
+      {
+        heading: "Customs Assistance",
+        text: "Customers who are new to international shipping should contact the PHREIGHTS Sales/Support team regarding required documentation before booking."
+      },
+      {
+        heading: "Customs Hold & Clearance Timelines",
+        text: "If a shipment is held by Customs, PHREIGHTS may follow up with the applicable logistics partner/authority and assist with the required process. However: Customs clearance timelines are controlled by the relevant customs authority and are outside PHREIGHTS's control. PHREIGHTS therefore does not guarantee a fixed customs-clearance SLA."
+      },
+      {
+        heading: "Customs-Related Charges",
+        text: "Depending on the shipment, applicable charges may include: Duty, Tax, Customs examination, Brokerage, Storage, Demurrage, Clearance, Return, Disposal, and Other destination charges. These may vary by shipment and destination."
       }
     ]
   },
   cookie: {
     title: "Cookie Policy",
-    lastUpdated: "June 16, 2026",
+    lastUpdated: "October 2026",
     sections: [
       {
         heading: "1. Essential Cookies",

@@ -53,7 +53,7 @@ const InsuranceClaims = () => {
         try {
             const res = await API.post("/tickets/claim", claimForm);
             setClaimSuccess(res.data.message || "Insurance claim request submitted successfully.");
-            setClaimForm({ shipmentId: "", claimType: "Lost Shipment", description: "", claimAmount: "" });
+            setClaimForm({ shipmentId: "", claimType: "Lost Shipment", description: "", claimAmount: 0 });
             await fetchClaims();
         } catch (err) {
             setClaimError(err.response?.data?.message || "Dispute claim request failed.");
@@ -73,20 +73,23 @@ const InsuranceClaims = () => {
     ];
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div className="space-y-6 select-none animate-fade-in">
+            {/* Title Header */}
+            <div>
+                <h1 className="text-2xl font-extrabold text-[#0A1F44] tracking-tight">Logistics Insurance Claims</h1>
+                <p className="text-sm text-[#687280]">File lost or damaged consignment claims, track audit disputes, and review administrative settlements.</p>
+            </div>
 
-            <div className="bg-[#E5E7EB]/5 border border-[#687280]/20 rounded-3xl p-6 space-y-6">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2 border-b border-[#687280]/20 pb-4">
-                    <ShieldAlert size={22} className="text-[#FF6A00]" />
-                    Logistics Insurance Claims
-                </h3>
+            {/* File claim card */}
+            <div className="glass-card p-6 md:p-8 rounded-2xl border border-[#687280]/20 shadow-xl space-y-4">
+                <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider pb-3 border-b border-[#687280]/15 flex items-center gap-2">
+                    <ShieldAlert size={16} /> File New Insurance Claim Dispute
+                </h4>
 
-                <form onSubmit={handleFileClaim} className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
-                    <h4 className="text-xs font-bold uppercase text-[#FF6A00]">File New Insurance claim dispute</h4>
-
-                    <div className="grid md:grid-cols-3 gap-4">
+                <form onSubmit={handleFileClaim} className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
                         <div>
-                            <label className="text-[10px] text-gray-400 block mb-1">Select Shipment ID</label>
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Select Shipment ID</label>
                             <Select
                                 options={shipmentOptions}
                                 value={claimForm.shipmentId}
@@ -95,7 +98,7 @@ const InsuranceClaims = () => {
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-400 block mb-1">Claim Dispute Category</label>
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Claim Dispute Category</label>
                             <Select
                                 options={claimTypeOptions}
                                 value={claimForm.claimType}
@@ -103,39 +106,28 @@ const InsuranceClaims = () => {
                                 placeholder="-- Select Category --"
                             />
                         </div>
-                        {/*<div>*/}
-                        {/*    <label className="text-[10px] text-gray-400 block mb-1">Requested Payout Amount (₹)</label>*/}
-                        {/*    <input*/}
-                        {/*        type="number"*/}
-                        {/*        placeholder="5000"*/}
-                        {/*        value={claimForm.claimAmount}*/}
-                        {/*        onChange={(e) => setClaimForm({ ...claimForm, claimAmount: e.target.value })}*/}
-                        {/*        required*/}
-                        {/*        className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"*/}
-                        {/*    />*/}
-                        {/*</div>*/}
                     </div>
 
                     <div>
-                        <label className="text-[10px] text-gray-400 block mb-1">Description & Incident Details</label>
+                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Description & Incident Details</label>
                         <textarea
-                            placeholder="Please detail the loss or delay particulars..."
+                            placeholder="Please detail the loss, damage, or delay particulars..."
                             value={claimForm.description}
                             onChange={(e) => setClaimForm({ ...claimForm, description: e.target.value })}
                             rows="3"
                             required
-                            className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                            className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm"
                         />
                     </div>
 
                     {claimError && (
-                        <div className="bg-red-500/10 border border-red-500/30 text-red-500 text-xs p-3.5 rounded-xl">
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-3.5 rounded-xl">
                             {claimError}
                         </div>
                     )}
 
                     {claimSuccess && (
-                        <div className="bg-green-500/10 border border-green-500/30 text-green-500 text-xs p-3.5 rounded-xl">
+                        <div className="bg-green-50 border border-green-200 text-green-700 text-xs p-3.5 rounded-xl">
                             {claimSuccess}
                         </div>
                     )}
@@ -143,65 +135,62 @@ const InsuranceClaims = () => {
                     <button
                         type="submit"
                         disabled={!claimForm.shipmentId}
-                        className="w-full bg-[#FF6A00] text-[#0A1F44] font-extrabold py-3.5 rounded-xl text-xs hover:brightness-110 active:scale-95 transition disabled:opacity-50"
+                        className="w-full bg-[#FF6A00] hover:bg-[#ff7b1a] text-white font-extrabold py-3.5 rounded-xl text-xs transition disabled:opacity-50 shadow-md shadow-[#FF6A00]/20"
                     >
                         Submit Dispute Claim Request
                     </button>
-
                 </form>
             </div>
 
             {/* Claims list */}
-            <div className="bg-[#E5E7EB]/5 border border-[#687280]/20 rounded-3xl p-6 space-y-4">
-                <h3 className="text-lg font-bold text-white">Disputed claims register</h3>
+            <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 shadow-xl space-y-4">
+                <h3 className="text-base font-bold text-[#0A1F44]">Disputed Claims Register</h3>
 
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto custom-scrollbar">
                     <table className="w-full text-left border-collapse text-xs">
                         <thead>
                         <tr className="border-b border-[#687280]/20 text-[#687280] uppercase tracking-wider text-[10px]">
-                            <th className="py-2.5 px-4">Date Filed</th>
-                            <th className="py-2.5 px-4">Shipment</th>
-                            <th className="py-2.5 px-4 text-center">Dispute Class</th>
-                            {/*<th className="py-2.5 px-4 text-right">Requested Payout</th>*/}
-                            <th className="py-2.5 px-4">Description</th>
-                            <th className="py-2.5 px-4 text-center">Status</th>
-                            <th className="py-2.5 px-4">Admin Remarks</th>
+                            <th className="py-3 px-4 font-semibold">Date Filed</th>
+                            <th className="py-3 px-4 font-semibold">Shipment ID</th>
+                            <th className="py-3 px-4 text-center font-semibold">Dispute Class</th>
+                            <th className="py-3 px-4 font-semibold">Description</th>
+                            <th className="py-3 px-4 text-center font-semibold">Status</th>
+                            <th className="py-3 px-4 font-semibold">Admin Remarks</th>
                         </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#687280]/10">
+                        <tbody className="divide-y divide-[#687280]/10 text-[#0A1F44]">
                         {claims.map(c => (
-                            <tr key={c._id} className="hover:bg-white/5 transition-colors">
-                                <td className="py-3 px-4 text-gray-500">{new Date(c.createdAt).toLocaleDateString()}</td>
-                                <td className="py-3 px-4 font-mono font-bold text-[#FF6A00]">
-                                    {/* Accounts for backend populating the shipment reference */}
+                            <tr key={c._id} className="hover:bg-[#E5E7EB]/30 transition-colors">
+                                <td className="py-3.5 px-4 text-[#687280]">{new Date(c.createdAt).toLocaleDateString()}</td>
+                                <td className="py-3.5 px-4 font-mono font-bold text-[#FF6A00]">
                                     {c.shipmentId?.shipmentId || c.shipmentId || "Unknown"}
                                 </td>
-                                <td className="py-3 px-4 text-center font-semibold">{c.claimType}</td>
-                                {/*<td className="py-3 px-4 text-right font-bold text-white">₹{c.claimAmount.toFixed(2)}</td>*/}
-                                <td className="py-3 px-4 text-gray-400">{c.description}</td>
-                                <td className="py-3 px-4 text-center">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                        c.status === "Approved" || c.status === "Paid" ? "bg-green-500/10 text-green-500" :
-                                            c.status === "Pending" ? "bg-amber-500/10 text-amber-500" : "bg-red-500/10 text-red-500"
+                                <td className="py-3.5 px-4 text-center font-semibold text-[#0A1F44]">{c.claimType}</td>
+                                <td className="py-3.5 px-4 text-[#687280] max-w-xs">{c.description}</td>
+                                <td className="py-3.5 px-4 text-center">
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
+                                        c.status === "Approved" || c.status === "Paid" ? "bg-green-100 text-green-700 border-green-200" :
+                                            c.status === "Pending" ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-red-100 text-red-700 border-red-200"
                                     }`}>
-                                      {c.status}
+                                        {c.status}
                                     </span>
                                 </td>
-                                <td className="py-3 px-4 text-gray-400 italic">{c.adminRemarks || "No admin notes yet."}</td>
+                                <td className="py-3.5 px-4 text-[#687280] italic">{c.adminRemarks || "No admin notes yet."}</td>
                             </tr>
                         ))}
                         {claims.length === 0 && (
                             <tr>
-                                <td colSpan="7" className="py-6 text-center text-gray-500">No insurance claims filed yet.</td>
+                                <td colSpan="6" className="py-10 text-center text-[#687280] font-semibold">
+                                    No insurance claims filed yet.
+                                </td>
                             </tr>
                         )}
                         </tbody>
                     </table>
                 </div>
             </div>
-
         </div>
-    )
-}
+    );
+};
 
 export default InsuranceClaims;

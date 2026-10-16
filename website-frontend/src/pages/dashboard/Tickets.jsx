@@ -57,31 +57,31 @@ const Tickets = () => {
         fetchTickets()
     }, []);
     return (
-        <div className="bg-[#E5E7EB]/5 border border-[#687280]/20 rounded-3xl p-6 animate-fade-in grid lg:grid-cols-3 gap-8">
+        <div className="glass-card border border-[#687280]/20 rounded-2xl p-6 shadow-xl animate-fade-in grid lg:grid-cols-3 gap-8">
 
             {/* Ticket creation and listing */}
             <div className="lg:col-span-1 space-y-6">
                 <div className="space-y-4">
-                    <h3 className="text-lg font-bold text-white border-b border-[#687280]/20 pb-2">Open New Ticket</h3>
+                    <h3 className="text-lg font-black text-[#0A1F44] border-b border-[#687280]/20 pb-2">Open New Ticket</h3>
 
                     <form onSubmit={handleCreateTicket} className="space-y-3 text-xs">
                         <div>
-                            <label className="text-[10px] text-gray-400 block mb-1">Subject</label>
+                            <label className="text-[11px] font-bold text-[#687280] uppercase tracking-wider block mb-1">Subject</label>
                             <input
                                 type="text"
                                 placeholder="Delayed delivery AWB..."
                                 value={ticketForm.subject}
                                 onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })}
                                 required
-                                className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                                className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] placeholder:text-[#687280]/60 outline-none focus:border-[#FF6A00] focus:ring-1 focus:ring-[#FF6A00] text-xs transition"
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-400 block mb-1">Issue category</label>
+                            <label className="text-[11px] font-bold text-[#687280] uppercase tracking-wider block mb-1">Issue category</label>
                             <select
                                 value={ticketForm.type}
                                 onChange={(e) => setTicketForm({ ...ticketForm, type: e.target.value })}
-                                className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                                className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] focus:ring-1 focus:ring-[#FF6A00] text-xs transition"
                             >
                                 <option value="Shipment Issue">Shipment Issue</option>
                                 <option value="Tracking Issue">Tracking Issue</option>
@@ -92,26 +92,26 @@ const Tickets = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-400 block mb-1">Problem details</label>
+                            <label className="text-[11px] font-bold text-[#687280] uppercase tracking-wider block mb-1">Problem details</label>
                             <textarea
                                 placeholder="Elaborate details..."
                                 value={ticketForm.description}
                                 onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })}
                                 rows="3"
                                 required
-                                className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                                className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] placeholder:text-[#687280]/60 outline-none focus:border-[#FF6A00] focus:ring-1 focus:ring-[#FF6A00] text-xs transition"
                             />
                         </div>
 
                         {ticketSuccess && (
-                            <div className="bg-green-500/10 border border-green-500/30 text-green-500 text-xs p-2 rounded">
+                            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-2.5 rounded-xl font-medium">
                                 {ticketSuccess}
                             </div>
                         )}
 
                         <button
                             type="submit"
-                            className="w-full bg-[#FF6A00] text-[#0A1F44] font-bold py-2.5 rounded-xl text-xs hover:brightness-110 transition"
+                            className="w-full bg-[#FF6A00] text-white font-bold py-2.5 rounded-xl text-xs hover:brightness-110 shadow-md transition active:scale-[0.99]"
                         >
                             Submit Ticket
                         </button>
@@ -120,59 +120,59 @@ const Tickets = () => {
 
                 {/* Ticket roster list */}
                 <div className="space-y-4 pt-4 border-t border-[#687280]/20">
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">Active Tickets</h3>
+                    <h3 className="text-xs font-black text-[#0A1F44] uppercase tracking-wider">Active Tickets</h3>
 
-                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                    <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-1">
                         {tickets.map(t => (
                             <div
                                 key={t._id}
                                 onClick={() => setSelectedTicket(t)}
                                 className={`p-3 rounded-xl border cursor-pointer transition flex justify-between items-center ${
-                                    selectedTicket?._id === t._id ? "bg-[#FF6A00]/20 border-[#FF6A00]" : "bg-black/20 border-white/5 hover:border-white/10"
+                                    selectedTicket?._id === t._id ? "bg-[#FF6A00]/10 border-2 border-[#FF6A00] shadow-sm" : "bg-white border-[#687280]/20 hover:border-[#687280]/40 hover:bg-[#E5E7EB]/20 shadow-sm"
                                 }`}
                             >
                                 <div className="space-y-1">
-                                    <span className="font-mono text-[10px] text-[#FF6A00] font-bold block">{t.ticketId}</span>
-                                    <span className="font-bold text-white text-xs block truncate max-w-[120px]">{t.subject}</span>
-                                    <span className="text-[9px] text-gray-500 block">{new Date(t.createdAt).toLocaleDateString()}</span>
+                                    <span className="font-mono text-[10px] text-[#FF6A00] font-black block">{t.ticketId}</span>
+                                    <span className="font-bold text-[#0A1F44] text-xs block truncate max-w-[140px]">{t.subject}</span>
+                                    <span className="text-[10px] text-[#687280] block">{new Date(t.createdAt).toLocaleDateString()}</span>
                                 </div>
-                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                                    t.status === "Resolved" || t.status === "Closed" ? "bg-green-500/10 text-green-500" : "bg-amber-500/10 text-amber-500"
+                                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                    t.status === "Resolved" || t.status === "Closed" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-amber-50 text-amber-600 border-amber-200"
                                 }`}>
-                          {t.status}
-                        </span>
+                                    {t.status}
+                                </span>
                             </div>
                         ))}
                         {tickets.length === 0 && (
-                            <p className="text-gray-500 text-center py-6 text-xs">No active tickets opened.</p>
+                            <p className="text-[#687280] text-center py-6 text-xs">No active tickets opened.</p>
                         )}
                     </div>
                 </div>
             </div>
 
             {/* Ticket Chat thread */}
-            <div className="lg:col-span-2 bg-black/20 border border-white/5 rounded-3xl p-6 flex flex-col justify-between min-h-[450px]">
+            <div className="lg:col-span-2 bg-[#E5E7EB]/30 border border-[#687280]/20 rounded-2xl p-6 flex flex-col justify-between min-h-[450px]">
                 {selectedTicket ? (
                     <>
                         <div>
                             <div className="flex justify-between items-start border-b border-[#687280]/20 pb-4 mb-4">
                                 <div>
-                                    <span className="font-mono text-xs text-[#FF6A00] font-bold">{selectedTicket.ticketId} | {selectedTicket.type}</span>
-                                    <h4 className="text-lg font-bold text-white">{selectedTicket.subject}</h4>
+                                    <span className="font-mono text-xs text-[#FF6A00] font-black">{selectedTicket.ticketId} | {selectedTicket.type}</span>
+                                    <h4 className="text-lg font-black text-[#0A1F44]">{selectedTicket.subject}</h4>
                                 </div>
-                                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                    selectedTicket.status === "Resolved" || selectedTicket.status === "Closed" ? "bg-green-500/10 text-green-500" : "bg-amber-500/10 text-amber-500"
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
+                                    selectedTicket.status === "Resolved" || selectedTicket.status === "Closed" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-amber-50 text-amber-600 border-amber-200"
                                 }`}>
-                          Status: {selectedTicket.status}
-                        </span>
+                                    Status: {selectedTicket.status}
+                                </span>
                             </div>
 
                             {/* Chat Messages */}
-                            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 mb-6">
+                            <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2 mb-6">
                                 {selectedTicket.messages.map((m, idx) => (
                                     <div key={idx} className={`flex flex-col ${m.sender === "Seller" ? "items-end" : "items-start"}`}>
-                                        <div className={`p-3 rounded-2xl max-w-sm text-xs ${
-                                            m.sender === "Seller" ? "bg-[#FF6A00]/20 text-white rounded-tr-none" : "bg-[#0A1F44] text-white rounded-tl-none border border-white/5"
+                                        <div className={`p-3.5 rounded-2xl max-w-sm text-xs shadow-sm ${
+                                            m.sender === "Seller" ? "bg-[#FF6A00] text-white rounded-tr-none" : "bg-white text-[#0A1F44] rounded-tl-none border border-[#687280]/20"
                                         }`}>
                                             {m.content.startsWith("data:image/") ? (
                                                 <img
@@ -188,7 +188,7 @@ const Tickets = () => {
                                                 <p>{m.content}</p>
                                             )}
                                         </div>
-                                        <span className="text-[9px] text-gray-500 mt-1">{new Date(m.time).toLocaleString()}</span>
+                                        <span className="text-[10px] text-[#687280] mt-1 font-medium">{new Date(m.time).toLocaleString()}</span>
                                     </div>
                                 ))}
                             </div>
@@ -196,7 +196,7 @@ const Tickets = () => {
 
                         {/* Send reply message */}
                         {selectedTicket.status !== "Closed" && (
-                            <form onSubmit={handleTicketReply} className="flex gap-3 items-center">
+                            <form onSubmit={handleTicketReply} className="flex gap-3 items-center pt-3 border-t border-[#687280]/20">
                                 <input
                                     id="ticket-image-upload"
                                     type="file"
@@ -224,7 +224,7 @@ const Tickets = () => {
                                 <button
                                     type="button"
                                     onClick={() => document.getElementById("ticket-image-upload").click()}
-                                    className="bg-[#0A1F44] hover:bg-white/5 border border-white/10 text-[#FF6A00] p-3 rounded-xl transition flex items-center justify-center shrink-0"
+                                    className="bg-white hover:bg-[#E5E7EB]/50 border border-[#687280]/30 text-[#FF6A00] p-3 rounded-xl transition flex items-center justify-center shrink-0 shadow-sm"
                                     title="Upload Image"
                                 >
                                     <Upload size={16} />
@@ -235,11 +235,11 @@ const Tickets = () => {
                                     value={ticketReply}
                                     onChange={(e) => setTicketReply(e.target.value)}
                                     required
-                                    className="flex-1 p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                                    className="flex-1 p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] placeholder:text-[#687280]/60 outline-none focus:border-[#FF6A00] focus:ring-1 focus:ring-[#FF6A00] text-xs transition"
                                 />
                                 <button
                                     type="submit"
-                                    className="bg-[#FF6A00] text-[#0A1F44] font-bold px-4 py-3 rounded-xl hover:brightness-110 transition flex items-center justify-center shrink-0"
+                                    className="bg-[#FF6A00] text-white font-bold px-4 py-3 rounded-xl hover:brightness-110 transition flex items-center justify-center shrink-0 shadow-md"
                                 >
                                     <Send size={16} />
                                 </button>
@@ -247,9 +247,9 @@ const Tickets = () => {
                         )}
                     </>
                 ) : (
-                    <div className="my-auto text-center text-gray-500 py-20">
-                        <HelpCircle size={48} className="mx-auto mb-3 text-gray-600 animate-pulse" />
-                        <p className="text-sm">Select a ticket from the left panel to inspect communication logs.</p>
+                    <div className="my-auto text-center text-[#687280] py-20">
+                        <HelpCircle size={48} className="mx-auto mb-3 text-[#687280]/50 animate-pulse" />
+                        <p className="text-sm font-semibold">Select a ticket from the left panel to inspect communication logs.</p>
                     </div>
                 )}
             </div>

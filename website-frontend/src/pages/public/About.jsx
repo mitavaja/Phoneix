@@ -22,51 +22,52 @@ const About = () => {
 
       {/* 🔥 HERO */}
       <section className="text-center px-6">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">
-          {data?.hero?.title || "About Phreight International Courier Company"}
+        <h1 className="text-4xl md:text-5xl font-extrabold mb-4 text-[#0A1F44]">
+          {data?.hero?.title || "About PHREIGHTS | International Shipping & Courier Solutions"}
         </h1>
-        <p className="text-[#687280] max-w-2xl mx-auto">
-          {data?.hero?.description || "We are redefining international shipping and global logistics for modern businesses with fast, reliable, and cost-effective delivery solutions."}
+        <p className="text-[#FF6A00] font-semibold text-lg md:text-xl max-w-2xl mx-auto">
+          {data?.hero?.description || "Delivering Beyond Borders."}
         </p>
       </section>
 
       {/* 📦 ABOUT CONTENT */}
-      <section className="px-6 max-w-6xl mx-auto grid md:grid-cols-2 gap-10 items-center">
-        <div>
-          <h2 className="text-3xl font-bold mb-4">
-            {data?.whoWeAre?.title || "Who We Are"}
+      <section className="px-6 max-w-6xl mx-auto grid md:grid-cols-2 gap-10 items-start">
+        <div className="space-y-4">
+          <h2 className="text-3xl font-extrabold text-[#0A1F44]">
+            {data?.whoWeAre?.title || "What PHREIGHTS Provides"}
           </h2>
-          <p className="text-[#687280] leading-relaxed">
-            {data?.whoWeAre?.description || "Phreight International Courier Company is a smart global shipping platform designed for sellers who want to scale globally. We integrate with top international logistics providers to deliver the best shipping experience with transparent pricing and fast, precise delivery."}
+          <p className="text-[#687280] leading-relaxed whitespace-pre-line text-sm md:text-base">
+            {data?.whoWeAre?.description || "PHREIGHTS is an international shipping and courier platform operated by Phoenix Commerce, designed to simplify cross-border shipping for businesses and individuals.\n\nWe help customers ship internationally through a streamlined platform that combines shipment booking, pickup coordination, international transportation, tracking, customs assistance and customer support under one PHREIGHTS experience.\n\nOur technology-enabled platform connects customers with suitable logistics solutions while keeping the customer experience simple and transparent."}
           </p>
         </div>
 
-        <div className="bg-white border border-[#687280]/20 rounded-xl p-6">
-          <p className="text-[#687280] leading-loose whitespace-pre-line">
-            {data?.whoWeAre?.points || `✔ International Shipping & Global Courier\n✔ Automated Route & Tariff Calculation\n✔ Wallet-Based Secure Payment System\n✔ Real-Time GPS Tracking & Alerts`}
+        <div className="bg-white border border-[#687280]/20 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-xs uppercase font-extrabold tracking-wider text-[#FF6A00] mb-3">Key Solutions</h3>
+          <p className="text-[#0A1F44] text-sm leading-loose whitespace-pre-line font-medium">
+            {data?.whoWeAre?.points || `✔ International shipment booking\n✔ Door-to-door international shipping\n✔ Automated pickup allocation\n✔ Multiple international logistics solutions\n✔ Competitive shipment quotations\n✔ DDU and DDP service options\n✔ PHREIGHTS shipment tracking\n✔ Last-mile tracking\n✔ Customs documentation assistance\n✔ Shipment support\n✔ Wallet-based booking payments\n✔ Shipment protection for eligible loss scenarios`}
           </p>
         </div>
       </section>
 
-      {/* 🎯 MISSION & VISION */}
-      <section className="bg-white border border-[#687280]/20 py-16 px-6 rounded-3xl max-w-7xl mx-auto w-full">
+      {/* 🎯 OUR APPROACH & BUSINESS DETAILS */}
+      <section className="bg-white border border-[#687280]/20 py-16 px-6 rounded-3xl max-w-7xl mx-auto w-full shadow-sm">
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-10">
 
-          <div className="bg-white border border-[#687280]/20 p-8 rounded-2xl hover:scale-105 transition duration-500">
-            <h3 className="text-2xl font-semibold mb-4 text-[#FF6A00]">
-              {data?.missionVision?.missionTitle || "Our Mission"}
+          <div className="bg-[#E5E7EB]/25 border border-[#687280]/20 p-8 rounded-2xl hover:shadow-md transition duration-300">
+            <h3 className="text-2xl font-bold mb-4 text-[#FF6A00]">
+              {data?.missionVision?.missionTitle || "Our Approach"}
             </h3>
-            <p className="text-[#687280] leading-relaxed">
-              {data?.missionVision?.missionDesc || "To simplify global shipping for businesses by providing affordable, fast, and highly reliable logistics and courier solutions."}
+            <p className="text-[#687280] leading-relaxed whitespace-pre-line text-sm md:text-base">
+              {data?.missionVision?.missionDesc || "One platform. Multiple logistics possibilities. One PHREIGHTS experience.\n\nCustomers do not need to select individual underlying logistics partners during booking. PHREIGHTS determines the appropriate pickup and logistics routing based on available service options and operational requirements."}
             </p>
           </div>
 
-          <div className="bg-white border border-[#687280]/20 p-8 rounded-2xl hover:scale-105 transition duration-500">
-            <h3 className="text-2xl font-semibold mb-4 text-[#FF6A00]">
-              {data?.missionVision?.visionTitle || "Our Vision"}
+          <div className="bg-[#E5E7EB]/25 border border-[#687280]/20 p-8 rounded-2xl hover:shadow-md transition duration-300">
+            <h3 className="text-2xl font-bold mb-4 text-[#0A1F44]">
+              {data?.missionVision?.visionTitle || "Business Details"}
             </h3>
-            <p className="text-[#687280] leading-relaxed">
-              {data?.missionVision?.visionDesc || "To become a leading global shipping and courier platform and empower every seller to go international seamlessly."}
+            <p className="text-[#687280] leading-relaxed whitespace-pre-line text-sm md:text-base font-medium">
+              {data?.missionVision?.visionDesc || "PHREIGHTS (Operated by Phoenix Commerce)\nRegistered Business Address: 2051, International Fashion Market, Opp. Raajmahal AC Mall, Sitanagar, Surat – 395010, Gujarat, India\nPublic Location: Surat, Gujarat, India\nGSTIN: 24DYHPA2082J1ZL | PAN: DYHPA2082J\nIEC: DYHPA2082J | AD Code: 01800J65600009"}
             </p>
           </div>
 
@@ -75,15 +76,15 @@ const About = () => {
 
       {/* ⭐ WHY CHOOSE US */}
       <section className="px-6 text-center">
-        <h2 className="text-3xl font-bold mb-10">
-          {data?.whyChooseUs?.title || "Why Choose Us"}
+        <h2 className="text-3xl font-extrabold mb-10 text-[#0A1F44]">
+          {data?.whyChooseUs?.title || "Why Choose PHREIGHTS"}
         </h2>
 
         <div className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto">
-          {(data?.whyChooseUs?.items || ["Lowest Rates", "Fast Pickup", "Live Tracking", "Secure Wallet"]).map((item, idx) => (
+          {(data?.whyChooseUs?.items || ["Door-to-Door Shipping", "Automated Pickup Allocation", "Full Last-Mile Tracking", "Wallet-Based Payments"]).map((item, idx) => (
             <div
               key={idx}
-              className="bg-white border border-[#687280]/20 p-6 rounded-xl hover:scale-105 transition duration-300"
+              className="bg-white border border-[#687280]/20 p-6 rounded-xl hover:scale-105 transition duration-300 font-bold text-[#0A1F44] shadow-sm"
             >
               {item}
             </div>
@@ -92,17 +93,17 @@ const About = () => {
       </section>
 
       {/* 📊 STATS */}
-      <section className="bg-white border border-[#687280]/20 py-16 px-6 text-center rounded-3xl max-w-7xl mx-auto w-full">
+      <section className="bg-white border border-[#687280]/20 py-16 px-6 text-center rounded-3xl max-w-7xl mx-auto w-full shadow-sm">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {(data?.stats?.items || [
-            { value: "10K+", label: "Shipments" },
-            { value: "500+", label: "Sellers" },
-            { value: "20+", label: "Countries" },
-            { value: "99%", label: "Success Rate" }
+            { value: "10K+", label: "Shipments Delivered" },
+            { value: "500+", label: "Active Merchants" },
+            { value: "20+", label: "Destinations Covered" },
+            { value: "99%", label: "Delivery Success" }
           ]).map((item, idx) => (
             <div key={idx}>
-              <h2 className="text-4xl font-bold text-[#FF6A00] mb-2">{item.value}</h2>
-              <p className="text-[#687280] font-medium">{item.label}</p>
+              <h2 className="text-4xl font-extrabold text-[#FF6A00] mb-2">{item.value}</h2>
+              <p className="text-[#687280] font-semibold text-sm">{item.label}</p>
             </div>
           ))}
         </div>
@@ -110,15 +111,15 @@ const About = () => {
 
       {/* 🚀 CTA */}
       <section className="text-center px-6">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">
-          {data?.cta?.title || "Ready to Start Shipping?"}
+        <h2 className="text-3xl md:text-4xl font-extrabold mb-4 text-[#0A1F44]">
+          {data?.cta?.title || "Customer Support & Hours"}
         </h2>
-        <p className="text-[#687280] mb-8">
-          {data?.cta?.description || "Join Phreight International Courier Company and grow your business globally."}
+        <p className="text-[#687280] mb-8 max-w-2xl mx-auto leading-relaxed whitespace-pre-line text-sm md:text-base">
+          {data?.cta?.description || "Monday–Saturday: 10:00 AM–6:00 PM IST | Email: phoenixfreights@gmail.com\nCustomers can also raise support tickets after logging into their PHREIGHTS account."}
         </p>
 
-        <Link to="/register" className="bg-[#FF6A00] text-white px-8 py-3 rounded-lg font-bold hover:scale-105 hover:shadow-lg hover:bg-orange-600 transition duration-300 inline-block">
-          {data?.cta?.buttonText || "Get Started"}
+        <Link to="/register" className="bg-[#FF6A00] text-white px-8 py-3.5 rounded-xl font-bold hover:scale-105 hover:shadow-lg hover:shadow-[#FF6A00]/25 transition duration-300 inline-block">
+          {data?.cta?.buttonText || "Start Shipping Now"}
         </Link>
       </section>
 

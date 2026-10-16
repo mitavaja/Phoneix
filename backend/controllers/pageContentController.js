@@ -1,11 +1,16 @@
 import PageContent from "../models/PageContent.js";
+import { defaultCmsContent } from "../utils/defaultCmsContent.js";
 
 // Retrieve content for a specific page (Public)
 export const getPageContent = async (req, res) => {
   try {
     const { page } = req.params;
-    const content = await PageContent.findOne({ page });
+    let content = await PageContent.findOne({ page });
     if (!content) {
+      if (defaultCmsContent[page]) {
+        content = await PageContent.create({ page, sections: defaultCmsContent[page] });
+        return res.status(200).json(content);
+      }
       return res.status(404).json({ message: `Page content for '${page}' not found` });
     }
     res.status(200).json(content);

@@ -44,7 +44,7 @@ const App = () => {
                     <Route path="users/blocked" element={<BlockedUsers />} />
 
                     {/* Catch-all Redirect */}
-                    <Route path="*" element={<Navigate to="cms/home" />} />
+                    <Route path="*" element={<Navigate to="/admin/cms/home" replace />} />
                   </Routes>
                 </AdminLayout>
               </ProtectedRoute>
