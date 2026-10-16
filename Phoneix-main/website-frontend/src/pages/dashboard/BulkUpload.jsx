@@ -63,197 +63,226 @@ const BulkUpload = () => {
         fetchWarehouses();
     }, []);
 
-    const handleDownloadSample = (format) => {
-        const ws = XLSX.utils.aoa_to_sheet([headers, sampleDataRow]);
+    // Helper: Generate and Download Excel/CSV Files
+    const downloadTemplate = (format = "csv") => {
+        if (format === "csv") {
+            const csvContent = [headers.join(","), sampleDataRow.join(",")].join("\n");
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", "Phoenix_Bulk_Booking_Template.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+        }
+
+        // Generate Styled XLSX Template
+        const wb = XLSX.utils.book_new();
+        const wsData = [headers, sampleDataRow];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
         const headerStyle = {
             font: { bold: true, color: { rgb: "FFFFFF" } },
             fill: { fgColor: { rgb: "0A1F44" } },
-            alignment: { horizontal: "center", vertical: "center" },
-            border: {
-                top: { style: "thin", color: { rgb: "CCCCCC" } },
-                bottom: { style: "thin", color: { rgb: "CCCCCC" } },
-                left: { style: "thin", color: { rgb: "CCCCCC" } },
-                right: { style: "thin", color: { rgb: "CCCCCC" } }
-            }
+            alignment: { horizontal: "center", vertical: "center" }
         };
-
-        ws["!cols"] = headers.map(() => ({ wch: 22 }));
 
         headers.forEach((_, colIndex) => {
             const cellAddress = XLSX.utils.encode_cell({ r: 0, c: colIndex });
-            if (ws[cellAddress]) ws[cellAddress].s = headerStyle;
+            if (ws[cellAddress]) {
+                ws[cellAddress].s = headerStyle;
+            }
         });
 
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Bulk_Template");
-
-        if (format === "excel") XLSX.writeFile(wb, "Phoenix_Bulk_Template.xlsx");
-        if (format === "csv") XLSX.writeFile(wb, "Phoenix_Bulk_Template.csv");
+        ws["!cols"] = headers.map(() => ({ wch: 22 }));
+        XLSX.utils.book_append_sheet(wb, ws, "Consignments");
+        XLSX.writeFile(wb, "Phoenix_Bulk_Booking_Template.xlsx");
     };
 
     const dropdownItems = [
-        { label: "Download as Excel (.xlsx)", icon: FileSpreadsheet, onClick: () => handleDownloadSample("excel") },
-        { label: "Download as CSV (.csv)", icon: FileText, onClick: () => handleDownloadSample("csv") }
+        {
+            label: "Template Spreadsheet (.xlsx)",
+            icon: FileSpreadsheet,
+            onClick: () => downloadTemplate("xlsx")
+        },
+        {
+            label: "Template Comma-Separated (.csv)",
+            icon: FileText,
+            onClick: () => downloadTemplate("csv")
+        }
     ];
 
-    // STEP 1: Parse File in Frontend & Validate Basic Fields
+    // STEP 1: Process and Validate Uploaded File
     const handleFileProcessAndValidate = (e) => {
         const file = e.target.files[0];
-        setBulkFile(file);
-        setBulkResult(null);
-        setRatesCalculated(false);
-        setBulkValidationError("");
-
         if (!file) return;
 
-        const allowedExtensions = ["csv", "xlsx", "xls"];
-        const fileExtension = file.name.split('.').pop().toLowerCase();
-
-        if (!allowedExtensions.includes(fileExtension)) {
-            setBulkValidationError("Invalid file format. Please upload a .csv or .xlsx file.");
-            return;
-        }
-
-        const defaultWh = warehouses.find(w => w.isDefault) || warehouses[0];
-        if (!defaultWh) {
-            setBulkValidationError("No warehouse found. Please create a pickup warehouse in the Warehouses tab first.");
-            return;
-        }
-
+        setBulkValidationError("");
+        setBulkResult(null);
+        setRatesCalculated(false);
+        setBulkFile(file);
         setBulkProcessing(true);
 
         const reader = new FileReader();
-        reader.onload = (evt) => {
+        const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+
+        reader.onload = (event) => {
             try {
-                const bstr = evt.target.result;
-                const wb = XLSX.read(bstr, { type: "binary" });
-                const wsname = wb.SheetNames[0];
-                const ws = wb.Sheets[wsname];
-                const data = XLSX.utils.sheet_to_json(ws);
+                let parsedRows = [];
 
-                console.log(data)
+                if (isExcel) {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, { type: "array" });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    parsedRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+                } else {
+                    const text = event.target.result;
+                    const lines = text.split("\n").map(l => l.trim()).filter(l => l);
+                    if (lines.length < 2) {
+                        setBulkValidationError("The uploaded file does not contain any data rows.");
+                        setBulkProcessing(false);
+                        return;
+                    }
+                    const fileHeaders = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ''));
+                    parsedRows = lines.slice(1).map(line => {
+                        const values = line.split(",").map(v => v.trim().replace(/^"|"$/g, ''));
+                        const rowObj = {};
+                        fileHeaders.forEach((h, i) => { rowObj[h] = values[i] || ""; });
+                        return rowObj;
+                    });
+                }
 
-                let valid = [];
-                let invalid = [];
+                if (parsedRows.length === 0) {
+                    setBulkValidationError("No valid data rows found in the spreadsheet.");
+                    setBulkProcessing(false);
+                    return;
+                }
 
-                // Prepare Validated Reference Arrays
-                const validCountries = ARAMEX_SUPPORTED_COUNTRIES.map(c => (c.code || c.value || "").toUpperCase());
-                const validCurrencies = ARAMEX_SUPPORTED_CURRENCIES.map(c => (c.code || c.value || "").toUpperCase());
-                const validProductTypes = ["PPX", "EPX", "PDX"];
+                // Row-by-Row Deep Validation
+                const validRows = [];
+                const invalidRows = [];
 
-                data.forEach((row, index) => {
-                    let errors = [];
+                const defaultWarehouse = warehouses.find(w => w.isDefault) || warehouses[0];
+                const pickupAddressId = defaultWarehouse ? defaultWarehouse._id : "";
+                const goodsOriginCountry = defaultWarehouse ? defaultWarehouse.country : "IN";
 
-                    // Basic Mandatory Validations
-                    if (!row.receiverName) errors.push("Missing receiverName");
-                    if (!row.receiverMobile) errors.push("Missing receiverMobile");
-                    if (!row.receiverEmail) errors.push("Missing receiverEmail");
-                    if (!row.receiverAddressLine1) errors.push("Missing receiverAddressLine1");
-                    if (!row.receiverCity) errors.push("Missing receiverCity");
-                    if (!row.receiverState) errors.push("Missing receiverState");
+                parsedRows.forEach((row, index) => {
+                    const errors = [];
+                    const line = index + 2;
 
-                    // Country Code Validation
-                    if (!row.receiverCountry) {
-                        errors.push("Missing receiverCountry");
-                    } else if (!validCountries.includes(row.receiverCountry.toString().toUpperCase())) {
-                        errors.push(`Invalid receiverCountry: '${row.receiverCountry}'`);
+                    // Required Fields Checks
+                    if (!row.receiverName) errors.push("Missing receiver name");
+                    if (!row.receiverMobile) errors.push("Missing receiver mobile number");
+                    if (!row.receiverAddressLine1) errors.push("Missing receiver address");
+                    if (!row.receiverCity) errors.push("Missing receiver city");
+                    if (!row.receiverState) errors.push("Missing receiver state/province code");
+                    if (!row.receiverCountry) errors.push("Missing 2-letter destination country code");
+                    if (!row.receiverPincode) errors.push("Missing receiver postal/zip code");
+                    if (!row.productDescription) errors.push("Missing parcel content description");
+
+                    // Weight Validation
+                    const weightVal = parseFloat(row.weight);
+                    if (!row.weight || isNaN(weightVal) || weightVal <= 0) {
+                        errors.push("Invalid dead weight (must be greater than 0 kg)");
                     }
 
-                    if (!row.receiverPincode) errors.push("Missing receiverPincode");
-
-                    // Dimensions and Weight Validation
-                    if (!row.weight || isNaN(parseFloat(row.weight))) errors.push("Invalid weight");
-                    if (!row.length || isNaN(parseFloat(row.length))) errors.push("Invalid length");
-                    if (!row.width || isNaN(parseFloat(row.width))) errors.push("Invalid width");
-                    if (!row.height || isNaN(parseFloat(row.height))) errors.push("Invalid height");
-
-                    if (!row.numberOfPieces || isNaN(parseInt(row.numberOfPieces))) errors.push("Invalid numberOfPieces");
-                    if (!row.productDescription) errors.push("Missing productDescription");
-
-                    if (!row.customsValue || isNaN(parseFloat(row.customsValue))) errors.push("Invalid customsValue");
-
-                    // Currency Code Validation
-                    if (!row.customsCurrency) {
-                        errors.push("Missing customsCurrency");
-                    } else if (!validCurrencies.includes(row.customsCurrency.toString().toUpperCase())) {
-                        errors.push(`Invalid customsCurrency: '${row.customsCurrency}'`);
+                    // Customs Value & Currency Check
+                    const customsVal = parseFloat(row.customsValue);
+                    if (!row.customsValue || isNaN(customsVal) || customsVal <= 0) {
+                        errors.push("Missing or invalid customs declared monetary value");
+                    }
+                    if (!row.customsCurrency || !ARAMEX_SUPPORTED_CURRENCIES.some(c => c.value === row.customsCurrency.toUpperCase())) {
+                        errors.push(`Invalid customs currency: ${row.customsCurrency}`);
                     }
 
-                    // Product Type Validation
-                    if (!row.productType) {
-                        errors.push("Missing productType");
-                    } else if (!validProductTypes.includes(row.productType.toString().toUpperCase())) {
-                        errors.push(`Invalid productType: '${row.productType}'`);
+                    // Country Support Check
+                    if (row.receiverCountry && !ARAMEX_SUPPORTED_COUNTRIES.some(c => c.value === row.receiverCountry.toUpperCase())) {
+                        errors.push(`Destination country '${row.receiverCountry}' is not supported`);
                     }
 
                     if (errors.length > 0) {
-                        invalid.push({ line: index + 2, row, errors });
+                        invalidRows.push({ line, row, errors });
                     } else {
-                        valid.push({
-                            line: index + 2,
-                            pickupAddressId: defaultWh._id,
+                        validRows.push({
+                            line,
                             receiverName: row.receiverName,
-                            receiverMobile: row.receiverMobile.toString(),
-                            receiverEmail: row.receiverEmail.toString(),
+                            receiverMobile: row.receiverMobile,
+                            receiverEmail: row.receiverEmail || "",
                             receiverAddressLine1: row.receiverAddressLine1,
                             receiverCity: row.receiverCity,
-                            receiverState: row.receiverState,
+                            receiverState: row.receiverState.toUpperCase(),
                             receiverCountry: row.receiverCountry.toUpperCase(),
-                            receiverPincode: row.receiverPincode.toString(),
-                            weight: parseFloat(row.weight),
-                            length: parseFloat(row.length),
-                            width: parseFloat(row.width),
-                            height: parseFloat(row.height),
-                            numberOfPieces: parseInt(row.numberOfPieces),
+                            receiverPincode: row.receiverPincode,
+                            weight: weightVal,
+                            length: parseFloat(row.length) || 10,
+                            width: parseFloat(row.width) || 10,
+                            height: parseFloat(row.height) || 10,
+                            numberOfPieces: parseInt(row.numberOfPieces, 10) || 1,
                             productDescription: row.productDescription,
-                            customsValue: parseFloat(row.customsValue),
+                            customsValue: customsVal,
                             customsCurrency: row.customsCurrency.toUpperCase(),
-                            productType: row.productType.toUpperCase()
+                            pickupAddressId: pickupAddressId,
+                            goodsOriginCountry: goodsOriginCountry,
+                            productGroup: "EXP",
+                            productType: row.productType ? row.productType.toUpperCase() : "PPX",
+                            invoiceTotal: 0
                         });
                     }
                 });
 
                 setBulkResult({
-                    validRows: valid,
-                    invalidRows: invalid,
+                    totalRows: parsedRows.length,
+                    validRows,
+                    invalidRows,
                     summary: {
-                        totalRows: data.length,
-                        validCount: valid.length,
-                        invalidCount: invalid.length,
+                        totalRows: parsedRows.length,
+                        validCount: validRows.length,
+                        invalidCount: invalidRows.length,
                         totalEstimatedCost: 0,
-                        walletAvailable: wallet?.availableBalance || 0,
+                        walletAvailable: wallet ? wallet.availableBalance : 0,
                         hasSufficientFunds: true
                     }
                 });
+
             } catch (err) {
-                setBulkValidationError("Error parsing file. Please ensure it follows the sample template.");
+                console.error("Processing failed", err);
+                setBulkValidationError("Failed to parse data. Please check your column formatting.");
             } finally {
                 setBulkProcessing(false);
             }
         };
-        reader.readAsBinaryString(file);
+
+        if (isExcel) {
+            reader.readAsArrayBuffer(file);
+        } else {
+            reader.readAsText(file);
+        }
     };
 
-    // STEP 2: Loop API to Calculate Rates for Valid Rows
+    // STEP 2: Calculate Rates across all Valid Rows
     const handleCalculateBatchRates = async () => {
-        if (!bulkResult || bulkResult.validRows.length === 0) return;
+        if (!bulkResult || !bulkResult.validRows || bulkResult.validRows.length === 0) return;
         setCalculatingRates(true);
+        setBulkValidationError("");
 
-        let updatedValid = [];
-        let newInvalids = [...bulkResult.invalidRows];
         let totalCost = 0;
+        const calculatedRows = [];
+        const newInvalids = [...bulkResult.invalidRows];
 
         for (const row of bulkResult.validRows) {
             try {
                 const payload = {
-                    isTestMode: batchSettings.isTestMode,
                     courier: batchSettings.courier,
                     pickupAddressId: row.pickupAddressId,
-                    customerId: "", // Force Guest Recipient mapping on backend
                     weight: row.weight,
-                    length: row.length, width: row.width, height: row.height,
-                    productGroup: "EXP",
-                    productType: batchSettings.courier === "aramex" ? row.productType : undefined,
+                    length: row.length,
+                    width: row.width,
+                    height: row.height,
+                    productGroup: row.productGroup,
+                    productType: row.productType,
                     receiverName: row.receiverName,
                     receiverMobile: row.receiverMobile,
                     receiverAddressLine1: row.receiverAddressLine1,
@@ -264,39 +293,32 @@ const BulkUpload = () => {
                 };
 
                 const res = await API.post("/rates/calculate", payload);
-
-                let cost = res.data.invoiceTotal;
-                let service = res.data.selectedService || row.productType;
-
-                // For phreights dynamic services, grab the first available returned plan
-                if (batchSettings.courier === "phreights" && res.data.services?.length > 0) {
-                    cost = res.data.services[0].invoiceTotal;
-                    service = res.data.services[0].serviceName;
-                }
-
+                const cost = res.data.invoiceTotal || 0;
                 totalCost += cost;
-                updatedValid.push({
+
+                calculatedRows.push({
                     ...row,
                     invoiceTotal: cost,
-                    serviceType: service
+                    serviceType: res.data.serviceType || row.productType
                 });
-            } catch (error) {
+            } catch (err) {
                 newInvalids.push({
                     line: row.line,
                     row,
-                    errors: [error.response?.data?.message || "Courier route not supported or rate failed."]
+                    errors: [err.response?.data?.message || "Courier rejected rate query for this destination"]
                 });
             }
         }
 
-        const walletBal = wallet?.availableBalance || 0;
+        const walletBal = wallet ? wallet.availableBalance : 0;
 
         setBulkResult({
-            validRows: updatedValid,
+            ...bulkResult,
+            validRows: calculatedRows,
             invalidRows: newInvalids,
             summary: {
-                totalRows: updatedValid.length + newInvalids.length,
-                validCount: updatedValid.length,
+                totalRows: bulkResult.totalRows,
+                validCount: calculatedRows.length,
                 invalidCount: newInvalids.length,
                 totalEstimatedCost: totalCost,
                 walletAvailable: walletBal,
@@ -341,146 +363,146 @@ const BulkUpload = () => {
     };
 
     return (
-        <div className="bg-[#E5E7EB]/5 border border-[#687280]/20 rounded-3xl p-6 space-y-6 animate-fade-in">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#687280]/20 pb-4 mb-4">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <UploadCloud size={22} className="text-[#FF6A00]" />
-                    Double-Pass Bulk Consignments Upload
-                </h3>
+        <div className="space-y-6 select-none animate-fade-in">
+            {/* Title & Actions */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-extrabold text-[#0A1F44] tracking-tight">Bulk Consignments Upload</h1>
+                    <p className="text-sm text-[#687280]">Batch upload consignments via CSV or Excel, validate data in real-time, and auto-book manifests.</p>
+                </div>
 
                 <div className="flex items-center gap-3">
-                    {/* Help Guide Navigation Button */}
                     <button
                         onClick={() => navigate("/dashboard/help-guide")}
-                        className="bg-[#0A1F44] text-gray-300 border border-white/10 hover:border-[#FF6A00]/50 hover:text-[#FF6A00] px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2"
+                        className="bg-white border border-[#687280]/20 hover:border-[#FF6A00] text-[#0A1F44] px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm"
                     >
                         <HelpCircle size={14} /> Format Guide
                     </button>
 
-                    {/* Download Sample File Dropdown */}
                     <Dropdown
                         buttonLabel="Download Sample File"
                         icon={Download}
                         items={dropdownItems}
-                        buttonClassName="bg-[#FF6A00]/10 text-[#FF6A00] border border-[#FF6A00]/30 hover:bg-[#FF6A00] hover:text-[#0A1F44]"
+                        buttonClassName="bg-[#0A1F44] hover:bg-[#FF6A00] text-white shadow-sm"
                     />
                 </div>
             </div>
 
             {/* Excel & CSV Upload Guidelines Block */}
-            <div className="bg-[#0A1F44]/40 p-6 rounded-2xl border border-white/5 space-y-4 shadow-sm">
-                <h4 className="text-xs font-bold text-[#FF6A00] uppercase tracking-wider">Excel & CSV Upload Guidelines</h4>
-                <p className="text-xs text-[#687280]">Your columns must exactly match these headers in order:</p>
+            <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 shadow-xl space-y-4">
+                <div className="flex items-center gap-2">
+                    <UploadCloud size={18} className="text-[#FF6A00]" />
+                    <h4 className="text-xs font-bold text-[#0A1F44] uppercase tracking-wider">Excel & CSV Upload Guidelines</h4>
+                </div>
+                <p className="text-xs text-[#687280]">Your spreadsheet columns must exactly match these headers in order:</p>
 
-                <div className="bg-[#071630] border border-white/10 rounded-xl overflow-hidden">
-                    <div className="overflow-x-auto custom-scrollbar pb-3 pt-3 px-4">
-                        <code className="text-gray-300 font-mono text-xs whitespace-nowrap select-all">
-                            {headers.join(",")}
+                <div className="bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-xl overflow-hidden p-3">
+                    <div className="overflow-x-auto custom-scrollbar">
+                        <code className="text-[#0A1F44] font-mono text-xs whitespace-nowrap select-all font-semibold">
+                            {headers.join(", ")}
                         </code>
                     </div>
                 </div>
 
-                <div className="space-y-1.5 pt-1">
-                    <p className="text-xs text-[#687280] italic">* The system will automatically use your account's Default Warehouse for all pickups.</p>
-                    <p className="text-xs text-[#687280] italic">
-                        * For supported country codes, currencies, and Product Types, please refer to the{" "}
-                        <button onClick={() => navigate("/dashboard/help-guide")} className="text-[#FF6A00] font-semibold hover:underline">Format Guide</button>.
+                <div className="space-y-1.5 pt-1 text-xs text-[#687280]">
+                    <p>• The system will automatically use your account's Default Warehouse for all pickups.</p>
+                    <p>
+                        • For supported country codes, currencies, and Product Types, please refer to the{" "}
+                        <button onClick={() => navigate("/dashboard/help-guide")} className="text-[#FF6A00] font-bold hover:underline">Format Guide</button>.
                     </p>
                 </div>
             </div>
 
-            {/* Batch Level Courier Settings */}
-            <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
-                <div className="flex justify-between items-center border-b border-white/10 pb-3">
-                    <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Batch Carrier Settings</h4>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                    <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${batchSettings.courier === "aramex" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
-                        <input type="radio" value="aramex" checked={batchSettings.courier === "aramex"} onChange={() => { setBatchSettings({ ...batchSettings, courier: "aramex", productType: "PPX" }); setBulkResult(null); setRatesCalculated(false); }} className="hidden" />
-                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${batchSettings.courier === "aramex" ? "border-[#FF6A00]" : "border-gray-500"}`}>
-                            {batchSettings.courier === "aramex" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
-                        </div>
-                        <span className="text-white font-bold text-sm">Aramex</span>
-                    </label>
-
-                    <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${batchSettings.courier === "phreights" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
-                        <input type="radio" value="phreights" checked={batchSettings.courier === "phreights"} onChange={() => { setBatchSettings({ ...batchSettings, courier: "phreights", productType: "" }); setBulkResult(null); setRatesCalculated(false); }} className="hidden" />
-                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${batchSettings.courier === "phreights" ? "border-[#FF6A00]" : "border-gray-500"}`}>
-                            {batchSettings.courier === "phreights" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
-                        </div>
-                        <span className="text-white font-bold text-sm">phreights</span>
-                    </label>
-                </div>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6 items-end">
+            {/* Batch Level Courier Settings & File Upload */}
+            <div className="glass-card p-6 md:p-8 rounded-2xl border border-[#687280]/20 shadow-xl space-y-6">
                 <div>
-                    <label className="text-[10px] text-gray-400 block mb-1 font-bold uppercase tracking-wider">Select Excel (.xlsx) or CSV File</label>
+                    <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider mb-3">Carrier Partner Selection</h4>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition shadow-sm ${batchSettings.courier === "aramex" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-[#687280]/20 bg-white hover:border-[#FF6A00]/40"}`}>
+                            <input type="radio" value="aramex" checked={batchSettings.courier === "aramex"} onChange={() => { setBatchSettings({ ...batchSettings, courier: "aramex", productType: "PPX" }); setBulkResult(null); setRatesCalculated(false); }} className="hidden" />
+                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${batchSettings.courier === "aramex" ? "border-[#FF6A00]" : "border-[#687280]"}`}>
+                                {batchSettings.courier === "aramex" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                            </div>
+                            <span className="text-[#0A1F44] font-bold text-sm">Aramex</span>
+                        </label>
+
+                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition shadow-sm ${batchSettings.courier === "phreights" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-[#687280]/20 bg-white hover:border-[#FF6A00]/40"}`}>
+                            <input type="radio" value="phreights" checked={batchSettings.courier === "phreights"} onChange={() => { setBatchSettings({ ...batchSettings, courier: "phreights", productType: "" }); setBulkResult(null); setRatesCalculated(false); }} className="hidden" />
+                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${batchSettings.courier === "phreights" ? "border-[#FF6A00]" : "border-[#687280]"}`}>
+                                {batchSettings.courier === "phreights" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                            </div>
+                            <span className="text-[#0A1F44] font-bold text-sm">Phreight</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div className="border-t border-[#687280]/15 pt-6">
+                    <label className="text-[10px] text-[#687280] block mb-2 font-bold uppercase tracking-wider">Select Excel (.xlsx) or CSV File</label>
                     <input
                         type="file"
                         accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
                         onChange={handleFileProcessAndValidate}
-                        className="w-full text-xs text-gray-400 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-white/10 file:text-white hover:file:bg-white/20 transition cursor-pointer bg-[#0A1F44] border border-white/10 rounded-xl outline-none"
+                        className="w-full text-xs text-[#0A1F44] file:mr-4 file:py-3 file:px-5 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#0A1F44] file:text-white hover:file:bg-[#FF6A00] transition cursor-pointer bg-[#E5E7EB]/30 border border-[#687280]/30 rounded-xl outline-none p-2 shadow-sm"
                     />
                 </div>
             </div>
 
             {bulkValidationError && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-500 text-xs p-3.5 rounded-xl flex items-center gap-2">
-                    <AlertTriangle size={14} className="shrink-0" />
+                <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-4 rounded-xl flex items-center gap-2">
+                    <AlertTriangle size={15} className="shrink-0" />
                     <span>{bulkValidationError}</span>
                 </div>
             )}
 
             {bulkResult && (
                 <div className="space-y-6">
-                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5 grid md:grid-cols-4 gap-6 text-xs">
+                    {/* Summary Row */}
+                    <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 shadow-xl grid md:grid-cols-4 gap-6 text-xs">
                         <div>
-                            <span className="text-gray-500 block">Total Rows Detected:</span>
-                            <span className="text-lg font-bold text-white">{bulkResult.summary.totalRows}</span>
+                            <span className="text-[#687280] block font-semibold mb-1">Total Rows Detected:</span>
+                            <span className="text-2xl font-black text-[#0A1F44]">{bulkResult.summary.totalRows}</span>
                         </div>
                         <div>
-                            <span className="text-gray-500 block">Valid Rows:</span>
-                            <span className="text-lg font-bold text-green-500">{bulkResult.summary.validCount}</span>
+                            <span className="text-[#687280] block font-semibold mb-1">Valid Rows:</span>
+                            <span className="text-2xl font-black text-green-600">{bulkResult.summary.validCount}</span>
                         </div>
                         <div>
-                            <span className="text-gray-500 block">Invalid Rows:</span>
-                            <span className="text-lg font-bold text-red-500">{bulkResult.summary.invalidCount}</span>
+                            <span className="text-[#687280] block font-semibold mb-1">Invalid Rows:</span>
+                            <span className="text-2xl font-black text-red-600">{bulkResult.summary.invalidCount}</span>
                         </div>
                         <div>
-                            <span className="text-gray-500 block">Calculated Total Cost:</span>
-                            <span className="text-lg font-bold text-[#FF6A00]">
+                            <span className="text-[#687280] block font-semibold mb-1">Calculated Total Cost:</span>
+                            <span className="text-2xl font-black text-[#FF6A00]">
                                 {ratesCalculated ? `₹${bulkResult.summary.totalEstimatedCost.toFixed(2)}` : "Pending Calculation"}
                             </span>
                         </div>
                     </div>
 
                     {!bulkResult.summary.hasSufficientFunds && ratesCalculated && (
-                        <div className="bg-red-500/10 border border-red-500/30 text-red-500 text-xs p-3.5 rounded-xl flex items-center gap-2">
-                            <AlertTriangle size={14} className="shrink-0" />
+                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-4 rounded-xl flex items-center gap-2">
+                            <AlertTriangle size={15} className="shrink-0" />
                             <span>Insufficient Funds! Your available wallet balance (₹{bulkResult.summary.walletAvailable.toFixed(2)}) is lower than the batch cost (₹{bulkResult.summary.totalEstimatedCost.toFixed(2)}).</span>
                         </div>
                     )}
 
                     {bulkResult.summary.invalidCount > 0 && (
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-red-500 uppercase tracking-wider">Validation Errors Listing</h4>
-                            <div className="max-h-60 overflow-y-auto border border-red-500/10 rounded-2xl custom-scrollbar">
-                                <table className="w-full text-left text-xs bg-red-500/5">
+                        <div className="glass-card p-6 rounded-2xl border border-red-200 shadow-xl space-y-3">
+                            <h4 className="text-xs font-bold text-red-600 uppercase tracking-wider">Validation Errors Listing</h4>
+                            <div className="max-h-60 overflow-y-auto border border-red-200 rounded-xl custom-scrollbar">
+                                <table className="w-full text-left text-xs bg-red-50/50">
                                     <thead>
-                                    <tr className="border-b border-red-500/10 text-red-400 text-[10px] uppercase font-bold sticky top-0 bg-[#0A1F44]">
+                                    <tr className="border-b border-red-200 text-red-700 text-[10px] uppercase font-bold sticky top-0 bg-red-100/90 backdrop-blur-sm">
                                         <th className="py-3 px-4 text-center">Row</th>
                                         <th className="py-3 px-4">Recipient Name</th>
                                         <th className="py-3 px-4">Error Reasons</th>
                                     </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-red-500/10">
+                                    <tbody className="divide-y divide-red-200/60">
                                     {bulkResult.invalidRows.map((inv, idx) => (
-                                        <tr key={idx} className="hover:bg-red-500/10 transition-colors">
-                                            <td className="py-2.5 px-4 text-center font-bold text-red-400">{inv.line}</td>
-                                            <td className="py-2.5 px-4 font-semibold text-white">{inv.row.receiverName || "Empty name"}</td>
-                                            <td className="py-2.5 px-4 text-red-400 italic">{inv.errors.join(", ")}</td>
+                                        <tr key={idx} className="hover:bg-red-100/40 transition-colors">
+                                            <td className="py-2.5 px-4 text-center font-bold text-red-600">{inv.line}</td>
+                                            <td className="py-2.5 px-4 font-semibold text-[#0A1F44]">{inv.row.receiverName || "Empty name"}</td>
+                                            <td className="py-2.5 px-4 text-red-700 font-medium">{inv.errors.join(", ")}</td>
                                         </tr>
                                     ))}
                                     </tbody>
@@ -490,12 +512,12 @@ const BulkUpload = () => {
                     )}
 
                     {bulkResult.summary.validCount > 0 && (
-                        <div className="space-y-3">
-                            <h4 className="text-xs font-bold text-green-500 uppercase tracking-wider">Valid Bookings Preview Grid</h4>
-                            <div className="max-h-60 overflow-y-auto border border-green-500/10 rounded-2xl custom-scrollbar">
-                                <table className="w-full text-left text-xs bg-green-500/5">
+                        <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 shadow-xl space-y-3">
+                            <h4 className="text-xs font-bold text-green-700 uppercase tracking-wider">Valid Bookings Preview Grid</h4>
+                            <div className="max-h-60 overflow-y-auto border border-[#687280]/20 rounded-xl custom-scrollbar">
+                                <table className="w-full text-left text-xs">
                                     <thead>
-                                    <tr className="border-b border-green-500/10 text-green-400 text-[10px] uppercase font-bold sticky top-0 bg-[#0A1F44]">
+                                    <tr className="border-b border-[#687280]/20 text-[#687280] text-[10px] uppercase font-bold sticky top-0 bg-[#E5E7EB]/90 backdrop-blur-sm">
                                         <th className="py-3 px-4 text-center">Row</th>
                                         <th className="py-3 px-4">Customer Name</th>
                                         <th className="py-3 px-4">Route</th>
@@ -503,19 +525,19 @@ const BulkUpload = () => {
                                         <th className="py-3 px-4 text-right">Cost (Calculated)</th>
                                     </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-green-500/10">
+                                    <tbody className="divide-y divide-[#687280]/10 text-[#0A1F44]">
                                     {bulkResult.validRows.map((val, idx) => (
-                                        <tr key={idx} className="hover:bg-green-500/10 transition-colors">
-                                            <td className="py-2.5 px-4 text-center font-bold text-green-400">{val.line}</td>
-                                            <td className="py-2.5 px-4 font-semibold text-white">{val.receiverName}</td>
-                                            <td className="py-2.5 px-4 text-gray-300">
+                                        <tr key={idx} className="hover:bg-[#E5E7EB]/40 transition-colors">
+                                            <td className="py-2.5 px-4 text-center font-bold text-green-700">{val.line}</td>
+                                            <td className="py-2.5 px-4 font-semibold text-[#0A1F44]">{val.receiverName}</td>
+                                            <td className="py-2.5 px-4 text-[#687280]">
                                                 {val.receiverCity}, {val.receiverCountry}
                                             </td>
                                             <td className="py-2.5 px-4 text-center font-mono">
                                                 <span className="block text-[10px] font-bold text-[#FF6A00]">{val.productType}</span>
                                                 {val.weight} kg
                                             </td>
-                                            <td className="py-2.5 px-4 text-right font-bold text-[#FF6A00]">
+                                            <td className="py-2.5 px-4 text-right font-extrabold text-[#FF6A00]">
                                                 {ratesCalculated ? `₹${val.invoiceTotal?.toFixed(2)}` : "Pending"}
                                             </td>
                                         </tr>
@@ -531,9 +553,9 @@ const BulkUpload = () => {
                         <button
                             onClick={handleCalculateBatchRates}
                             disabled={calculatingRates}
-                            className="w-full bg-[#0A1F44] border border-[#FF6A00]/50 text-[#FF6A00] font-extrabold py-4 rounded-xl text-xs hover:bg-[#FF6A00]/10 transition flex items-center justify-center gap-2"
+                            className="w-full bg-[#0A1F44] hover:bg-[#FF6A00] text-white font-extrabold py-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md"
                         >
-                            {calculatingRates ? <span className="w-5 h-5 border-2 border-[#FF6A00] border-t-transparent rounded-full animate-spin"></span> : <><Calculator size={16} /> Calculate Rates for {bulkResult.summary.validCount} Rows</>}
+                            {calculatingRates ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span> : <><Calculator size={16} /> Calculate Rates for {bulkResult.summary.validCount} Rows</>}
                         </button>
                     )}
 
@@ -542,9 +564,9 @@ const BulkUpload = () => {
                         <button
                             onClick={handleBulkConfirm}
                             disabled={bulkConfirming}
-                            className="w-full bg-[#FF6A00] text-[#0A1F44] font-extrabold py-4 rounded-xl text-xs hover:brightness-110 active:scale-95 transition flex items-center justify-center gap-2"
+                            className="w-full bg-[#FF6A00] hover:bg-[#ff7b1a] text-white font-extrabold py-4 rounded-xl text-xs shadow-md shadow-[#FF6A00]/20 active:scale-95 transition flex items-center justify-center gap-2"
                         >
-                            {bulkConfirming ? <span className="w-5 h-5 border-2 border-[#0A1F44] border-t-transparent rounded-full animate-spin"></span> : <><CheckCircle size={16} /> Confirm & Book Batch (Debits ₹{bulkResult.summary.totalEstimatedCost.toFixed(2)})</>}
+                            {bulkConfirming ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span> : <><CheckCircle size={16} /> Confirm & Book Batch (Debits ₹{bulkResult.summary.totalEstimatedCost.toFixed(2)})</>}
                         </button>
                     )}
                 </div>

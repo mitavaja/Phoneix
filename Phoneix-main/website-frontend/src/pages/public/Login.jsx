@@ -61,8 +61,11 @@ const Login = () => {
         <div className="relative z-10 flex flex-col h-full justify-between">
           {/* Top: Logo & Back to Home */}
           <div className="flex items-center justify-between">
-            <div className="cursor-pointer" onClick={() => navigate("/")}>
-              <Logo theme="dark" size="md" />
+            <div 
+              className="cursor-pointer bg-[#0A1F44]/85 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/15 shadow-xl hover:border-[#FF6A00]/40 transition" 
+              onClick={() => navigate("/")}
+            >
+              <Logo theme="navy" size="md" />
             </div>
             <button 
               onClick={() => navigate("/")}
@@ -99,12 +102,13 @@ const Login = () => {
       <div className="w-full md:w-1/2 lg:w-2/5 h-full bg-[#071630] border-l border-[#687280]/20 flex flex-col justify-center items-center px-6 sm:px-12 md:px-16 overflow-y-auto">
         <div className="w-full max-w-md space-y-8 py-8">
           {/* Title and Header */}
-          <div className="space-y-2">
-            {/* Show logo on mobile only */}
-            <div className="md:hidden flex justify-center mb-6">
-              <Logo theme="dark" size="md" />
+          <div className="space-y-3">
+            <div className="flex justify-center sm:justify-start mb-2">
+              <div className="p-2.5 bg-[#0A1F44] rounded-2xl border border-white/10 shadow-lg inline-flex">
+                <Logo theme="navy" size="md" className="justify-center" />
+              </div>
             </div>
-            <h2 className="text-3xl font-extrabold tracking-tight text-white">
+            <h2 className="text-3xl font-black tracking-tight text-white">
               Welcome back
             </h2>
             <p className="text-gray-400 text-sm">

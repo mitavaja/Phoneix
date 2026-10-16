@@ -27,38 +27,36 @@ const Pagination = ({ pagination, onPageChange }) => {
     };
 
     return (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-white/10 select-none">
-
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-[#687280]/20 select-none">
             {/* Pagination Status Text */}
             <div className="text-xs text-[#687280] font-medium">
-                Showing <span className="font-bold text-white">{startItem}</span> to <span className="font-bold text-white">{endItem}</span> of <span className="font-bold text-[#FF6A00]">{totalItems}</span> records
+                Showing <span className="font-bold text-[#0A1F44]">{startItem}</span> to <span className="font-bold text-[#0A1F44]">{endItem}</span> of <span className="font-bold text-[#FF6A00]">{totalItems}</span> records
             </div>
 
             {/* Pagination Controls */}
-            <div className="flex items-center gap-2">
-
+            <div className="flex items-center gap-1.5">
                 {/* Prev Button */}
                 <button
                     onClick={() => onPageChange(currentPage - 1)}
                     disabled={!hasPrevPage}
-                    className="px-3 py-1.5 text-xs font-bold rounded-lg border border-white/10 text-white bg-white/5 hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
+                    className="px-3 py-1.5 text-xs font-bold rounded-lg border border-[#687280]/20 text-[#0A1F44] bg-white hover:bg-[#0A1F44] hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1 shadow-sm"
                 >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                     </svg>
-                    Prev
+                    Previous
                 </button>
 
                 {/* Page Numbers */}
-                <div className="hidden sm:flex items-center gap-1.5">
+                <div className="hidden sm:flex items-center gap-1">
                     {getPageNumbers().map((pageNum) => (
                         <button
                             key={pageNum}
                             onClick={() => onPageChange(pageNum)}
-                            className={`w-8 h-8 flex items-center justify-center text-xs font-bold rounded-lg transition-all border ${
+                            className={`w-8 h-8 flex items-center justify-center text-xs font-bold rounded-lg transition-all ${
                                 currentPage === pageNum
-                                    ? "bg-[#FF6A00] text-[#0A1F44] border-[#FF6A00] shadow-[0_0_15px_rgba(255,106,0,0.3)]"
-                                    : "bg-white/5 text-[#687280] border-white/5 hover:border-white/20 hover:text-white"
+                                    ? "bg-[#FF6A00] text-white shadow-md border border-transparent font-extrabold"
+                                    : "bg-white text-[#687280] hover:bg-[#E5E7EB]/50 hover:text-[#0A1F44] border border-[#687280]/20"
                             }`}
                         >
                             {pageNum}
@@ -70,7 +68,7 @@ const Pagination = ({ pagination, onPageChange }) => {
                 <button
                     onClick={() => onPageChange(currentPage + 1)}
                     disabled={!hasNextPage}
-                    className="px-3 py-1.5 text-xs font-bold rounded-lg border border-white/10 text-white bg-white/5 hover:bg-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
+                    className="px-3 py-1.5 text-xs font-bold rounded-lg border border-[#687280]/20 text-[#0A1F44] bg-white hover:bg-[#0A1F44] hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1 shadow-sm"
                 >
                     Next
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

@@ -63,6 +63,41 @@ const SingleBooking = () => {
         countryCode: ""
     };
     const [singleCustomerForm, setSingleCustomerForm] = useState(initialCustomerForm);
+    const [saveCustomerToDirectory, setSaveCustomerToDirectory] = useState(true);
+
+    const handleSaveSingleCustomer = () => {
+        if (!singleCustomerForm.name || !singleCustomerForm.mobile || !singleCustomerForm.addressLine1 || !singleCustomerForm.city || !singleCustomerForm.stateOrProvinceCode || !singleCustomerForm.countryCode) {
+            alert("Please complete mandatory recipient fields: Name, Mobile, Address, City, State, Country.");
+            return;
+        }
+
+        setSingleForm(prev => ({
+            ...prev,
+            isGuestRecipient: true,
+            receiverName: singleCustomerForm.name,
+            receiverMobile: singleCustomerForm.mobile,
+            receiverAddress: `${singleCustomerForm.addressLine1} ${singleCustomerForm.addressLine2 || ""}`.trim(),
+            receiverCity: singleCustomerForm.city,
+            receiverState: singleCustomerForm.stateOrProvinceCode,
+            receiverCountry: singleCustomerForm.countryCode,
+            receiverPincode: singleCustomerForm.postCode,
+            customerId: ""
+        }));
+
+        if (saveCustomerToDirectory) {
+            API.post("/recipient-customer", singleCustomerForm)
+                .then(res => {
+                    if (res.data?.data) {
+                        setCustomers(prev => [...prev, res.data.data]);
+                    }
+                })
+                .catch(err => {
+                    console.error("Failed to background save recipient customer", err);
+                });
+        }
+
+        setShowSingleCustomerModal(false);
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -71,12 +106,18 @@ const SingleBooking = () => {
                     API.get("/warehouses/my-addresses"),
                     API.get("/recipient-customer")
                 ]);
+
                 setWarehouses(whRes.data || []);
-                if (whRes.data && whRes.data.length > 0) {
+                if (whRes.data?.length > 0) {
                     const defaultWh = whRes.data.find(w => w.isDefault) || whRes.data[0];
-                    setSingleForm(prev => ({ ...prev, pickupAddressId: defaultWh._id }));
+                    setSingleForm(prev => ({
+                        ...prev,
+                        pickupAddressId: defaultWh._id,
+                        goodsOriginCountry: defaultWh.country || "IN"
+                    }));
                 }
-                if (custRes.data && custRes.data.data) {
+
+                if (custRes.data?.data) {
                     setCustomers(custRes.data.data);
                 }
             } catch (err) {
@@ -86,70 +127,53 @@ const SingleBooking = () => {
         fetchData();
     }, []);
 
-    const processManualRecipient = async () => {
-        if (!isManualRecipient) return singleForm.customerId;
-
-        if (!singleForm.receiverName || !singleForm.receiverMobile || !singleForm.receiverAddress || !singleForm.receiverCity || !singleForm.receiverState || !singleForm.receiverCountry || !singleForm.receiverPincode) {
-            throw new Error("Please fill out all mandatory manual recipient fields.");
-        }
-
-        if (saveManualRecipient) {
-            const res = await API.post("/recipient-customer", {
-                name: singleForm.receiverName,
-                mobile: singleForm.receiverMobile,
-                countryCode: singleForm.receiverCountry,
-                addressLine1: singleForm.receiverAddress,
-                city: singleForm.receiverCity,
-                stateOrProvinceCode: singleForm.receiverState,
-                postCode: singleForm.receiverPincode
-            });
-            const newCustomerId = res.data?.customer?._id || res.data?._id || res.data?.data?._id;
-
-            const custRes = await API.get("/recipient-customer");
-            if (custRes.data && custRes.data.data) {
-                setCustomers(custRes.data.data);
-            }
-            return newCustomerId;
-        }
-        return null;
-    };
-
+    // Estimate Cost for Single Booking
     const handleEstimateSingle = async () => {
+        setEstimating(true);
         setBookingError("");
         setEstimateResult(null);
-        setEstimating(true);
 
         try {
-            let finalCustomerId = singleForm.customerId;
-
             if (isManualRecipient) {
-                finalCustomerId = await processManualRecipient();
-                if (finalCustomerId) {
-                    setSingleForm(prev => ({ ...prev, customerId: finalCustomerId }));
+                if (!singleForm.receiverName || !singleForm.receiverMobile || !singleForm.receiverAddress || !singleForm.receiverCity || !singleForm.receiverState || !singleForm.receiverCountry || !singleForm.receiverPincode) {
+                    setBookingError("Please complete all required recipient fields.");
+                    setEstimating(false);
+                    return;
+                }
+
+                if (saveManualRecipient) {
+                    try {
+                        const newCustRes = await API.post("/recipient-customer", {
+                            name: singleForm.receiverName,
+                            mobile: singleForm.receiverMobile,
+                            addressLine1: singleForm.receiverAddress,
+                            city: singleForm.receiverCity,
+                            stateOrProvinceCode: singleForm.receiverState,
+                            postCode: singleForm.receiverPincode,
+                            countryCode: singleForm.receiverCountry,
+                        });
+                        if (newCustRes.data?.data) {
+                            setCustomers(prev => [...prev, newCustRes.data.data]);
+                        }
+                    } catch (custErr) {
+                        console.error("Could not background save customer", custErr);
+                    }
                 }
             }
 
-            const { courier, pickupAddressId, weight, length, width, height, productGroup, productType } = singleForm;
-
-            if (!weight || !pickupAddressId || (!finalCustomerId && !isManualRecipient)) {
-                setBookingError("Please provide weight, origin warehouse, and destination recipient.");
-                setEstimating(false);
-                return;
-            }
-
             const payload = {
-                courier,
-                pickupAddressId,
-                customerId: finalCustomerId,
-                weight: parseFloat(weight),
-                length: length ? parseFloat(length) : 0,
-                width: width ? parseFloat(width) : 0,
-                height: height ? parseFloat(height) : 0,
-                productGroup,
-                productType: courier === "aramex" ? productType : undefined,
+                courier: singleForm.courier,
+                pickupAddressId: singleForm.pickupAddressId,
+                customerId: !isManualRecipient && !singleForm.isGuestRecipient ? singleForm.customerId : undefined,
+                weight: parseFloat(singleForm.weight),
+                length: singleForm.length ? parseFloat(singleForm.length) : 0,
+                width: singleForm.width ? parseFloat(singleForm.width) : 0,
+                height: singleForm.height ? parseFloat(singleForm.height) : 0,
+                productGroup: singleForm.productGroup,
+                productType: singleForm.courier === "aramex" ? singleForm.productType : undefined,
                 receiverName: singleForm.receiverName,
                 receiverMobile: singleForm.receiverMobile,
-                receiverAddress: singleForm.receiverAddress,
+                receiverAddressLine1: singleForm.receiverAddress,
                 receiverCity: singleForm.receiverCity,
                 receiverState: singleForm.receiverState,
                 receiverCountry: singleForm.receiverCountry,
@@ -159,136 +183,83 @@ const SingleBooking = () => {
             const res = await API.post("/rates/calculate", payload);
             setEstimateResult(res.data);
 
-            if (courier === "phreights" && res.data.services?.length > 0) {
+            if (singleForm.courier === "phreight" && res.data.services?.length > 0) {
                 setSingleForm(prev => ({ ...prev, productType: res.data.services[0].serviceName }));
             }
         } catch (err) {
-            setBookingError(err.response?.data?.message || err.message || "Rate estimation failed.");
+            setBookingError(err.response?.data?.message || err.message || "Failed to estimate cost.");
         } finally {
             setEstimating(false);
         }
     };
 
+    // Commit Single Booking
     const handleBookSingle = async (e) => {
         e.preventDefault();
+        setBookingLoading(true);
         setBookingError("");
         setBookingSuccess("");
 
-        if (user?.status !== "Active") {
-            setBookingError("Booking locked: Your store account KYC status is currently not Active.");
-            return;
-        }
-
-        setBookingLoading(true);
         try {
-            let finalCustomerId = singleForm.customerId;
-
             if (isManualRecipient) {
-                finalCustomerId = await processManualRecipient();
-                if (finalCustomerId) {
-                    setSingleForm(prev => ({ ...prev, customerId: finalCustomerId }));
+                if (!singleForm.receiverName || !singleForm.receiverMobile || !singleForm.receiverAddress || !singleForm.receiverCity || !singleForm.receiverState || !singleForm.receiverCountry || !singleForm.receiverPincode) {
+                    setBookingError("Please complete all required recipient fields.");
+                    setBookingLoading(false);
+                    return;
                 }
-            }
 
-            const {
-                pickupAddressId,
-                weight,
-                productDescription,
-                courier,
-                customsValue,
-                customsCurrency,
-                productType
-            } = singleForm;
-
-            if (!courier || (!finalCustomerId && !isManualRecipient) || !pickupAddressId || !weight || !productDescription || !customsValue || !customsCurrency) {
-                setBookingError("Please fill out recipient details, weight, pickup warehouse, and all customs values.");
-                setBookingLoading(false);
-                return;
-            }
-
-            if (courier === "phreights" && !productType) {
-                setBookingError("Please calculate the cost quote and select a Phreight service plan before booking.");
-                setBookingLoading(false);
-                return;
+                if (saveManualRecipient) {
+                    try {
+                        const newCustRes = await API.post("/recipient-customer", {
+                            name: singleForm.receiverName,
+                            mobile: singleForm.receiverMobile,
+                            addressLine1: singleForm.receiverAddress,
+                            city: singleForm.receiverCity,
+                            stateOrProvinceCode: singleForm.receiverState,
+                            postCode: singleForm.receiverPincode,
+                            countryCode: singleForm.receiverCountry,
+                        });
+                        if (newCustRes.data?.data) {
+                            setCustomers(prev => [...prev, newCustRes.data.data]);
+                        }
+                    } catch (custErr) {
+                        console.error("Could not background save customer", custErr);
+                    }
+                }
             }
 
             const payload = {
                 ...singleForm,
-                customerId: finalCustomerId,
+                weight: parseFloat(singleForm.weight),
+                length: singleForm.length ? parseFloat(singleForm.length) : 0,
+                width: singleForm.width ? parseFloat(singleForm.width) : 0,
+                height: singleForm.height ? parseFloat(singleForm.height) : 0,
+                numberOfPieces: parseInt(singleForm.numberOfPieces, 10) || 1,
+                customsValue: parseFloat(singleForm.customsValue),
+                customsCurrency: singleForm.customsCurrency,
+                isGuestRecipient: isManualRecipient ? true : singleForm.isGuestRecipient,
+                receiverName: isManualRecipient ? singleForm.receiverName : singleForm.receiverName,
+                receiverMobile: isManualRecipient ? singleForm.receiverMobile : singleForm.receiverMobile,
+                receiverAddressLine1: isManualRecipient ? singleForm.receiverAddress : singleForm.receiverAddress,
+                receiverCity: isManualRecipient ? singleForm.receiverCity : singleForm.receiverCity,
+                receiverState: isManualRecipient ? singleForm.receiverState : singleForm.receiverState,
+                receiverCountry: isManualRecipient ? singleForm.receiverCountry : singleForm.receiverCountry,
+                receiverPincode: isManualRecipient ? singleForm.receiverPincode : singleForm.receiverPincode,
+                customerId: !isManualRecipient && !singleForm.isGuestRecipient ? singleForm.customerId : undefined
             };
 
             const res = await API.post("/shipments/book", payload);
-            setBookingSuccess(res.data.message || "Shipment successfully booked!");
+            setBookingSuccess(`Shipment successfully booked! Tracking ID: ${res.data.shipment?.shipmentId}`);
+            await fetchWalletData();
 
-            // Reset Form completely
-            setSingleForm({
-                ...singleForm,
-                customerId: "",
-                pickupAddressId: warehouses[0]?._id || "",
-                weight: "",
-                length: "",
-                width: "",
-                height: "",
-                productDescription: "",
-                customsValue: "",
-                customsCurrency: "USD",
-                productType: courier === "aramex" ? "PPX" : "",
-                receiverName: "",
-                receiverMobile: "",
-                receiverAddress: "",
-                receiverCity: "",
-                receiverState: "",
-                receiverCountry: "AE",
-                receiverPincode: "",
-            });
-            setIsManualRecipient(false);
-            setEstimateResult(null);
+            setTimeout(() => {
+                navigate("/dashboard/shipments");
+            }, 1500);
+
         } catch (err) {
-            setBookingError(err.response?.data?.message || err.message || "Booking request failed.");
+            setBookingError(err.response?.data?.message || "Shipment booking failed.");
         } finally {
             setBookingLoading(false);
-        }
-    };
-
-    const handleSaveSingleCustomer = async (e) => {
-        e.preventDefault();
-        if (saveManualRecipient) {
-            try {
-                const res = await API.post("/recipient-customer", singleCustomerForm);
-                const newId = res.data?.customer?._id || res.data?._id || res.data?.data?._id;
-
-                const custRes = await API.get("/recipient-customer");
-                if (custRes.data && custRes.data.data) {
-                    setCustomers(custRes.data.data);
-                }
-
-                setSingleForm(prev => ({
-                    ...prev,
-                    customerId: newId,
-                    isGuestRecipient: false,
-                    receiverCountry: singleCustomerForm.countryCode,
-                    receiverPincode: singleCustomerForm.postCode
-                }));
-                setShowSingleCustomerModal(false);
-                setSingleCustomerForm(initialCustomerForm);
-            } catch (error) {
-                alert(error.response?.data?.message || "Failed to save recipient.");
-            }
-        } else {
-            setSingleForm(prev => ({
-                ...prev,
-                customerId: "",
-                isGuestRecipient: true,
-                receiverName: singleCustomerForm.name,
-                receiverMobile: singleCustomerForm.mobile,
-                receiverAddress: singleCustomerForm.addressLine1,
-                receiverCity: singleCustomerForm.city,
-                receiverState: singleCustomerForm.stateOrProvinceCode,
-                receiverCountry: singleCustomerForm.countryCode,
-                receiverPincode: singleCustomerForm.postCode,
-            }));
-            setShowSingleCustomerModal(false);
-            setSingleCustomerForm(initialCustomerForm);
         }
     };
 
@@ -316,68 +287,67 @@ const SingleBooking = () => {
     ];
 
     return (
-        <div className="bg-[#E5E7EB]/5 border border-[#687280]/20 rounded-3xl p-6 space-y-6 animate-fade-in">
-            <div className="flex justify-between items-center border-b border-[#687280]/20 pb-4 mb-4">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <PlusCircle size={22} className="text-[#FF6A00]" />
-                    Book Single Shipping Voucher
-                </h3>
+        <div className="space-y-6 select-none animate-fade-in">
+            {/* Title Header */}
+            <div>
+                <h1 className="text-2xl font-extrabold text-[#0A1F44] tracking-tight">Book Single Shipping Voucher</h1>
+                <p className="text-sm text-[#687280]">Dispatch individual consignments, generate airway bills, and debit your store wallet ledger.</p>
             </div>
 
-            <form onSubmit={handleBookSingle} className="space-y-6">
+            <form onSubmit={handleBookSingle} className="glass-card p-6 md:p-8 rounded-2xl border border-[#687280]/20 shadow-xl space-y-6">
 
                 {/* Courier Selection */}
-                <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-3">
+                <div className="bg-[#E5E7EB]/30 p-5 rounded-2xl border border-[#687280]/15 space-y-3">
                     <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Select Courier Partner</h4>
                     <div className="grid md:grid-cols-2 gap-4">
-                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${singleForm.courier === "aramex" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
+                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition shadow-sm ${singleForm.courier === "aramex" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-[#687280]/20 bg-white hover:border-[#FF6A00]/40"}`}>
                             <input
                                 type="radio"
                                 name="courier"
                                 value="aramex"
                                 checked={singleForm.courier === "aramex"}
-                                onChange={(e) => {
+                                onChange={() => {
                                     setSingleForm({ ...singleForm, courier: "aramex", productType: "PPX" });
                                     setEstimateResult(null);
                                 }}
                                 className="hidden"
                             />
-                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleForm.courier === "aramex" ? "border-[#FF6A00]" : "border-gray-500"}`}>
+                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleForm.courier === "aramex" ? "border-[#FF6A00]" : "border-[#687280]"}`}>
                                 {singleForm.courier === "aramex" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
                             </div>
-                            <span className="text-white font-bold text-sm">Aramex</span>
+                            <span className="text-[#0A1F44] font-bold text-sm">Aramex</span>
                         </label>
 
-                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${singleForm.courier === "phreight" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
+                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition shadow-sm ${singleForm.courier === "phreight" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-[#687280]/20 bg-white hover:border-[#FF6A00]/40"}`}>
                             <input
                                 type="radio"
                                 name="courier"
                                 value="phreight"
                                 checked={singleForm.courier === "phreight"}
-                                onChange={(e) => {
+                                onChange={() => {
                                     setSingleForm({ ...singleForm, courier: "phreight", productType: "" });
                                     setEstimateResult(null);
                                 }}
                                 className="hidden"
                             />
-                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleForm.courier === "phreight" ? "border-[#FF6A00]" : "border-gray-500"}`}>
+                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleForm.courier === "phreight" ? "border-[#FF6A00]" : "border-[#687280]"}`}>
                                 {singleForm.courier === "phreight" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
                             </div>
-                            <span className="text-white font-bold text-sm">Phreight</span>
+                            <span className="text-[#0A1F44] font-bold text-sm">Phreight</span>
                         </label>
                     </div>
                 </div>
 
                 {/* Warehouse Origin & Recipient Details Side-by-Side Container */}
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 gap-6">
 
                     {/* Warehouse Origin */}
-                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4 flex flex-col justify-between h-full">
+                    <div className="bg-[#E5E7EB]/30 p-5 rounded-2xl border border-[#687280]/15 space-y-4 flex flex-col justify-between h-full">
                         <div className="flex justify-between items-center">
                             <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">1. Select Warehouse Pickup Origin</h4>
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-400 block mb-1">Saved Warehouses</label>
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Saved Warehouses</label>
                             <Select
                                 options={warehouseOptions}
                                 value={singleForm.pickupAddressId}
@@ -396,13 +366,13 @@ const SingleBooking = () => {
                     </div>
 
                     {/* Recipient Details */}
-                    <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4 flex flex-col h-full">
+                    <div className="bg-[#E5E7EB]/30 p-5 rounded-2xl border border-[#687280]/15 space-y-4 flex flex-col h-full">
                         <div className="flex justify-between items-center">
                             <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">2. Recipient Customer Details</h4>
                             <button
                                 type="button"
                                 onClick={() => setIsManualRecipient(!isManualRecipient)}
-                                className="text-[10px] text-[#FF6A00] hover:text-white transition flex items-center gap-1 bg-[#FF6A00]/10 px-2 py-1 rounded"
+                                className="text-[10px] text-[#FF6A00] hover:text-[#0A1F44] font-bold transition flex items-center gap-1 bg-[#FF6A00]/10 px-2.5 py-1 rounded-lg"
                             >
                                 {isManualRecipient ? "Use Saved Directory" : <><Plus size={12} /> Add New Recipient Inline</>}
                             </button>
@@ -410,7 +380,7 @@ const SingleBooking = () => {
 
                         {!isManualRecipient ? (
                             <div>
-                                <label className="text-[10px] text-gray-400 block mb-1">Saved Customer Directory</label>
+                                <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Saved Customer Directory</label>
                                 <Select
                                     options={customerOptions}
                                     value={singleForm.isGuestRecipient ? "guest" : singleForm.customerId}
@@ -423,13 +393,13 @@ const SingleBooking = () => {
                                 />
                             </div>
                         ) : (
-                            <div className="space-y-4 border-t border-white/5 pt-4">
+                            <div className="space-y-4 border-t border-[#687280]/15 pt-4">
                                 <div className="grid md:grid-cols-3 gap-4">
                                     <div>
-                                        <input type="text" placeholder="Contact Name *" value={singleForm.receiverName} onChange={(e) => setSingleForm({ ...singleForm, receiverName: e.target.value })} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" required />
+                                        <input type="text" placeholder="Contact Name *" value={singleForm.receiverName} onChange={(e) => setSingleForm({ ...singleForm, receiverName: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
                                     </div>
                                     <div>
-                                        <input type="text" placeholder="Mobile *" value={singleForm.receiverMobile} onChange={(e) => setSingleForm({ ...singleForm, receiverMobile: e.target.value })} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" required />
+                                        <input type="text" placeholder="Mobile *" value={singleForm.receiverMobile} onChange={(e) => setSingleForm({ ...singleForm, receiverMobile: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
                                     </div>
                                     <div>
                                         <Select
@@ -445,24 +415,24 @@ const SingleBooking = () => {
                                 </div>
 
                                 <div>
-                                    <input type="text" placeholder="Full Address *" value={singleForm.receiverAddress} onChange={(e) => setSingleForm({ ...singleForm, receiverAddress: e.target.value })} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" required />
+                                    <input type="text" placeholder="Full Address *" value={singleForm.receiverAddress} onChange={(e) => setSingleForm({ ...singleForm, receiverAddress: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
                                 </div>
 
                                 <div className="grid md:grid-cols-3 gap-4">
                                     <div>
-                                        <input type="text" placeholder="City *" value={singleForm.receiverCity} onChange={(e) => setSingleForm({ ...singleForm, receiverCity: e.target.value })} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" required />
+                                        <input type="text" placeholder="City *" value={singleForm.receiverCity} onChange={(e) => setSingleForm({ ...singleForm, receiverCity: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
                                     </div>
                                     <div>
-                                        <input type="text" placeholder="State / Province *" value={singleForm.receiverState} onChange={(e) => setSingleForm({ ...singleForm, receiverState: e.target.value.toUpperCase() })} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs uppercase" required />
+                                        <input type="text" placeholder="State / Province *" value={singleForm.receiverState} onChange={(e) => setSingleForm({ ...singleForm, receiverState: e.target.value.toUpperCase() })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs uppercase shadow-sm" required />
                                     </div>
                                     <div>
-                                        <input type="text" placeholder="Pincode *" value={singleForm.receiverPincode} onChange={(e) => setSingleForm({ ...singleForm, receiverPincode: e.target.value })} className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" required />
+                                        <input type="text" placeholder="Pincode *" value={singleForm.receiverPincode} onChange={(e) => setSingleForm({ ...singleForm, receiverPincode: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-2 pt-2">
                                     <input type="checkbox" id="saveRecipient" checked={saveManualRecipient} onChange={(e) => setSaveManualRecipient(e.target.checked)} className="accent-[#FF6A00] w-4 h-4 cursor-pointer" />
-                                    <label htmlFor="saveRecipient" className="text-xs text-gray-300 font-semibold cursor-pointer select-none">
+                                    <label htmlFor="saveRecipient" className="text-xs text-[#0A1F44] font-semibold cursor-pointer select-none">
                                         Save this recipient to Customer Directory for future use
                                     </label>
                                 </div>
@@ -471,59 +441,59 @@ const SingleBooking = () => {
                     </div>
                 </div>
 
-                {/* Quick Add Recipient Modal (Triggered by Top Bar if needed, preserved for consistency) */}
+                {/* Quick Add Recipient Modal */}
                 {showSingleCustomerModal && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-[#0A1F44] w-full max-w-2xl rounded-3xl border border-[#FF6A00]/20 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden">
-                            <div className="px-6 py-4 border-b border-white/10 flex justify-between items-center">
-                                <h3 className="text-[#FF6A00] font-bold">Recipient Customer Details</h3>
-                                <button type="button" onClick={() => setShowSingleCustomerModal(false)} className="text-gray-400 hover:text-white">
+                        <div className="bg-white w-full max-w-2xl rounded-3xl border border-[#687280]/20 shadow-2xl overflow-hidden text-[#0A1F44]">
+                            <div className="px-6 py-4 border-b border-[#687280]/15 flex justify-between items-center">
+                                <h3 className="text-[#0A1F44] font-bold">Recipient Customer Details</h3>
+                                <button type="button" onClick={() => setShowSingleCustomerModal(false)} className="text-[#687280] hover:text-[#0A1F44]">
                                     <XCircle size={20} />
                                 </button>
                             </div>
                             <div className="p-6">
                                 <div className="grid md:grid-cols-3 gap-4 mb-4">
                                     <div>
-                                        <label className="text-[10px] text-gray-400 block mb-1">Contact Name <span className="text-red-500">*</span></label>
-                                        <input type="text" placeholder="Jane Smith" value={singleCustomerForm.name} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, name: e.target.value })} required className="w-full p-2.5 rounded-xl bg-black/20 border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Contact Name <span className="text-red-500">*</span></label>
+                                        <input type="text" placeholder="Jane Smith" value={singleCustomerForm.name} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, name: e.target.value })} required className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-gray-400 block mb-1">Mobile Number <span className="text-red-500">*</span></label>
-                                        <input type="text" placeholder="+91 98765 43210" value={singleCustomerForm.mobile} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, mobile: e.target.value })} required className="w-full p-2.5 rounded-xl bg-black/20 border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Mobile Number <span className="text-red-500">*</span></label>
+                                        <input type="text" placeholder="+91 98765 43210" value={singleCustomerForm.mobile} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, mobile: e.target.value })} required className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-gray-400 block mb-1">Country (2-Letter) <span className="text-red-500">*</span></label>
-                                        <input type="text" placeholder="AE" maxLength={2} value={singleCustomerForm.countryCode} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, countryCode: e.target.value.toUpperCase() })} required className="w-full p-2.5 rounded-xl bg-black/20 border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs uppercase" />
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Country (2-Letter) <span className="text-red-500">*</span></label>
+                                        <input type="text" placeholder="AE" maxLength={2} value={singleCustomerForm.countryCode} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, countryCode: e.target.value.toUpperCase() })} required className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs uppercase" />
                                     </div>
                                 </div>
 
                                 <div className="mb-4">
-                                    <label className="text-[10px] text-gray-400 block mb-1">Address Line 1 <span className="text-red-500">*</span></label>
-                                    <input type="text" placeholder="Plot No 22, MIDC Industrial Area" value={singleCustomerForm.addressLine1} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, addressLine1: e.target.value })} required className="w-full p-2.5 rounded-xl bg-black/20 border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                                    <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Address Line 1 <span className="text-red-500">*</span></label>
+                                    <input type="text" placeholder="Plot No 22, MIDC Industrial Area" value={singleCustomerForm.addressLine1} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, addressLine1: e.target.value })} required className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs" />
                                 </div>
 
                                 <div className="grid md:grid-cols-3 gap-4 mb-4">
                                     <div>
-                                        <label className="text-[10px] text-gray-400 block mb-1">City <span className="text-red-500">*</span></label>
-                                        <input type="text" placeholder="Mumbai" value={singleCustomerForm.city} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, city: e.target.value })} required className="w-full p-2.5 rounded-xl bg-black/20 border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">City <span className="text-red-500">*</span></label>
+                                        <input type="text" placeholder="Mumbai" value={singleCustomerForm.city} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, city: e.target.value })} required className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-gray-400 block mb-1">State / Province <span className="text-red-500">*</span></label>
-                                        <input type="text" placeholder="MH" value={singleCustomerForm.stateOrProvinceCode} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, stateOrProvinceCode: e.target.value.toUpperCase() })} required className="w-full p-2.5 rounded-xl bg-black/20 border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs uppercase" />
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">State / Province <span className="text-red-500">*</span></label>
+                                        <input type="text" placeholder="MH" value={singleCustomerForm.stateOrProvinceCode} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, stateOrProvinceCode: e.target.value.toUpperCase() })} required className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs uppercase" />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-gray-400 block mb-1">Pincode <span className="text-red-500">*</span></label>
-                                        <input type="text" placeholder="400001" value={singleCustomerForm.postCode} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, postCode: e.target.value })} required className="w-full p-2.5 rounded-xl bg-black/20 border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Pincode <span className="text-red-500">*</span></label>
+                                        <input type="text" placeholder="400001" value={singleCustomerForm.postCode} onChange={(e) => setSingleCustomerForm({ ...singleCustomerForm, postCode: e.target.value })} required className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs" />
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 mt-2 p-3 bg-white/5 border border-white/10 rounded-xl cursor-pointer" onClick={() => setSaveCustomerToDirectory(!saveCustomerToDirectory)}>
+                                <div className="flex items-center gap-2 mt-2 p-3 bg-[#E5E7EB]/40 border border-[#687280]/15 rounded-xl cursor-pointer" onClick={() => setSaveCustomerToDirectory(!saveCustomerToDirectory)}>
                                     <input type="checkbox" checked={saveCustomerToDirectory} onChange={(e) => setSaveCustomerToDirectory(e.target.checked)} className="accent-[#FF6A00] w-4 h-4 cursor-pointer" />
-                                    <label className="text-xs font-bold text-white cursor-pointer">Save this recipient to my Customer Directory for future use.</label>
+                                    <label className="text-xs font-bold text-[#0A1F44] cursor-pointer">Save this recipient to my Customer Directory for future use.</label>
                                 </div>
 
-                                <div className="flex gap-4 pt-6 mt-4 border-t border-white/10">
-                                    <button type="button" onClick={handleSaveSingleCustomer} className="flex-1 bg-[#FF6A00] text-[#0A1F44] font-bold py-3 rounded-xl text-xs hover:brightness-110 transition">
+                                <div className="flex gap-4 pt-6 mt-4 border-t border-[#687280]/15">
+                                    <button type="button" onClick={handleSaveSingleCustomer} className="flex-1 bg-[#FF6A00] hover:bg-[#ff7b1a] text-white font-bold py-3 rounded-xl text-xs transition shadow-md shadow-[#FF6A00]/20">
                                         Confirm Recipient Details
                                     </button>
                                 </div>
@@ -533,23 +503,23 @@ const SingleBooking = () => {
                 )}
 
                 {/* Package Specs */}
-                <div className="bg-black/20 p-5 rounded-2xl border border-white/5 space-y-4">
+                <div className="bg-[#E5E7EB]/30 p-5 rounded-2xl border border-[#687280]/15 space-y-4">
                     <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">3. Package Specifications & Value</h4>
 
                     <div className="grid md:grid-cols-3 gap-4">
                         <div>
-                            <label className="text-[10px] text-gray-400 block mb-1">Dead Weight (kg)</label>
-                            <input type="number" step="0.01" placeholder="1.5" value={singleForm.weight} onChange={(e) => setSingleForm({ ...singleForm, weight: e.target.value })} required className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Dead Weight (kg)</label>
+                            <input type="number" step="0.01" placeholder="1.5" value={singleForm.weight} onChange={(e) => setSingleForm({ ...singleForm, weight: e.target.value })} required className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-400 block mb-1">Total Pieces</label>
-                            <input type="number" min="1" value={singleForm.numberOfPieces || 1} onChange={(e) => setSingleForm({ ...singleForm, numberOfPieces: e.target.value })} required className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Total Pieces</label>
+                            <input type="number" min="1" value={singleForm.numberOfPieces || 1} onChange={(e) => setSingleForm({ ...singleForm, numberOfPieces: e.target.value })} required className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                         </div>
 
-                        {/* Aramex Product Type Selector via Custom Combobox */}
+                        {/* Aramex Product Type Selector */}
                         {singleForm.courier === "aramex" && (
                             <div>
-                                <label className="text-[10px] text-gray-400 block mb-1">International Product Type</label>
+                                <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">International Product Type</label>
                                 <Select
                                     options={productTypeOptions}
                                     value={singleForm.productType}
@@ -562,11 +532,11 @@ const SingleBooking = () => {
 
                     <div className="grid md:grid-cols-2 gap-4">
                         <div>
-                            <label className="text-[10px] text-gray-400 block mb-1">Product Description</label>
-                            <input type="text" placeholder="Apparel, Electronics..." value={singleForm.productDescription} onChange={(e) => setSingleForm({ ...singleForm, productDescription: e.target.value })} required className="w-full p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Product Description</label>
+                            <input type="text" placeholder="Apparel, Electronics..." value={singleForm.productDescription} onChange={(e) => setSingleForm({ ...singleForm, productDescription: e.target.value })} required className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-400 block mb-1">Goods Origin Country</label>
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Goods Origin Country</label>
                             <Select
                                 options={ARAMEX_SUPPORTED_COUNTRIES}
                                 value={singleForm.goodsOriginCountry}
@@ -577,7 +547,7 @@ const SingleBooking = () => {
                     </div>
 
                     <div>
-                        <label className="text-[10px] text-gray-400 block mb-1">Dimensions (L x W x H cm)</label>
+                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Dimensions (L x W x H cm)</label>
                         <div className="grid grid-cols-3 gap-3">
                             <input
                                 type="number"
@@ -587,20 +557,20 @@ const SingleBooking = () => {
                                     ...singleForm,
                                     length: e.target.value
                                 })}
-                                className="p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white text-center outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs"
+                                className="p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] text-center outline-none focus:border-[#FF6A00] text-xs shadow-sm"
                             />
-                            <input type="number" placeholder="Width" value={singleForm.width} onChange={(e) => setSingleForm({ ...singleForm, width: e.target.value })} className="p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white text-center outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
-                            <input type="number" placeholder="Height" value={singleForm.height} onChange={(e) => setSingleForm({ ...singleForm, height: e.target.value })} className="p-3 rounded-xl bg-[#0A1F44] border border-white/10 text-white text-center outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                            <input type="number" placeholder="Width" value={singleForm.width} onChange={(e) => setSingleForm({ ...singleForm, width: e.target.value })} className="p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] text-center outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
+                            <input type="number" placeholder="Height" value={singleForm.height} onChange={(e) => setSingleForm({ ...singleForm, height: e.target.value })} className="p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] text-center outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                         </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-4 border-t border-white/10 pt-4 mt-2">
+                    <div className="grid md:grid-cols-2 gap-4 border-t border-[#687280]/15 pt-4 mt-2">
                         <div>
-                            <label className="text-[10px] text-[#FF6A00] font-bold block mb-1">Customs Declared Value <span className="text-red-500">*</span></label>
-                            <input type="number" step="0.01" placeholder="50.00" value={singleForm.customsValue} onChange={(e) => setSingleForm({ ...singleForm, customsValue: e.target.value })} required className="w-full p-3 rounded-xl bg-[#0A1F44] border border-[#FF6A00]/50 text-white outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs" />
+                            <label className="text-[10px] text-[#FF6A00] font-bold block mb-1 uppercase tracking-wider">Customs Declared Value <span className="text-red-500">*</span></label>
+                            <input type="number" step="0.01" placeholder="50.00" value={singleForm.customsValue} onChange={(e) => setSingleForm({ ...singleForm, customsValue: e.target.value })} required className="w-full p-3 rounded-xl bg-white border border-[#FF6A00]/50 text-[#0A1F44] outline-none focus:ring-1 focus:ring-[#FF6A00] text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label className="text-[10px] text-[#FF6A00] font-bold block mb-1">Currency Code <span className="text-red-500">*</span></label>
+                            <label className="text-[10px] text-[#FF6A00] font-bold block mb-1 uppercase tracking-wider">Currency Code <span className="text-red-500">*</span></label>
                             <Select
                                 options={ARAMEX_SUPPORTED_CURRENCIES}
                                 value={singleForm.customsCurrency}
@@ -611,12 +581,12 @@ const SingleBooking = () => {
                     </div>
                 </div>
 
-                {/* Estimate Result Block (Aramex vs ShipGlobal Multi-Plan UI) */}
+                {/* Estimate Result Block */}
                 {estimateResult && (
                     <>
-                        {/* ShipGlobal Multi-Service Cards */}
+                        {/* Phreight Multi-Service Cards */}
                         {singleForm.courier === "phreight" && estimateResult.services && estimateResult.services.length > 0 ? (
-                            <div className="bg-black/30 p-5 rounded-2xl border border-[#FF6A00]/30 space-y-4">
+                            <div className="bg-white p-6 rounded-2xl border-2 border-[#FF6A00]/40 shadow-xl space-y-4">
                                 <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Select Phreight Service Plan</h4>
                                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
                                     {estimateResult.services.map((svc, idx) => {
@@ -625,15 +595,15 @@ const SingleBooking = () => {
                                             <div
                                                 key={idx}
                                                 onClick={() => setSingleForm({ ...singleForm, productType: svc.serviceName })}
-                                                className={`p-4 rounded-xl cursor-pointer border transition-all ${isSelected ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}
+                                                className={`p-4 rounded-xl cursor-pointer border transition-all ${isSelected ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-[#687280]/20 bg-[#E5E7EB]/30 hover:border-[#FF6A00]/40"}`}
                                             >
                                                 <div className="flex justify-between items-start mb-2">
-                                                    <span className={`font-bold text-xs ${isSelected ? "text-white" : "text-gray-300"}`}>{svc.title}</span>
+                                                    <span className={`font-bold text-xs ${isSelected ? "text-[#0A1F44]" : "text-[#687280]"}`}>{svc.title}</span>
                                                     {isSelected && <CheckCircle size={14} className="text-[#FF6A00]" />}
                                                 </div>
-                                                <p className="text-[10px] text-gray-400 mb-2">{svc.transitTime} {svc.notes ? `| ${svc.notes}` : ''}</p>
-                                                <div className="flex justify-between items-center mt-3 border-t border-white/10 pt-2">
-                                                    <span className="text-[10px] text-gray-500">Total Payable</span>
+                                                <p className="text-[10px] text-[#687280] mb-2">{svc.transitTime} {svc.notes ? `| ${svc.notes}` : ''}</p>
+                                                <div className="flex justify-between items-center mt-3 border-t border-[#687280]/15 pt-2">
+                                                    <span className="text-[10px] text-[#687280]">Total Payable</span>
                                                     <span className="font-black text-[#FF6A00] text-sm">₹{svc.invoiceTotal.toFixed(2)}</span>
                                                 </div>
                                             </div>
@@ -643,17 +613,17 @@ const SingleBooking = () => {
                             </div>
                         ) : (
                             /* Aramex Single Plan Block */
-                            <div className="bg-black/30 p-5 rounded-2xl border border-[#FF6A00]/30 space-y-3">
+                            <div className="bg-white p-6 rounded-2xl border-2 border-[#FF6A00]/40 shadow-xl space-y-4">
                                 <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Dynamic Shipping Quotation Breakdown</h4>
                                 <div className="grid md:grid-cols-3 gap-4 text-xs">
-                                    <div><span className="text-gray-500 block">Courier Name:</span><span className="font-bold text-white capitalize">{estimateResult.courierName}</span></div>
-                                    <div><span className="text-gray-500 block">Chargeable Weight:</span><span className="font-bold text-[#FF6A00]">{estimateResult.chargeableWeight}</span></div>
-                                    <div><span className="text-gray-500 block">Volumetric weight:</span><span className="text-gray-400 font-semibold">{estimateResult.volumetricWeight}</span></div>
+                                    <div><span className="text-[#687280] block">Courier Partner:</span><span className="font-bold text-[#0A1F44] capitalize">{estimateResult.courierName}</span></div>
+                                    <div><span className="text-[#687280] block">Chargeable Weight:</span><span className="font-bold text-[#FF6A00]">{estimateResult.chargeableWeight}</span></div>
+                                    <div><span className="text-[#687280] block">Volumetric Weight:</span><span className="text-[#0A1F44] font-semibold">{estimateResult.volumetricWeight}</span></div>
                                 </div>
-                                <div className="border-t border-white/10 pt-3 flex flex-wrap justify-between items-center text-sm gap-2">
+                                <div className="border-t border-[#687280]/15 pt-3 flex flex-wrap justify-between items-center text-sm gap-2">
                                     <div className="space-x-4">
-                                        <span className="text-[#687280]">Shipping Charge: <strong>₹{estimateResult.shippingCharge}</strong></span>
-                                        <span className="text-[#687280]">GST (18%): <strong>₹{estimateResult.gstAmount}</strong></span>
+                                        <span className="text-[#687280]">Shipping Charge: <strong className="text-[#0A1F44]">₹{estimateResult.shippingCharge}</strong></span>
+                                        <span className="text-[#687280]">GST (18%): <strong className="text-[#0A1F44]">₹{estimateResult.gstAmount}</strong></span>
                                     </div>
                                     <span className="text-lg font-black text-[#FF6A00]">Total Payable: ₹{estimateResult.invoiceTotal}</span>
                                 </div>
@@ -662,15 +632,15 @@ const SingleBooking = () => {
                     </>
                 )}
 
-                {bookingError && <div className="bg-red-500/10 border border-red-500/30 text-red-500 text-xs p-3.5 rounded-xl flex items-center gap-2"><AlertTriangle size={14} className="shrink-0" /><span>{bookingError}</span></div>}
-                {bookingSuccess && <div className="bg-green-500/10 border border-green-500/30 text-green-500 text-xs p-3.5 rounded-xl flex items-center gap-2"><Check size={14} className="shrink-0" /><span>{bookingSuccess}</span></div>}
+                {bookingError && <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-3.5 rounded-xl flex items-center gap-2"><AlertTriangle size={15} className="shrink-0" /><span>{bookingError}</span></div>}
+                {bookingSuccess && <div className="bg-green-50 border border-green-200 text-green-700 text-xs p-3.5 rounded-xl flex items-center gap-2"><Check size={15} className="shrink-0" /><span>{bookingSuccess}</span></div>}
 
                 <div className="flex gap-4">
                     <button
                         type="button"
                         onClick={handleEstimateSingle}
                         disabled={estimating || !singleForm.weight || (!singleForm.customerId && !singleForm.isGuestRecipient) || !singleForm.pickupAddressId}
-                        className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-3.5 rounded-xl text-xs transition disabled:opacity-50"
+                        className="flex-1 bg-[#E5E7EB]/50 hover:bg-[#E5E7EB] border border-[#687280]/20 text-[#0A1F44] font-bold py-3.5 rounded-xl text-xs transition disabled:opacity-50 shadow-sm"
                     >
                         {estimating ? "Calculating..." : "Calculate Cost Quote"}
                     </button>
@@ -678,10 +648,10 @@ const SingleBooking = () => {
                     <button
                         type="submit"
                         disabled={bookingLoading || user?.status !== "Active" || (singleForm.courier === "phreight" && !singleForm.productType)}
-                        className="flex-1 bg-[#FF6A00] text-[#0A1F44] font-extrabold py-3.5 rounded-xl text-xs hover:brightness-110 active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="flex-1 bg-[#FF6A00] hover:bg-[#ff7b1a] text-white font-extrabold py-3.5 rounded-xl text-xs active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md shadow-[#FF6A00]/20"
                     >
                         {bookingLoading ?
-                            <span className="w-5 h-5 border-2 border-[#0A1F44] border-t-transparent rounded-full animate-spin"></span> :
+                            <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span> :
                             <><Check size={16} /> Confirm Booking</>
                         }
                     </button>

@@ -98,8 +98,13 @@ const Sidebar = () => {
     <div className="w-64 h-screen bg-[#0A1F44] text-white fixed left-0 top-0 p-5 shadow-[4px_0_24px_rgba(0,0,0,0.25)] flex flex-col justify-between overflow-y-auto custom-scrollbar border-r border-[#687280]/20 select-none z-40">
       <div>
         {/* Brand Header */}
-        <div className="mb-8 mt-2 px-2 pb-4 border-b border-[#687280]/20">
-          <Logo showText={true} theme="navy" size="md" />
+        <div className="mb-6 mt-2 px-2 pb-4 border-b border-[#687280]/20 flex flex-col items-center text-center">
+          <div className="flex justify-center w-full">
+            <Logo showText={true} theme="navy" size="lg" className="justify-center" />
+          </div>
+          <div className="mt-2 text-[10px] text-[#FF6A00] font-bold tracking-wider uppercase bg-[#FF6A00]/10 px-3 py-1 rounded-full border border-[#FF6A00]/20">
+            CRM Console
+          </div>
         </div>
 
         {/* Sidebar Nav */}

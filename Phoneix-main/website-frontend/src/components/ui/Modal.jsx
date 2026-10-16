@@ -3,16 +3,16 @@ import { Dialog, Transition } from "@headlessui/react";
 import { AlertTriangle, CheckCircle, Info, X } from "lucide-react";
 
 export const Modal = ({
-                          isOpen,
-                          onClose,
-                          onConfirm,
-                          title,
-                          description,
-                          confirmText = "Confirm",
-                          cancelText = "Cancel",
-                          variant = "confirm",
-                          isLoading = false,
-                      }) => {
+    isOpen,
+    onClose,
+    onConfirm,
+    title,
+    description,
+    confirmText = "Confirm",
+    cancelText = "Cancel",
+    variant = "confirm",
+    isLoading = false,
+}) => {
     // Styling configurations based on variant
     const variants = {
         danger: {
@@ -20,28 +20,28 @@ export const Modal = ({
             iconColor: "text-red-500",
             iconBg: "bg-red-500/10",
             border: "border-red-500/20",
-            btnClass: "bg-red-500 hover:bg-red-600 text-white",
+            btnClass: "bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-500/20",
         },
         success: {
             icon: CheckCircle,
-            iconColor: "text-green-500",
+            iconColor: "text-green-600",
             iconBg: "bg-green-500/10",
             border: "border-green-500/20",
-            btnClass: "bg-green-500 hover:bg-green-600 text-white",
+            btnClass: "bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-500/20",
         },
         info: {
             icon: Info,
-            iconColor: "text-blue-500",
+            iconColor: "text-blue-600",
             iconBg: "bg-blue-500/10",
             border: "border-blue-500/20",
-            btnClass: "bg-blue-500 hover:bg-blue-600 text-white",
+            btnClass: "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20",
         },
         confirm: {
             icon: AlertTriangle,
             iconColor: "text-[#FF6A00]",
             iconBg: "bg-[#FF6A00]/10",
             border: "border-[#FF6A00]/20",
-            btnClass: "bg-[#FF6A00] hover:brightness-110 text-[#0A1F44]",
+            btnClass: "bg-[#FF6A00] hover:bg-[#ff7b1a] text-white shadow-md shadow-[#FF6A00]/20",
         }
     };
 
@@ -61,7 +61,7 @@ export const Modal = ({
                     leaveFrom="opacity-100"
                     leaveTo="opacity-0"
                 >
-                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" />
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
                 </Transition.Child>
 
                 <div className="fixed inset-0 overflow-y-auto">
@@ -76,7 +76,7 @@ export const Modal = ({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <Dialog.Panel className={`w-full max-w-md transform overflow-hidden rounded-3xl bg-[#0A1F44] border ${config.border} p-6 text-left align-middle shadow-2xl transition-all`}>
+                            <Dialog.Panel className={`w-full max-w-md transform overflow-hidden rounded-3xl bg-white border border-[#687280]/20 p-6 text-left align-middle shadow-2xl transition-all`}>
                                 {/* Header / Icon */}
                                 <div className="flex items-start justify-between">
                                     <div className={`flex h-12 w-12 items-center justify-center rounded-full ${config.iconBg}`}>
@@ -85,7 +85,7 @@ export const Modal = ({
                                     <button
                                         onClick={onClose}
                                         disabled={isLoading}
-                                        className="text-gray-400 hover:text-white transition disabled:opacity-50"
+                                        className="text-[#687280] hover:text-[#0A1F44] transition disabled:opacity-50"
                                     >
                                         <X size={20} />
                                     </button>
@@ -93,11 +93,11 @@ export const Modal = ({
 
                                 {/* Content */}
                                 <div className="mt-4">
-                                    <Dialog.Title as="h3" className="text-lg font-bold leading-6 text-white">
+                                    <Dialog.Title as="h3" className="text-lg font-bold leading-6 text-[#0A1F44]">
                                         {title}
                                     </Dialog.Title>
                                     <div className="mt-2">
-                                        <p className="text-sm text-gray-400 leading-relaxed">
+                                        <p className="text-sm text-[#687280] leading-relaxed">
                                             {description}
                                         </p>
                                     </div>
@@ -107,7 +107,7 @@ export const Modal = ({
                                 <div className="mt-8 flex gap-3">
                                     <button
                                         type="button"
-                                        className="flex-1 rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-xs font-bold text-white hover:bg-white/10 transition disabled:opacity-50"
+                                        className="flex-1 rounded-xl bg-[#E5E7EB]/50 border border-[#687280]/20 px-4 py-3 text-xs font-bold text-[#0A1F44] hover:bg-[#E5E7EB] transition disabled:opacity-50"
                                         onClick={onClose}
                                         disabled={isLoading}
                                     >

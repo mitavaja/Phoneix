@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import API, { resolveAssetUrl } from "../services/api";
 
-const Logo = ({ className = "", showText = true, theme = "light", size = "md", text, subtitle, logoUrl }) => {
+const Logo = ({ className = "", showText = true, theme = "navy", size = "md", text, subtitle, logoUrl }) => {
   const [logoConfig, setLogoConfig] = useState(null);
 
   useEffect(() => {
@@ -42,25 +42,27 @@ const Logo = ({ className = "", showText = true, theme = "light", size = "md", t
     }
   };
 
-  const colors = iconColorMap[theme] || iconColorMap.light;
+  const colors = iconColorMap[theme] || iconColorMap.navy;
 
   const sizeClasses = {
-    sm: { icon: "h-10 w-12", text: "text-xl" },
-    md: { icon: "h-14 w-16", text: "text-3xl font-bold" },
-    lg: { icon: "h-16 w-20", text: "text-4xl font-bold" },
-    xl: { icon: "h-24 w-28", text: "text-6xl font-bold" }
-  }[size] || { icon: "h-14 w-16", text: "text-3xl font-bold" };
+    sm: { icon: "h-9 w-10", text: "text-lg font-bold" },
+    md: { icon: "h-12 w-14", text: "text-2xl font-bold" },
+    lg: { icon: "h-20 w-22", text: "text-3xl font-bold" },
+    xl: { icon: "h-26 w-28", text: "text-5xl font-bold" },
+    sidebar: { icon: "h-20 w-22", text: "text-3xl font-bold" }
+  }[size] || { icon: "h-14 w-16", text: "text-2xl font-bold" };
 
   // Proper sizes for logo image to prevent distortion (maintaining aspect-ratio)
   const imgSizeClasses = {
-    sm: "h-10 w-auto max-w-[140px] scale-110 origin-left",
-    md: "h-14 w-auto max-w-[280px] scale-[1.3] origin-left",
-    lg: "h-16 w-auto max-w-[350px] scale-[1.4] origin-left",
-    xl: "h-24 w-auto max-w-[500px] scale-[1.5] origin-left"
-  }[size] || "h-14 w-auto max-w-[280px] scale-[1.3] origin-left";
+    sm: "h-9 w-auto max-w-[130px]",
+    md: "h-12 w-auto max-w-[190px]",
+    lg: "h-20 w-auto max-w-[190px]",
+    xl: "h-26 w-auto max-w-[260px]",
+    sidebar: "h-20 w-auto max-w-[190px]"
+  }[size] || "h-14 w-auto max-w-[190px]";
 
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div className={`flex items-center gap-2.5 ${className}`}>
       {displayLogoUrl ? (
         <img
           src={resolveAssetUrl(displayLogoUrl)}

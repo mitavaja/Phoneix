@@ -931,11 +931,17 @@ export const downloadInvoicePdf = async (req, res) => {
 
     doc.pipe(res);
 
-    // Invoice Header
-    doc.fontSize(22).fillColor("#FF6A00").text("PHOENIX COMMERCE", { align: "center" }).moveDown(0.2);
-    doc.fontSize(10).fillColor("#687280").text("Courier Shipping Aggregation & Logistics Intermediary", { align: "center" }).moveDown(1.5);
+    // Invoice Header Logo & Business Information
+    const logoPath = path.join(process.cwd(), "public/logo/phreights.png");
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, 50, 40, { height: 42 });
+    }
 
-    doc.fontSize(14).fillColor("#0A1F44").text("TAX INVOICE / RECIPIENT BILL", { underline: true }).moveDown(0.5);
+    doc.fontSize(20).fillColor("#FF6A00").text("PHOENIX COMMERCE", { align: "right" }).moveDown(0.2);
+    doc.fontSize(8.5).fillColor("#0A1F44").text("2051, INTERNATIONAL FASHION MARKET (IFM), OPP. RAAJMAHAL AC MALL, SITANAGAR SURAT 395010", { align: "right" }).moveDown(0.2);
+    doc.fontSize(8.5).fillColor("#687280").text("GST: 24DYHPA2082J1ZL | Email: phoenixfreights@gmail.com", { align: "right" }).moveDown(1.5);
+
+    doc.fontSize(14).fillColor("#0A1F44").text("TAX INVOICE / RECIPIENT BILL", 50, doc.y, { underline: true }).moveDown(0.5);
 
     // Invoice Meta Columns
     const startY = doc.y;
@@ -979,7 +985,10 @@ export const downloadInvoicePdf = async (req, res) => {
     doc.fontSize(11).text("Net Invoice Total (Payable):", 300, totalY + 45, { bold: true });
     doc.fillColor("#FF6A00").text(`Rs. ${shipment.invoiceTotal.toFixed(2)}`, 450, totalY + 45, { align: "right", bold: true });
 
-    doc.moveDown(4);
+    doc.moveDown(2.5);
+    doc.fontSize(9).fillColor("#0A1F44").text("BANK ACCOUNT DETAILS (Kotak Current A/c):", 50, doc.y, { bold: true });
+    doc.fontSize(8.5).fillColor("#374151").text("Name: Phoenix Commerce | Bank: Kotak Bank | A/c Type: Current | A/C No: 5949289868 | IFSC: KKBK0002887").moveDown(1);
+
     doc.fontSize(8).fillColor("#687280").text("This is an auto-generated GST tax invoice. No signature is required. Thank you for shipping with Phoenix Commerce.", { align: "center" });
 
     doc.end();

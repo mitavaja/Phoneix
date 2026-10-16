@@ -205,8 +205,11 @@ const Register = () => {
         <div className="relative z-10 flex flex-col h-full justify-between">
           {/* Top: Logo & Back to Home */}
           <div className="flex items-center justify-between">
-            <div className="cursor-pointer" onClick={() => navigate("/")}>
-              <Logo theme="dark" size="md" />
+            <div 
+              className="cursor-pointer bg-[#0A1F44]/85 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/15 shadow-xl hover:border-[#FF6A00]/40 transition" 
+              onClick={() => navigate("/")}
+            >
+              <Logo theme="navy" size="md" />
             </div>
             <button 
               onClick={() => navigate("/")}

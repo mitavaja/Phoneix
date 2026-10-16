@@ -7,7 +7,7 @@ export const Dropdown = ({ buttonLabel, icon: Icon, items = [], buttonClassName 
         <Menu as="div" className="relative inline-block text-left">
             <div>
                 <Menu.Button
-                    className={`inline-flex w-full justify-center items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75 ${buttonClassName}`}
+                    className={`inline-flex w-full justify-center items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all focus:outline-none shadow-sm ${buttonClassName}`}
                 >
                     {Icon && <Icon size={14} />}
                     {buttonLabel}
@@ -24,7 +24,7 @@ export const Dropdown = ({ buttonLabel, icon: Icon, items = [], buttonClassName 
                 leaveTo="transform opacity-0 scale-95"
             >
                 <Menu.Items
-                    className={`absolute right-0 mt-2 w-56 origin-top-right divide-y divide-[#687280]/10 rounded-xl bg-[#071630] border border-white/10 shadow-[0_8px_30px_rgb(0,0,0,0.5)] ring-1 ring-black/5 focus:outline-none z-50 overflow-hidden ${menuClassName}`}
+                    className={`absolute right-0 mt-2 w-56 origin-top-right divide-y divide-[#687280]/10 rounded-xl bg-white border border-[#687280]/20 shadow-[0_12px_40px_rgba(10,31,68,0.12)] ring-1 ring-black/5 focus:outline-none z-50 overflow-hidden ${menuClassName}`}
                 >
                     <div className="py-1">
                         {items.map((item, index) => (
@@ -33,10 +33,10 @@ export const Dropdown = ({ buttonLabel, icon: Icon, items = [], buttonClassName 
                                     <button
                                         onClick={item.onClick}
                                         className={`${
-                                            active ? "bg-[#FF6A00]/10 text-[#FF6A00]" : "text-gray-300"
+                                            active ? "bg-[#FF6A00]/10 text-[#FF6A00]" : "text-[#0A1F44]"
                                         } group flex w-full items-center gap-2 px-4 py-2.5 text-xs font-semibold transition-colors`}
                                     >
-                                        {item.icon && <item.icon size={14} className={active ? "text-[#FF6A00]" : "text-gray-400"} />}
+                                        {item.icon && <item.icon size={14} className={active ? "text-[#FF6A00]" : "text-[#687280]"} />}
                                         {item.label}
                                     </button>
                                 )}

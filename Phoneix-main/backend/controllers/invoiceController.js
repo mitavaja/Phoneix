@@ -11,7 +11,8 @@ export const generateInvoicePDF = async (req, res) => {
         const userId = req.user._id;
 
         // Accept custom date ranges from frontend, otherwise default to Current Month
-        let { fromDate, toDate } = req.query;
+        let fromDate = req.query.fromDate || req.query.startDate;
+        let toDate = req.query.toDate || req.query.endDate;
 
         if (!fromDate || !toDate) {
             fromDate = moment().startOf('month').toDate();

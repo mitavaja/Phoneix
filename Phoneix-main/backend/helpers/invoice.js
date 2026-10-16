@@ -1,11 +1,31 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+export const getLogoDataUri = () => {
+    try {
+        const logoPath = path.join(__dirname, "../public/logo/phreights.png");
+        if (fs.existsSync(logoPath)) {
+            const buf = fs.readFileSync(logoPath);
+            return `data:image/png;base64,${buf.toString("base64")}`;
+        }
+    } catch (err) {
+        console.error("Error reading logo file for invoice:", err);
+    }
+    return `${process.env.APP_URL || "http://localhost:9000"}/public/logo/phreights.png`;
+};
+
 export const generateInvoiceHTML = (invoice) => {
-    const logoURL = `${process.env.APP_URL}/public/logo/phreights.jpeg`;
+    const logoURL = getLogoDataUri();
     return `
 			<!DOCTYPE html>
 <html>
    <head>
       <meta charset="utf-8">
-      <title>Invoice - Blumoon</title>
+      <title>Invoice - Phoenix Commerce</title>
       <style>
          body{
          font-family: Arial, Helvetica, sans-serif;
@@ -18,8 +38,8 @@ export const generateInvoiceHTML = (invoice) => {
          text-align:right;
          }
          .logo-box img{
-         background:#0b1f3a;
-         padding:8px 12px;
+         max-height: 65px;
+         width: auto;
          display:inline-block;
          margin-bottom:10px;
          }
@@ -176,14 +196,15 @@ export const generateInvoiceHTML = (invoice) => {
                   ${invoice?.reference || "Loose Diamond"}
                </div>
                <div class="meta-row">
-                  <strong>ABN</strong>
-                  38 617 722 595
+                  <strong>GSTIN</strong>
+                  24DYHPA2082J1ZL
                </div>
             </div>
             <div>
-               <strong>Blumoon Pty Ltd</strong><br>
-               ABN: 38 617 722 595<br>
-               ACN: 617 722 595
+               <strong>PHOENIX COMMERCE</strong><br>
+               2051, INTERNATIONAL FASHION MARKET (IFM)<br>
+               OPP. RAAJMAHAL AC MALL, SITANAGAR SURAT 395010<br>
+               GST: 24DYHPA2082J1ZL
             </div>
          </div>
       </div>
@@ -224,19 +245,17 @@ export const generateInvoiceHTML = (invoice) => {
       </div>
       <div class="payment">
          <p><strong>Due Date: ${duedateInvoice}</strong></p>
-         <p>ACCOUNT DETAILS:</p>
-         <p>BANK NAME : ANZ</p>
-         <p>SWIFT CODE : ANZBAU3M</p>
-         <p>NAME : BLUMOON PTY LTD.</p>
-         <p>BSB : 013352 ACCOUNT NO : 464195678</p>
+         <p><strong>BANK ACCOUNT DETAILS (Kotak Current A/c):</strong></p>
+         <p>Name: Phoenix Commerce</p>
+         <p>Bank Name: Kotak Bank</p>
+         <p>A/c Type: Current</p>
+         <p>A/C number: 5949289868</p>
+         <p>IFSC code: KKBK0002887</p>
       </div>
       <ul class="terms">
-         <li>All payments for this invoice must be made to Blumoon Pty Ltd by the due date stated on the invoice.</li>
+         <li>All payments for this invoice must be made to Phoenix Commerce by the due date stated on the invoice.</li>
          <li>Please always mention the invoice number(s) as the payment reference.</li>
-         <li>Payments are accepted in AUD only.</li>
-         <li>Goods sold are final and cannot be returned or exchanged under any circumstances.</li>
-         <li>Any diamonds or jewellery provided on an approval basis must be returned to the Blumoon office by the due date stated in the quote or invoice, in the same condition as received, including all original certificates and documentation. Failure to return the goods by the due date will result in the items being invoiced to you and deemed sold.</li>
-         <li>For full details of our Terms & Conditions and Privacy Policy, please visit www.blumoon.com.au</li>
+         <li>This is a computer-generated tax invoice by Phoenix Commerce and does not require a physical signature.</li>
       </ul>
    </body>
 </html>
@@ -245,37 +264,53 @@ export const generateInvoiceHTML = (invoice) => {
 
 
 export const generateLogisticsInvoiceHTML = (data) => {
-    // You can replace this with your actual hosted logo URL or base64 string
-    const logoURL = `${process.env.APP_URL}/public/logo/phreights.jpeg`;
+    const logoURL = getLogoDataUri();
 
     return `
     <!DOCTYPE html>
     <html>
        <head>
           <meta charset="utf-8">
-          <title>Tax Invoice - Phoenix Aggregator</title>
+          <title>Tax Invoice - Phoenix Commerce</title>
           <style>
+             html, body {
+                 background-color: #ffffff;
+             }
              body {
                  font-family: Arial, Helvetica, sans-serif;
                  margin: 0;
                  padding: 40px 35px;
-                 color: #333;
+                 color: #1e293b;
+                 background-color: #ffffff;
              }
              .header {
                  display: flex;
                  justify-content: space-between;
-                 align-items: flex-start;
+                 align-items: center;
                  border-bottom: 2px solid #FF6A00;
                  padding-bottom: 20px;
              }
+             .logo-box {
+                 display: flex;
+                 align-items: center;
+             }
              .logo-box img {
-                 max-height: 60px;
-                 border-radius: 8px;
+                 max-height: 70px;
+                 width: auto;
+                 display: block;
+                 object-fit: contain;
              }
              .company-details {
                  text-align: right;
                  font-size: 11px;
-                 line-height: 1.4;
+                 line-height: 1.5;
+             }
+             .company-details strong.company-name {
+                 font-size: 15px;
+                 color: #0A1F44;
+                 letter-spacing: 0.5px;
+                 display: inline-block;
+                 margin-bottom: 2px;
              }
              .invoice-title {
                  font-size: 24px;
@@ -366,13 +401,15 @@ export const generateLogisticsInvoiceHTML = (data) => {
                  margin-top: 5px;
              }
              .payment {
-                 margin-top: 40px;
+                 margin-top: 35px;
                  font-size: 11px;
-                 background: #f8f9fa;
-                 padding: 15px;
+                 background: #f8fafc;
+                 padding: 16px 20px;
                  border-radius: 8px;
+                 border: 1px solid #e2e8f0;
              }
-             .payment p { margin: 4px 0; }
+             .payment p { margin: 5px 0; color: #334155; }
+             .payment p strong { color: #0A1F44; display: inline-block; min-width: 110px; }
              .terms {
                  margin-top: 30px;
                  font-size: 9px;
@@ -386,14 +423,14 @@ export const generateLogisticsInvoiceHTML = (data) => {
        <body>
           <div class="header">
              <div class="logo-box">
-                <img src="${logoURL}" alt="Phoenix Aggregator">
+                <img src="${logoURL}" alt="Phreights by Phoenix Commerce">
              </div>
              <div class="company-details">
-                 <strong>Phoenix Aggregator Pvt. Ltd.</strong><br>
-                 Warehouse 42, Logistics Park<br>
-                 Surat, Gujarat, 395010, IN<br>
-                 GSTIN: 24AAACP1234Q1Z5<br>
-                 support@phoenixaggregator.com
+                 <strong class="company-name">PHOENIX COMMERCE</strong><br>
+                 2051, INTERNATIONAL FASHION MARKET (IFM),<br>
+                 OPP. RAAJMAHAL AC MALL, SITANAGAR SURAT 395010<br>
+                 <strong>GST:</strong> 24DYHPA2082J1ZL<br>
+                 <strong>Email:</strong> phoenixfreights@gmail.com
              </div>
           </div>
           
@@ -458,18 +495,20 @@ export const generateLogisticsInvoiceHTML = (data) => {
           </div>
 
           <div class="payment">
-             <p><strong>BANK ACCOUNT DETAILS FOR NEFT/RTGS:</strong></p>
-             <p>Bank Name: HDFC Bank Ltd</p>
-             <p>Account Name: Phoenix Aggregator Pvt Ltd</p>
-             <p>Account Number: 50200012345678</p>
-             <p>IFSC Code: HDFC0001234</p>
+             <p style="font-size: 12px; font-weight: bold; color: #0A1F44; margin-bottom: 8px;">BANK ACCOUNT DETAILS FOR NEFT / RTGS / IMPS:</p>
+             <p><strong>Kotak Current A/c</strong></p>
+             <p><strong>Name:</strong> Phoenix Commerce</p>
+             <p><strong>Bank Name:</strong> Kotak Bank</p>
+             <p><strong>A/c Type:</strong> Current</p>
+             <p><strong>A/C number:</strong> <span style="font-family: monospace; font-weight: bold; font-size: 12px; color: #0A1F44;">5949289868</span></p>
+             <p><strong>IFSC code:</strong> <span style="font-family: monospace; font-weight: bold; font-size: 12px; color: #FF6A00;">KKBK0002887</span></p>
           </div>
 
           <ul class="terms">
              <li>All payments for this invoice must be cleared within 7 days of the invoice generation date to avoid late payment penalties.</li>
              <li>Please mention the Invoice Number as the payment reference during bank transfers.</li>
              <li>Any discrepancies regarding weights or dimensions must be raised within 48 hours of shipment delivery.</li>
-             <li>This is a computer-generated invoice and does not require a physical signature.</li>
+             <li>This is a computer-generated tax invoice by Phoenix Commerce and does not require a physical signature.</li>
           </ul>
        </body>
     </html>

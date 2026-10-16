@@ -30,24 +30,24 @@ const Services = () => {
 
   const defaultServices = [
     {
-      title: "International Shipping",
-      desc: "Ship your products globally with reliable courier partners.",
+      title: "International Courier",
+      desc: "International shipment solutions for businesses and individual customers across eligible destinations.",
       icon: "Globe",
     },
     {
-      title: "Pickup Service",
-      desc: "Schedule pickups from your location with ease and convenience.",
+      title: "Door-to-Door Shipping",
+      desc: "From pickup at the shipper's address to delivery at the destination, PHREIGHTS coordinates the shipping journey.",
       icon: "Truck",
     },
     {
-      title: "Live Tracking",
-      desc: "Track your shipments in real-time with accurate updates.",
-      icon: "BarChart3",
+      title: "DDU Shipping",
+      desc: "Under Delivered Duty Unpaid (DDU), customs duties/taxes are payable by consignee. Non-payment within 3 attempts may be debited from shipper's wallet.",
+      icon: "Package",
     },
     {
-      title: "Courier Aggregation",
-      desc: "Access multiple courier services in one platform.",
-      icon: "Package",
+      title: "DDP Shipping",
+      desc: "Under Delivered Duty Paid (DDP), applicable duty/tax charges are collected from the shipper during booking, subject to destination customs.",
+      icon: "BarChart3",
     },
   ];
 
@@ -59,10 +59,10 @@ const Services = () => {
       {/* 🔥 HERO */}
       <section className="text-center py-20 px-6 max-w-4xl mx-auto space-y-4">
         <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
-          {data?.hero?.title || "Our Services"}
+          {data?.hero?.title || "International Shipping Made Simple"}
         </h1>
         <p className="text-[#687280] max-w-2xl mx-auto text-base md:text-lg leading-relaxed">
-          {data?.hero?.description || "Explore powerful shipping solutions designed for modern businesses."}
+          {data?.hero?.description || "Ship internationally with PHREIGHTS through a streamlined booking, pickup, tracking and support experience."}
         </p>
       </section>
 
@@ -97,22 +97,22 @@ const Services = () => {
         <div className="max-w-6xl mx-auto grid md:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <h2 className="text-3xl md:text-4xl font-extrabold text-[#FF6A00] leading-tight">
-              {data?.featuresDetail?.title || "Powerful Shipping Platform"}
+              {data?.featuresDetail?.title || "Important Customs Note & Weight Calculation"}
             </h2>
-            <p className="text-[#687280] text-sm md:text-base leading-relaxed">
-              {data?.featuresDetail?.description || "Phreight provides everything you need to manage shipping, calculate rates, track orders, and grow your business globally."}
+            <p className="text-[#687280] text-sm md:text-base leading-relaxed whitespace-pre-line">
+              {data?.featuresDetail?.description || "Chargeable Weight = Higher of Dead Weight or Volumetric Weight (Length × Breadth × Height ÷ 5000 in cm).\n\nIf recorded weight/dimensions differ from booking, the additional amount may be automatically debited from the customer's PHREIGHTS Wallet."}
             </p>
           </div>
 
           <div className="bg-[#E5E7EB]/30 border border-[#687280]/20 rounded-2xl p-6 md:p-8 space-y-4">
-            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#0A1F44] border-b border-[#687280]/20 pb-2">Core Features Included</h4>
+            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#0A1F44] border-b border-[#687280]/20 pb-2">Logistics Guidelines</h4>
             <ul className="space-y-3.5">
               {(data?.featuresDetail?.points || [
-                "Automated rate calculation",
-                "Wallet-based payments",
-                "Bulk shipment upload",
-                "Label generation",
-                "Real-time tracking"
+                "Customs duty is not applicable in every country and varies by destination, commodity, and declared value",
+                "Pickup is automatically selected and allocated by PHREIGHTS without requiring partner selection",
+                "Every eligible consignment includes PHREIGHTS Tracking + Last-Mile Tracking",
+                "DDU & DDP options provide total flexibility for duties and taxes",
+                "Automated weight and dimension reconciliation via partner carrier logs"
               ]).map((pt, idx) => (
                 <li key={idx} className="flex items-center gap-2.5 text-sm text-[#687280] font-medium">
                   <span className="w-5 h-5 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center shrink-0 text-green-600">
