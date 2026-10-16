@@ -19,3 +19,7 @@ Phoneix-main/backend/.env
 *.log
 .DS_Store
 Thumbs.db
+
+# Environment configuration files
+**/.env.*
+!**/.env.example
