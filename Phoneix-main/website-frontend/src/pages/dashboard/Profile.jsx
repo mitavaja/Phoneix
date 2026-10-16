@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Fragment } from "react";
-import API from "../../services/api";
+import API, { API_ROOT } from "../../services/api";
 import {
     User,
     FileText,
@@ -15,7 +15,7 @@ import { toast } from "react-toastify";
 import { Dialog, Transition } from "@headlessui/react";
 
 const Profile = () => {
-    const baseKycUploadURL = `${import.meta.env.VITE_API_BASE_URL}/uploads/`
+    const baseKycUploadURL = `${API_ROOT}/uploads/`;
     const [activeTab, setActiveTab] = useState("profile");
     const [profileData, setProfileData] = useState(null);
     const [loading, setLoading] = useState(true);

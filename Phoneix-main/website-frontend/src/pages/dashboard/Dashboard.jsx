@@ -1348,7 +1348,7 @@ const Dashboard = () => {
                                 {sh.labelUrl ? (
                                     <a href={sh.labelUrl} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500 rounded text-[10px] font-semibold text-purple-400 hover:text-white transition inline-flex items-center gap-1">Label</a>
                                 ) : sh.labelPdfPath && (
-                                    <a href={`${import.meta.env.VITE_API_BASE_URL || ""}${sh.labelPdfPath}`} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500 rounded text-[10px] font-semibold text-purple-400 hover:text-white transition inline-flex items-center gap-1">Label</a>
+                                    <a href={`${import.meta.env.VITE_API_ROOT || "http://localhost:9000"}${sh.labelPdfPath}`} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500 rounded text-[10px] font-semibold text-purple-400 hover:text-white transition inline-flex items-center gap-1">Label</a>
                                 )}
                                 {sh.status === "Booked" && !sh.manifestCode && (
                                     <button onClick={() => handleOpenPickupModal(sh)} className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500 rounded text-[10px] font-semibold text-blue-400 hover:text-white transition inline-flex items-center gap-1">

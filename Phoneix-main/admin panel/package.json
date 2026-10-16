@@ -1,5 +1,5 @@
 {
-  "name": "website-frontend",
+  "name": "admin-panel",
   "version": "0.1.0",
   "private": true,
   "dependencies": {

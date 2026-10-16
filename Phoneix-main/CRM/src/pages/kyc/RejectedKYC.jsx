@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import API from "../../services/api";
+import API, { API_ROOT } from "../../services/api";
 import Pagination from "../../components/Pagination";
 
 const RejectedKYC = () => {
@@ -100,7 +100,7 @@ const RejectedKYC = () => {
                           <div className="flex flex-wrap gap-1.5 max-w-[220px]">
                             {s.panCard && (
                                 <a
-                                    href={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/uploads/${s.panCard}`}
+                                    href={`${API_ROOT}/uploads/${s.panCard}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all"
@@ -110,7 +110,7 @@ const RejectedKYC = () => {
                             )}
                             {s.aadhaarCard && (
                                 <a
-                                    href={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/uploads/${s.aadhaarCard}`}
+                                    href={`${API_ROOT}/uploads/${s.aadhaarCard}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all"
@@ -120,7 +120,7 @@ const RejectedKYC = () => {
                             )}
                             {s.gstCertificate && (
                                 <a
-                                    href={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/uploads/${s.gstCertificate}`}
+                                    href={`${API_ROOT}/uploads/${s.gstCertificate}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all"
@@ -130,7 +130,7 @@ const RejectedKYC = () => {
                             )}
                             {s.addressProof && (
                                 <a
-                                    href={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/uploads/${s.addressProof}`}
+                                    href={`${API_ROOT}/uploads/${s.addressProof}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all"
@@ -140,7 +140,7 @@ const RejectedKYC = () => {
                             )}
                             {s.companyRegistration && (
                                 <a
-                                    href={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/uploads/${s.companyRegistration}`}
+                                    href={`${API_ROOT}/uploads/${s.companyRegistration}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all"
@@ -150,7 +150,7 @@ const RejectedKYC = () => {
                             )}
                             {!s.panCard && !s.aadhaarCard && !s.gstCertificate && !s.addressProof && !s.companyRegistration && s.document && (
                                 <a
-                                    href={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"}/uploads/${s.document}`}
+                                    href={`${API_ROOT}/uploads/${s.document}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all underline"

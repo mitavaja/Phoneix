@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
-import API from "../../services/api";
+import API, { resolveAssetUrl } from "../../services/api";
 
 const CMSManager = () => {
   const { page } = useParams();
@@ -351,7 +351,7 @@ const CMSManager = () => {
                         {pageData.logo?.logoUrl && (
                           <div className="flex items-center gap-2">
                             <img
-                              src={pageData.logo.logoUrl.startsWith("http") ? pageData.logo.logoUrl : `http://localhost:5000${pageData.logo.logoUrl}`}
+                              src={resolveAssetUrl(pageData.logo.logoUrl)}
                               alt="Logo Preview"
                               className="h-10 w-auto object-contain rounded border bg-gray-50 p-1"
                             />

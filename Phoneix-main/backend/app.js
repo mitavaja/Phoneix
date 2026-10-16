@@ -23,7 +23,37 @@ import InvoiceRoutes from "./routes/invoiceRoutes.js";
 const app = express();
 
 // Middlewares
-app.use(cors());
+const allowedOrigins = [
+  process.env.CLIENT_WEBSITE_URL || "http://localhost:9001",
+  process.env.CLIENT_ADMIN_URL || "http://localhost:9002",
+  process.env.CLIENT_CRM_URL || "http://localhost:9003",
+  "http://localhost:9001",
+  "http://localhost:9002",
+  "http://localhost:9003",
+  "http://127.0.0.1:9001",
+  "http://127.0.0.1:9002",
+  "http://127.0.0.1:9003",
+  "https://phreights.com",
+  "https://www.phreights.com",
+  "https://admin.phreights.com",
+  "https://crm.phreights.com",
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(",") : [])
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
+      if (!origin) return callback(null, true);
+      // In development mode, allow any local or listed origin
+      if (process.env.NODE_ENV !== "production" || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error(`CORS blocked origin: ${origin}`));
+    },
+    credentials: true
+  })
+);
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 

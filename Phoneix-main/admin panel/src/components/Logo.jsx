@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import API, { resolveAssetUrl } from "../services/api";
 
 const Logo = ({ className = "", showText = true, theme = "light", size = "md", text, subtitle, logoUrl }) => {
   const [logoConfig, setLogoConfig] = useState(null);
@@ -7,7 +7,7 @@ const Logo = ({ className = "", showText = true, theme = "light", size = "md", t
   useEffect(() => {
     // If text/subtitle/logoUrl is not explicitly passed, fetch from backend API
     if (text === undefined || subtitle === undefined || logoUrl === undefined) {
-      axios.get("http://localhost:5000/api/page-content/header")
+      API.get("/page-content/header")
         .then(res => {
           if (res.data?.sections?.logo) {
             setLogoConfig(res.data.sections.logo);
@@ -63,7 +63,7 @@ const Logo = ({ className = "", showText = true, theme = "light", size = "md", t
     <div className={`flex items-center gap-3 ${className}`}>
       {displayLogoUrl ? (
         <img
-          src={displayLogoUrl.startsWith("http") ? displayLogoUrl : `http://localhost:5000${displayLogoUrl}`}
+          src={resolveAssetUrl(displayLogoUrl)}
           alt="Brand Logo"
           className={`${imgSizeClasses} object-contain select-none`}
           onError={(e) => {

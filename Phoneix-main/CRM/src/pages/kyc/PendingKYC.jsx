@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import API from "../../services/api";
+import API, { API_ROOT } from "../../services/api";
 import Pagination from "../../components/Pagination";
 
 const PendingKYC = () => {
@@ -107,7 +107,7 @@ const PendingKYC = () => {
                           <div className="flex flex-wrap gap-1.5 max-w-[220px]">
                             {sub.panCard && (
                                 <a
-                                    href={`http://localhost:5000/uploads/${sub.panCard}`}
+                                    href={`${API_ROOT}/uploads/${sub.panCard}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all"
@@ -117,7 +117,7 @@ const PendingKYC = () => {
                             )}
                             {sub.aadhaarCard && (
                                 <a
-                                    href={`http://localhost:5000/uploads/${sub.aadhaarCard}`}
+                                    href={`${API_ROOT}/uploads/${sub.aadhaarCard}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all"
@@ -127,7 +127,7 @@ const PendingKYC = () => {
                             )}
                             {sub.gstCertificate && (
                                 <a
-                                    href={`http://localhost:5000/uploads/${sub.gstCertificate}`}
+                                    href={`${API_ROOT}/uploads/${sub.gstCertificate}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all"
@@ -137,7 +137,7 @@ const PendingKYC = () => {
                             )}
                             {sub.addressProof && (
                                 <a
-                                    href={`http://localhost:5000/uploads/${sub.addressProof}`}
+                                    href={`${API_ROOT}/uploads/${sub.addressProof}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all"
@@ -147,7 +147,7 @@ const PendingKYC = () => {
                             )}
                             {sub.companyRegistration && (
                                 <a
-                                    href={`http://localhost:5000/uploads/${sub.companyRegistration}`}
+                                    href={`${API_ROOT}/uploads/${sub.companyRegistration}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all"
@@ -157,7 +157,7 @@ const PendingKYC = () => {
                             )}
                             {!sub.panCard && !sub.aadhaarCard && !sub.gstCertificate && !sub.addressProof && !sub.companyRegistration && sub.document && (
                                 <a
-                                    href={`http://localhost:5000/uploads/${sub.document}`}
+                                    href={`${API_ROOT}/uploads/${sub.document}`}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="px-2 py-0.5 bg-[#E5E7EB]/40 hover:bg-[#FF6A00]/25 text-[#0A1F44] border border-[#687280]/20 rounded text-[10px] font-bold transition-all underline"
