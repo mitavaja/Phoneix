@@ -1,5 +1,8 @@
 import axios from "axios";
 import SystemSetting from "../models/SystemSetting.js";
+import User from "../models/User.js";
+import { hashPassword } from "./authController.js";
+import { isValidEmail } from "../utils/validation.js";
 
 // Retrieve system settings
 export const getSystemSettings = async (req, res) => {
@@ -10,13 +13,33 @@ export const getSystemSettings = async (req, res) => {
       settings = await SystemSetting.create({
         maintenanceMode: false,
         codLimit: 50000,
+        adminEmail: "admin@phreight.com",
+        adminPin: "1234",
+        aramexUsername: process.env.ARAMEX_USERNAME || "test.api@aramex.com",
+        aramexPassword: process.env.ARAMEX_PASSWORD || "Aramex@12345",
+        aramexAccountNumber: process.env.ARAMEX_ACCOUNT_NUMBER || "60531487",
+        aramexAccountPin: process.env.ARAMEX_ACCOUNT_PIN || "654654",
+        aramexAccountEntity: process.env.ARAMEX_ENTITY || "BOM",
+        aramexAccountCountryCode: process.env.ARAMEX_COUNTRY_CODE || "IN",
       });
     }
+
+    const adminUser = await User.findOne({ role: "Admin" });
     
     // Mask sensitive fields so they are never returned in plain text
     const settingsObj = settings.toObject();
-    settingsObj.aramexPassword = settingsObj.aramexPassword ? "••••••••" : "";
-    settingsObj.aramexAccountPin = settingsObj.aramexAccountPin ? "••••••••" : "";
+    settingsObj.adminEmail = adminUser?.email || settings.adminEmail || "admin@phreight.com";
+    settingsObj.adminPin = adminUser?.pin || settings.adminPin || "1234";
+    settingsObj.adminPassword = "••••••••";
+
+    // Keep Aramex API credentials authentic (not overwritten by admin credentials)
+    settingsObj.aramexUsername = (settings.aramexUsername && settings.aramexUsername !== "admin@phreight.com")
+      ? settings.aramexUsername
+      : (process.env.ARAMEX_USERNAME || "test.api@aramex.com");
+    settingsObj.aramexAccountPin = settings.aramexAccountPin || process.env.ARAMEX_ACCOUNT_PIN || "654654";
+    settingsObj.aramexAccountNumber = settings.aramexAccountNumber || process.env.ARAMEX_ACCOUNT_NUMBER || "60531487";
+    settingsObj.aramexAccountEntity = settings.aramexAccountEntity || process.env.ARAMEX_ENTITY || "BOM";
+    settingsObj.aramexPassword = settings.aramexPassword ? "••••••••" : "";
 
     res.status(200).json(settingsObj);
   } catch (error) {
@@ -30,6 +53,9 @@ export const updateSystemSettings = async (req, res) => {
     const {
       maintenanceMode,
       codLimit,
+      adminEmail,
+      adminPassword,
+      adminPin,
       aramexUsername,
       aramexPassword,
       aramexAccountNumber,
@@ -50,29 +76,72 @@ export const updateSystemSettings = async (req, res) => {
     if (codLimit !== undefined) {
       settings.codLimit = parseFloat(codLimit);
     }
-    if (aramexUsername !== undefined) settings.aramexUsername = aramexUsername;
-    
-    // Only update sensitive values if user typed a new password/pin (not masked placeholder)
-    if (aramexPassword !== undefined && aramexPassword !== "••••••••") {
-      settings.aramexPassword = aramexPassword;
-    }
-    if (aramexAccountPin !== undefined && aramexAccountPin !== "••••••••") {
-      settings.aramexAccountPin = aramexAccountPin;
+
+    if (adminEmail !== undefined && adminEmail.trim()) {
+      settings.adminEmail = adminEmail.trim();
     }
     
-    if (aramexAccountNumber !== undefined) settings.aramexAccountNumber = aramexAccountNumber;
+    // Update admin sensitive values
+    if (adminPassword !== undefined && adminPassword !== "••••••••" && adminPassword.trim()) {
+      settings.adminPassword = adminPassword;
+    }
+    if (adminPin !== undefined && adminPin !== "••••••••" && adminPin.toString().trim()) {
+      settings.adminPin = adminPin.toString().trim();
+    }
+
+    // Only update Aramex credentials if explicitly provided and not admin email
+    if (aramexUsername !== undefined && aramexUsername.trim() && aramexUsername !== adminEmail) {
+      settings.aramexUsername = aramexUsername.trim();
+    }
+    if (aramexPassword !== undefined && aramexPassword !== "••••••••" && aramexPassword.trim() && aramexPassword !== adminPassword) {
+      settings.aramexPassword = aramexPassword.trim();
+    }
+    if (aramexAccountPin !== undefined && aramexAccountPin !== "••••••••" && aramexAccountPin.toString().trim() && aramexAccountPin.toString() !== "1234") {
+      settings.aramexAccountPin = aramexAccountPin.toString().trim();
+    }
+    if (aramexAccountNumber !== undefined && aramexAccountNumber.trim()) {
+      settings.aramexAccountNumber = aramexAccountNumber.trim();
+    }
+    if (aramexAccountEntity !== undefined && aramexAccountEntity.trim()) {
+      settings.aramexAccountEntity = aramexAccountEntity.trim();
+    }
+    if (aramexAccountCountryCode !== undefined && aramexAccountCountryCode.trim()) {
+      settings.aramexAccountCountryCode = aramexAccountCountryCode.trim();
+    }
+    if (aramexApiEnv !== undefined) {
+      settings.aramexApiEnv = aramexApiEnv;
+    }
     if (aramexAccountEntity !== undefined) settings.aramexAccountEntity = aramexAccountEntity;
     if (aramexAccountCountryCode !== undefined) settings.aramexAccountCountryCode = aramexAccountCountryCode;
     if (aramexApiEnv !== undefined) settings.aramexApiEnv = aramexApiEnv;
 
     await settings.save();
+
+    // Synchronize to Admin User model
+    const adminUser = await User.findOne({ role: "Admin" });
+    if (adminUser) {
+      if (targetEmail && targetEmail.trim() && isValidEmail(targetEmail.trim())) {
+        adminUser.email = targetEmail.trim().toLowerCase();
+      }
+      if (targetPassword && targetPassword !== "••••••••" && targetPassword.trim()) {
+        adminUser.password = hashPassword(targetPassword);
+      }
+      if (targetPin && targetPin !== "••••••••" && targetPin.toString().trim()) {
+        adminUser.pin = targetPin.toString().trim();
+      }
+      await adminUser.save();
+    }
     
     // Mask response output
     const settingsObj = settings.toObject();
-    settingsObj.aramexPassword = settingsObj.aramexPassword ? "••••••••" : "";
-    settingsObj.aramexAccountPin = settingsObj.aramexAccountPin ? "••••••••" : "";
+    settingsObj.adminEmail = adminUser?.email || settings.adminEmail || "admin@phreight.com";
+    settingsObj.adminPin = adminUser?.pin || settings.adminPin || "1234";
+    settingsObj.adminPassword = "••••••••";
+    settingsObj.aramexUsername = settingsObj.adminEmail;
+    settingsObj.aramexAccountPin = settingsObj.adminPin;
+    settingsObj.aramexPassword = "••••••••";
 
-    res.status(200).json({ message: "System settings updated successfully", settings: settingsObj });
+    res.status(200).json({ message: "System settings and admin credentials updated successfully", settings: settingsObj });
   } catch (error) {
     res.status(500).json({ message: "Failed to modify system settings", error: error.message });
   }

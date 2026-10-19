@@ -11,20 +11,19 @@ const Settings = () => {
   const [currency, setCurrency] = useState("INR (₹)");
   const [maintenanceMode, setMaintenanceMode] = useState(false);
 
-  // Aramex Credentials State
-  const [aramexUsername, setAramexUsername] = useState("");
-  const [aramexPassword, setAramexPassword] = useState("");
+  // User Management Credentials State
+  const [adminEmail, setAdminEmail] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminPin, setAdminPin] = useState("");
+  const [showAdminPass, setShowAdminPass] = useState(false);
+  const [showAdminPin, setShowAdminPin] = useState(false);
+
+  // Hidden legacy Aramex state for backward compatibility
   const [aramexAccountNumber, setAramexAccountNumber] = useState("");
-  const [aramexAccountPin, setAramexAccountPin] = useState("");
   const [aramexAccountEntity, setAramexAccountEntity] = useState("DEL");
   const [aramexAccountCountryCode, setAramexAccountCountryCode] = useState("IN");
   const [aramexApiEnv, setAramexApiEnv] = useState("Sandbox");
   
-  const [showAramexPass, setShowAramexPass] = useState(false);
-  const [showAramexPin, setShowAramexPin] = useState(false);
-  
-  const [testStatus, setTestStatus] = useState(null);
-  const [testMessage, setTestMessage] = useState("");
   const [originalSettings, setOriginalSettings] = useState(null);
 
   // Security configuration State
@@ -39,10 +38,10 @@ const Settings = () => {
           setOriginalSettings(res.data);
           setMaintenanceMode(res.data.maintenanceMode || false);
           setCodSurcharge(res.data.codLimit || 50000);
-          setAramexUsername(res.data.aramexUsername || "");
-          setAramexPassword(res.data.aramexPassword || "");
+          setAdminEmail(res.data.adminEmail || res.data.aramexUsername || "admin@phreight.com");
+          setAdminPassword(res.data.adminPassword || "••••••••");
+          setAdminPin(res.data.adminPin || res.data.aramexAccountPin || "1234");
           setAramexAccountNumber(res.data.aramexAccountNumber || "");
-          setAramexAccountPin(res.data.aramexAccountPin || "");
           setAramexAccountEntity(res.data.aramexAccountEntity || "DEL");
           setAramexAccountCountryCode(res.data.aramexAccountCountryCode || "IN");
           setAramexApiEnv(res.data.aramexApiEnv || "Sandbox");
@@ -61,24 +60,24 @@ const Settings = () => {
       const res = await API.put("/settings", {
         maintenanceMode,
         codLimit: codSurcharge,
-        aramexUsername,
-        aramexPassword,
+        adminEmail,
+        adminPassword,
+        adminPin,
         aramexAccountNumber,
-        aramexAccountPin,
         aramexAccountEntity,
         aramexAccountCountryCode,
         aramexApiEnv,
       });
       if (res.data && res.data.settings) {
         setOriginalSettings(res.data.settings);
-        setAramexPassword(res.data.settings.aramexPassword);
-        setAramexAccountPin(res.data.settings.aramexAccountPin);
+        setAdminPassword(res.data.settings.adminPassword || "••••••••");
+        setAdminPin(res.data.settings.adminPin || "1234");
       }
       setIsSaved(true);
       setTimeout(() => {
         setIsSaved(false);
       }, 3000);
-      alert("Success: Master configurations committed to database nodes successfully!");
+      alert("Success: User Management settings and credentials updated successfully!");
     } catch (err) {
       alert("Error: Failed to save configurations. " + (err.response?.data?.message || err.message));
     }
@@ -86,18 +85,16 @@ const Settings = () => {
 
   const handleCancel = () => {
     if (originalSettings) {
-      setAramexUsername(originalSettings.aramexUsername || "");
-      setAramexPassword(originalSettings.aramexPassword || "");
+      setAdminEmail(originalSettings.adminEmail || originalSettings.aramexUsername || "admin@phreight.com");
+      setAdminPassword(originalSettings.adminPassword || "••••••••");
+      setAdminPin(originalSettings.adminPin || originalSettings.aramexAccountPin || "1234");
       setAramexAccountNumber(originalSettings.aramexAccountNumber || "");
-      setAramexAccountPin(originalSettings.aramexAccountPin || "");
       setAramexAccountEntity(originalSettings.aramexAccountEntity || "DEL");
       setAramexAccountCountryCode(originalSettings.aramexAccountCountryCode || "IN");
       setAramexApiEnv(originalSettings.aramexApiEnv || "Sandbox");
       setMaintenanceMode(originalSettings.maintenanceMode || false);
       setCodSurcharge(originalSettings.codLimit || 50000);
     }
-    setTestStatus(null);
-    setTestMessage("");
     alert("Cancelled adjustments. Original settings restored.");
   };
 
@@ -151,7 +148,7 @@ const Settings = () => {
               : "text-[#687280] hover:text-[#0A1F44]"
           }`}
         >
-          API Integrations
+          User Management
         </button>
         <button
           onClick={() => setActiveTab("security")}
@@ -265,28 +262,28 @@ const Settings = () => {
             </div>
           )}
 
-          {/* API Tab */}
+          {/* User Management Tab */}
           {activeTab === "api" && (
             <div className="space-y-6 animate-[fadeIn_0.3s_ease-out]">
               <div className="bg-white border border-[#687280]/20 p-6 rounded-2xl shadow-xl space-y-6">
                 <div>
-                  <h3 className="text-base font-extrabold text-[#0A1F44]">Aramex API Credentials</h3>
+                  <h3 className="text-base font-extrabold text-[#0A1F44]">User Management</h3>
                   <p className="text-[11px] text-[#687280] mt-1">
-                    Enter your Aramex account credentials to enable shipping, rate calculation, pickup scheduling, tracking, and label generation.
+                    Manage administrative login credentials and security PIN access.
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {/* User Name */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[#687280] font-bold text-[10px] uppercase tracking-wider">User Name *</label>
+                  {/* Mail */}
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label className="block text-[#687280] font-bold text-[10px] uppercase tracking-wider">Mail *</label>
                     <input
                       type="email"
                       required
-                      value={aramexUsername}
-                      onChange={(e) => setAramexUsername(e.target.value)}
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
                       className="w-full px-4 py-2.5 bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-xl text-[#0A1F44] focus:outline-none transition-all font-mono"
-                      placeholder="Enter Aramex API Username"
+                      placeholder="admin@phreight.com"
                     />
                   </div>
 
@@ -295,19 +292,19 @@ const Settings = () => {
                     <label className="block text-[#687280] font-bold text-[10px] uppercase tracking-wider">Password *</label>
                     <div className="relative">
                       <input
-                        type={showAramexPass ? "text" : "password"}
+                        type={showAdminPass ? "text" : "password"}
                         required
-                        value={aramexPassword}
-                        onChange={(e) => setAramexPassword(e.target.value)}
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
                         className="w-full px-4 py-2.5 pr-12 bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-xl text-[#0A1F44] focus:outline-none transition-all font-mono"
-                        placeholder="Enter Aramex API Password"
+                        placeholder="Enter Admin Password"
                       />
                       <button
                         type="button"
-                        onClick={() => setShowAramexPass(!showAramexPass)}
+                        onClick={() => setShowAdminPass(!showAdminPass)}
                         className="absolute right-3.5 top-2.5 text-[#687280] hover:text-[#0A1F44]"
                       >
-                        {showAramexPass ? (
+                        {showAdminPass ? (
                           <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                           </svg>
@@ -321,37 +318,24 @@ const Settings = () => {
                     </div>
                   </div>
 
-                  {/* Account Number */}
+                  {/* PIN */}
                   <div className="space-y-1.5">
-                    <label className="block text-[#687280] font-bold text-[10px] uppercase tracking-wider">Account Number *</label>
-                    <input
-                      type="text"
-                      required
-                      value={aramexAccountNumber}
-                      onChange={(e) => setAramexAccountNumber(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-xl text-[#0A1F44] focus:outline-none transition-all font-mono"
-                      placeholder="Enter Account Number"
-                    />
-                  </div>
-
-                  {/* Account PIN */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[#687280] font-bold text-[10px] uppercase tracking-wider">Account PIN *</label>
+                    <label className="block text-[#687280] font-bold text-[10px] uppercase tracking-wider">PIN *</label>
                     <div className="relative">
                       <input
-                        type={showAramexPin ? "text" : "password"}
+                        type={showAdminPin ? "text" : "password"}
                         required
-                        value={aramexAccountPin}
-                        onChange={(e) => setAramexAccountPin(e.target.value)}
+                        value={adminPin}
+                        onChange={(e) => setAdminPin(e.target.value)}
                         className="w-full px-4 py-2.5 pr-12 bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-xl text-[#0A1F44] focus:outline-none transition-all font-mono"
-                        placeholder="Enter Account PIN"
+                        placeholder="Enter Security PIN (e.g. 1234)"
                       />
                       <button
                         type="button"
-                        onClick={() => setShowAramexPin(!showAramexPin)}
+                        onClick={() => setShowAdminPin(!showAdminPin)}
                         className="absolute right-3.5 top-2.5 text-[#687280] hover:text-[#0A1F44]"
                       >
-                        {showAramexPin ? (
+                        {showAdminPin ? (
                           <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                           </svg>
@@ -364,87 +348,16 @@ const Settings = () => {
                       </button>
                     </div>
                   </div>
-
-                  {/* Account Entity */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[#687280] font-bold text-[10px] uppercase tracking-wider">Account Entity *</label>
-                    <input
-                      type="text"
-                      required
-                      value={aramexAccountEntity}
-                      onChange={(e) => setAramexAccountEntity(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-xl text-[#0A1F44] focus:outline-none transition-all font-mono"
-                      placeholder="Example: BOM"
-                    />
-                    <p className="text-[9px] text-[#687280]">Branch/Entity Code provided by Aramex.</p>
-                  </div>
-
-                  {/* Account Country Code */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[#687280] font-bold text-[10px] uppercase tracking-wider">Account Country Code *</label>
-                    <input
-                      type="text"
-                      required
-                      maxLength={2}
-                      value={aramexAccountCountryCode}
-                      onChange={(e) => setAramexAccountCountryCode(e.target.value.toUpperCase())}
-                      className="w-full px-4 py-2.5 bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-xl text-[#0A1F44] focus:outline-none transition-all font-mono"
-                      placeholder="Example: IN"
-                    />
-                  </div>
-
-                  {/* API Environment */}
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="block text-[#687280] font-bold text-[10px] uppercase tracking-wider">API Gateway Environment</label>
-                    <select
-                      value={aramexApiEnv}
-                      onChange={(e) => setAramexApiEnv(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-xl text-[#0A1F44] focus:outline-none transition-all cursor-pointer font-semibold"
-                    >
-                      <option value="Sandbox">Sandbox Mode (Mock simulated responses)</option>
-                      <option value="Production">Production Environment (Live Web Service calls)</option>
-                    </select>
-                  </div>
                 </div>
-
-                {/* Connection Status Response */}
-                {testStatus && (
-                  <div className={`p-3.5 rounded-xl border text-xs font-bold flex items-center gap-2 animate-[fadeIn_0.2s_ease-out] ${
-                    testStatus === "loading"
-                      ? "bg-blue-50 border-blue-200 text-blue-600"
-                      : testStatus === "success"
-                      ? "bg-green-50 border-green-200 text-green-600"
-                      : "bg-red-50 border-red-200 text-red-600"
-                  }`}>
-                    {testStatus === "loading" ? (
-                      <>
-                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
-                        Testing credentials integrity with Aramex servers...
-                      </>
-                    ) : testStatus === "success" ? (
-                      <>✅ Connection Successful</>
-                    ) : (
-                      <>❌ Invalid Credentials</>
-                    )}
-                  </div>
-                )}
 
                 {/* Form Buttons */}
                 <div className="flex flex-wrap gap-3 border-t border-[#687280]/10 pt-5">
                   <button
                     type="button"
-                    disabled={testStatus === "loading"}
-                    onClick={handleTestConnection}
-                    className="px-4 py-2.5 bg-[#0A1F44] hover:bg-[#0A1F44]/90 text-white font-bold rounded-xl transition-all border border-[#687280]/20 shadow-md text-xs"
-                  >
-                    Test Connection
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => handleSave()}
                     className="px-4 py-2.5 bg-[#FF6A00] hover:bg-orange-500 text-black font-extrabold rounded-xl transition-all shadow-md text-xs"
                   >
-                    Save Credentials
+                    Save Changes
                   </button>
                   <button
                     type="button"

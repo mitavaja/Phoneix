@@ -7,6 +7,7 @@ import Notification from "../models/Notification.js";
 import Coupon from "../models/Coupon.js";
 import { createPaymentOrder, verifyPaymentSignature } from "../services/paymentService.js";
 import { sendWalletRechargeEmail } from "../services/emailService.js";
+import { reprocessDraftShipmentsForUser } from "./shipmentController.js";
 
 // View own wallets and transactions (Merchant)
 export const getMyWallet = async (req, res) => {
@@ -211,17 +212,30 @@ export const addBalanceAdmin = async (req, res) => {
 
     const targetCurrency = currency || "INR";
 
-    // Find wallet by storeName and currency
-    let wallet = await Wallet.findOne({ storeName, currency: targetCurrency });
+    // Find user to map details if applicable
+    const user = await User.findOne({
+      $or: [
+        { name: storeName },
+        { companyName: storeName },
+        { email: storeName }
+      ]
+    });
+
+    // Find wallet by storeName or user and currency
+    let wallet = await Wallet.findOne({
+      $or: [
+        { storeName, currency: targetCurrency },
+        ...(user ? [{ user: user._id, currency: targetCurrency }] : [])
+      ]
+    });
+
     if (!wallet) {
-      // Find user to map details
-      const user = await User.findOne({ companyName: storeName });
       if (!user) {
-        return res.status(404).json({ message: `User profile with company name "${storeName}" not found` });
+        return res.status(404).json({ message: `Seller profile "${storeName}" not found` });
       }
       wallet = await Wallet.create({
         user: user._id,
-        storeName,
+        storeName: user.companyName || storeName || `${user.name}'s Store`,
         currency: targetCurrency,
         balance: 0.0,
         totalBalance: 0.0,
@@ -284,10 +298,22 @@ export const addBalanceAdmin = async (req, res) => {
       type: "Wallet Recharged",
     });
 
+    // Auto-reprocess any pending Draft shipments for this seller
+    let autoReprocessed = 0;
+    try {
+      const autoRes = await reprocessDraftShipmentsForUser(wallet.user);
+      if (autoRes?.processedCount) {
+        autoReprocessed = autoRes.processedCount;
+      }
+    } catch (autoErr) {
+      console.warn("Auto-reprocess error after admin balance adjust:", autoErr.message);
+    }
+
     res.status(201).json({
-      message: `Success: Authorized adjustment. Processed ${targetCurrency} ${numericAmount} wallet adjustment.`,
+      message: `Success: Authorized adjustment. Processed ${targetCurrency} ${numericAmount} wallet adjustment.${autoReprocessed > 0 ? ` Automatically reprocessed and booked ${autoReprocessed} draft shipment(s).` : ""}`,
       wallet,
       transaction,
+      autoReprocessed,
     });
   } catch (error) {
     res.status(500).json({ message: "Error writing balance ledger adjustment", error: error.message });
@@ -442,12 +468,26 @@ export const verifyRecharge = async (req, res) => {
     // Dispatch Email Alert
     await sendWalletRechargeEmail(req.user.email, req.user.name, totalCredit, closingBalance);
 
+    // Auto-reprocess any pending Draft shipments for this user
+    let autoReprocessed = 0;
+    try {
+      const autoRes = await reprocessDraftShipmentsForUser(req.user._id);
+      if (autoRes?.processedCount) {
+        autoReprocessed = autoRes.processedCount;
+      }
+    } catch (autoErr) {
+      console.warn("Auto-reprocess error after online recharge:", autoErr.message);
+    }
+
+    const latestWallet = await Wallet.findOne({ user: req.user._id, currency: targetCurrency });
+
     res.status(200).json({
       message: appliedCoupon
-        ? `Success: Deposited ₹${numericAmount} + ₹${bonusAmount.toFixed(2)} Coupon Bonus to wallet.`
-        : `Success: Deposited ₹${numericAmount} to wallet. Balance updated.`,
-      wallet,
+        ? `Success: Deposited ₹${numericAmount} + ₹${bonusAmount.toFixed(2)} Coupon Bonus to wallet.${autoReprocessed > 0 ? ` Automatically reprocessed and booked ${autoReprocessed} draft shipment(s)!` : ""}`
+        : `Success: Deposited ₹${numericAmount} to wallet. Balance updated.${autoReprocessed > 0 ? ` Automatically reprocessed and booked ${autoReprocessed} draft shipment(s)!` : ""}`,
+      wallet: latestWallet || wallet,
       transaction,
+      autoReprocessed,
     });
   } catch (error) {
     res.status(500).json({ message: "Error verifying payment recharge", error: error.message });
@@ -583,7 +623,25 @@ export const approveBankTransfer = async (req, res) => {
       await sendWalletRechargeEmail(user.email, user.name, tx.amount, closingBalance);
     }
 
-    res.status(200).json({ message: "Success: Verified bank transfer. Balance added.", wallet, tx });
+    // Auto-reprocess any pending Draft shipments for this user
+    let autoReprocessed = 0;
+    try {
+      const autoRes = await reprocessDraftShipmentsForUser(tx.userId);
+      if (autoRes?.processedCount) {
+        autoReprocessed = autoRes.processedCount;
+      }
+    } catch (autoErr) {
+      console.warn("Auto-reprocess error after bank transfer approve:", autoErr.message);
+    }
+
+    const latestWallet = await Wallet.findOne({ user: tx.userId, currency: txCurrency });
+
+    res.status(200).json({
+      message: `Success: Verified bank transfer. Balance added.${autoReprocessed > 0 ? ` Automatically reprocessed and booked ${autoReprocessed} draft shipment(s).` : ""}`,
+      wallet: latestWallet || wallet,
+      tx,
+      autoReprocessed,
+    });
   } catch (error) {
     res.status(500).json({ message: "Error approving manual deposit", error: error.message });
   }

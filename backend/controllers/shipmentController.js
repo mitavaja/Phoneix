@@ -97,6 +97,324 @@ const evaluatePriorityMargin = async (countryCode, weight, userId) => {
   };
 };
 
+/**
+ * Executes the carrier booking, wallet debit, and status update for a Draft shipment.
+ */
+export const executeBookDraftShipment = async (shipment, user = null) => {
+  const billingCurrency = "INR";
+  const invoiceTotal = parseFloat(shipment.invoiceTotal || shipment.charge || 0);
+
+  // 1. Verify Wallet Balance
+  const wallet = await Wallet.findOne({ user: shipment.user, currency: billingCurrency });
+  if (!wallet) {
+    throw new Error("Wallet not found. Please initialize your wallet.");
+  }
+
+  if (wallet.availableBalance < invoiceTotal) {
+    throw new Error(`Insufficient wallet balance. Total cost is ₹${invoiceTotal.toFixed(2)}, available balance is ₹${wallet.availableBalance.toFixed(2)}.`);
+  }
+
+  // 2. Ledger Hold
+  const openingBalance = wallet.availableBalance;
+  wallet.availableBalance -= invoiceTotal;
+  wallet.holdBalance += invoiceTotal;
+  wallet.balance = wallet.availableBalance;
+  await wallet.save();
+
+  const holdTransaction = await WalletTransaction.create({
+    walletId: wallet._id,
+    userId: shipment.user,
+    transactionType: "Hold",
+    amount: -invoiceTotal,
+    currency: billingCurrency,
+    openingBalance,
+    closingBalance: wallet.availableBalance,
+    referenceId: `HOLD-${shipment.shipmentId}`,
+    remarks: `Reserved funds for Reprocessing Shipment ${shipment.shipmentId}`,
+    shipmentId: shipment.shipmentId,
+    status: "HOLD",
+  });
+
+  try {
+    // 3. Resolve warehouse & recipient
+    let originWarehouse = null;
+    if (shipment.pickupAddressId) {
+      originWarehouse = await PickupAddress.findById(shipment.pickupAddressId);
+    }
+    if (!originWarehouse) {
+      originWarehouse = (await PickupAddress.findOne({ userId: shipment.user, isDefault: true })) || (await PickupAddress.findOne({ userId: shipment.user }));
+    }
+    if (!originWarehouse) {
+      originWarehouse = {
+        addressName: "Main Warehouse",
+        address: "Surat Central Depot",
+        city: "Surat",
+        state: "Gujarat",
+        country: "IN",
+        pincode: "395010",
+        contactPerson: user?.name || "Merchant",
+        mobile: user?.mobileNumber || "9876543210"
+      };
+    }
+
+    const dest = {
+      name: shipment.receiverName || shipment.customer,
+      mobile: shipment.receiverMobile || "9876543210",
+      addressLine1: shipment.receiverAddress || "Destination Address",
+      city: shipment.receiverCity || "Dubai",
+      stateOrProvinceCode: shipment.receiverState || "",
+      countryCode: shipment.receiverCountry || "AE",
+      postCode: shipment.receiverPincode || "00000",
+      email: (user && user.email) || "recipient@example.com"
+    };
+
+    const courier = (shipment.courier || shipment.courierName || "aramex").toLowerCase();
+    let courierShipmentId = "";
+    let courierTrackingNumber = "";
+    let labelUrl = "";
+    let labelBufferBase64 = null;
+
+    if (courier === "aramex") {
+      const aramexPayload = {
+        sender: {
+          id: shipment.user,
+          companyName: wallet.storeName || "Store",
+          contactPerson: originWarehouse.contactPerson || (user ? user.name : "Merchant"),
+          mobile: originWarehouse.mobile || "9876543210",
+          email: (user && user.email) || "sender@example.com",
+          address: originWarehouse.address,
+          city: originWarehouse.city,
+          state: originWarehouse.state,
+          country: originWarehouse.country || "IN",
+          pincode: originWarehouse.pincode,
+        },
+        receiver: {
+          name: dest.name,
+          contactPerson: dest.name,
+          mobile: dest.mobile,
+          address: dest.addressLine1,
+          city: dest.city,
+          state: dest.stateOrProvinceCode,
+          country: dest.countryCode,
+          postCode: dest.postCode,
+          email: dest.email,
+        },
+        parcel: {
+          referenceId: shipment.shipmentId,
+          weight: shipment.weight,
+          length: shipment.length || 10,
+          width: shipment.width || 10,
+          height: shipment.height || 10,
+          pieces: shipment.numberOfPieces || 1,
+          productGroup: shipment.productGroup || "EXP",
+          productType: shipment.productType || "PPX",
+          paymentType: shipment.paymentType || "P",
+          productDescription: shipment.productDescription || "E-commerce Goods",
+          goodsOriginCountry: shipment.goodsOriginCountry || "IN",
+          shipmentValue: shipment.shipmentValue || 10.0,
+          currency: shipment.currency || "USD",
+          type: shipment.shipmentType || "Parcel",
+        },
+      };
+
+      const bookingResult = await createAramexShipment(aramexPayload);
+      courierShipmentId = bookingResult.courierShipmentId;
+      courierTrackingNumber = bookingResult.courierTrackingNumber;
+      labelUrl = bookingResult.labelUrl;
+      labelBufferBase64 = bookingResult.labelBufferBase64;
+
+    } else {
+      // Phreight / ShipGlobal
+      const nameParts = (dest.name || "").split(" ");
+      const firstName = nameParts[0] || dest.name;
+      const lastName = nameParts.slice(1).join(" ") || "Customer";
+      const invoiceDate = new Date().toISOString().split("T")[0];
+
+      const sgPayload = {
+        invoice_no: shipment.invoiceNumber || `INV-${Date.now().toString().slice(-6)}`,
+        invoice_date: invoiceDate,
+        order_reference: shipment.shipmentId,
+        service: shipment.productType || "PPX",
+        package_weight: String(shipment.weight),
+        package_length: String(shipment.length || 10),
+        package_breadth: String(shipment.width || 10),
+        package_height: String(shipment.height || 10),
+        currency_code: shipment.currency || "USD",
+        csb5_status: 1,
+        customer_shipping_firstname: firstName,
+        customer_shipping_lastname: lastName,
+        customer_shipping_mobile: dest.mobile,
+        customer_shipping_email: dest.email,
+        customer_shipping_company: "",
+        customer_shipping_address: dest.addressLine1,
+        customer_shipping_address_2: "",
+        customer_shipping_address_3: "",
+        customer_shipping_city: dest.city,
+        customer_shipping_postcode: dest.postCode || "00000",
+        customer_shipping_country_code: dest.countryCode,
+        customer_shipping_state: dest.stateOrProvinceCode || dest.city,
+        ioss_number: "",
+        customer_nickname: "",
+        vendor_order_items: [
+          {
+            vendor_order_item_name: shipment.productDescription || "E-commerce Goods",
+            vendor_order_item_sku: "ITEM-01",
+            vendor_order_item_quantity: String(shipment.numberOfPieces || 1),
+            vendor_order_item_unit_price: String(((shipment.shipmentValue || 10) / (shipment.numberOfPieces || 1)).toFixed(2)),
+            vendor_order_item_hsn: "61112000",
+            vendor_order_item_tax_rate: "0"
+          }
+        ]
+      };
+
+      const sgOrderResult = await createShipGlobalOrder(sgPayload);
+      const orderId = sgOrderResult.order_id || sgOrderResult.data?.order_id;
+
+      try {
+        const sgLabelResult = await getShipGlobalLabel({ order_id: [orderId] });
+        courierShipmentId = String(orderId);
+        courierTrackingNumber = sgLabelResult.awb || sgLabelResult.data?.[0]?.awb || sgOrderResult.awb || `SG-${Date.now()}`;
+        labelUrl = sgLabelResult.label_url || sgLabelResult.data?.[0]?.label || "";
+      } catch (labelErr) {
+        console.warn("Failed to auto-fetch ShipGlobal Label on reprocess:", labelErr.message);
+        courierShipmentId = String(orderId);
+        courierTrackingNumber = sgOrderResult.awb || `SG-${Date.now()}`;
+      }
+    }
+
+    // 4. Commit Ledger Debit
+    wallet.holdBalance -= invoiceTotal;
+    wallet.totalBalance -= invoiceTotal;
+    await wallet.save();
+
+    holdTransaction.transactionType = "Debit";
+    holdTransaction.status = "Completed";
+    holdTransaction.remarks = `Shipping Debit Reprocessed (${courier.toUpperCase()} AWB: ${courierTrackingNumber})`;
+    holdTransaction.referenceId = courierTrackingNumber;
+    await holdTransaction.save();
+
+    // 5. Update Admin Wallet
+    let adminWallet = await AdminWallet.findOne({ currency: billingCurrency });
+    if (!adminWallet) {
+      adminWallet = await AdminWallet.create({ currency: billingCurrency });
+    }
+    adminWallet.totalGrossRevenue += invoiceTotal;
+    adminWallet.gstPayables += (shipment.gstAmount || 0);
+    adminWallet.netProfit += (shipment.marginAmount || 0);
+    if (courier === "aramex") {
+      adminWallet.aramexPayables += (shipment.aramexBaseCost || 0);
+    } else {
+      adminWallet.shipglobalPayables += (shipment.aramexBaseCost || 0);
+    }
+    await adminWallet.save();
+
+    // 6. Update Shipment Record
+    shipment.status = "Booked";
+    shipment.courierStatus = "Booked";
+    shipment.courierShipmentId = courierShipmentId;
+    shipment.courierTrackingNumber = courierTrackingNumber;
+    shipment.labelUrl = labelUrl;
+    if (!shipment.statusHistory) shipment.statusHistory = [];
+    shipment.statusHistory.push({ status: "Booked", time: new Date() });
+
+    if (labelBufferBase64) {
+      const labelFilename = `label-${courierTrackingNumber}.pdf`;
+      const uploadDir = path.join(process.cwd(), "uploads");
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadDir, labelFilename), Buffer.from(labelBufferBase64, "base64"));
+      shipment.labelPdfPath = `/uploads/${labelFilename}`;
+    }
+
+    await shipment.save();
+
+    // 7. Tracking & Logs
+    await TrackingHistory.create({
+      shipmentId: shipment._id,
+      status: "Booked",
+      location: originWarehouse.city,
+      description: `Shipment reprocessed and booked with ${courier}. AWB: ${courierTrackingNumber}`,
+      eventTime: new Date(),
+    });
+
+    await AuditLog.create({
+      userId: shipment.user,
+      action: "Merchant Reprocessed Draft Shipment",
+      module: "Shipments",
+      oldValue: "Draft",
+      newValue: "Booked",
+      ipAddress: "127.0.0.1",
+    });
+
+    await Notification.create({
+      userId: shipment.user,
+      title: "Draft Shipment Booked",
+      message: `Shipment ${shipment.shipmentId} was successfully reprocessed and booked! AWB: ${courierTrackingNumber}`,
+      type: "Shipment Booked",
+    });
+
+    return {
+      success: true,
+      shipment,
+      courierTrackingNumber,
+      walletBalance: wallet.availableBalance,
+    };
+
+  } catch (err) {
+    // Release hold on failure
+    wallet.availableBalance += invoiceTotal;
+    wallet.holdBalance -= invoiceTotal;
+    wallet.balance = wallet.availableBalance;
+    await wallet.save();
+
+    holdTransaction.status = "Released";
+    holdTransaction.remarks = `Hold released: Reprocess error - ${err.message}`;
+    await holdTransaction.save();
+
+    throw err;
+  }
+};
+
+/**
+ * Auto-reprocess any pending Draft shipments for a user in FIFO order when wallet balance is replenished.
+ */
+export const reprocessDraftShipmentsForUser = async (userId) => {
+  try {
+    const drafts = await Shipment.find({
+      user: userId,
+      status: "Draft"
+    }).sort({ createdAt: 1 });
+
+    if (!drafts || drafts.length === 0) {
+      return { success: true, processedCount: 0 };
+    }
+
+    const user = await User.findById(userId);
+    let processedCount = 0;
+
+    for (const draft of drafts) {
+      const currentWallet = await Wallet.findOne({ user: userId, currency: "INR" });
+      const invoiceTotal = parseFloat(draft.invoiceTotal || draft.charge || 0);
+
+      if (!currentWallet || currentWallet.availableBalance < invoiceTotal) {
+        // Stop loop: insufficient funds to process this and subsequent shipments
+        break;
+      }
+
+      try {
+        await executeBookDraftShipment(draft, user);
+        processedCount++;
+      } catch (err) {
+        console.error(`Error auto-reprocessing draft shipment ${draft.shipmentId}:`, err.message);
+      }
+    }
+
+    return { success: true, processedCount, totalDrafts: drafts.length };
+  } catch (error) {
+    console.error("Error in reprocessDraftShipmentsForUser:", error.message);
+    return { success: false, error: error.message };
+  }
+};
+
 // Book Shipment (Merchant) with HOLD Flow
 export const bookShipment = async (req, res) => {
   let holdTransaction = null;
@@ -184,7 +502,11 @@ export const bookShipment = async (req, res) => {
       });
       baseRate = parseFloat(rateRes.rate);
 
-    } else if (courier.toLowerCase() === "phreight" || courier.toLowerCase() === "shipglobal") {
+    } else if (
+      courier.toLowerCase() === "phreight" ||
+      courier.toLowerCase() === "phreights" ||
+      courier.toLowerCase() === "shipglobal"
+    ) {
       const sgRateRes = await calculateShipGlobalRate({
         weight: numericWeight,
         destinationCountry: dest.countryCode,
@@ -240,8 +562,78 @@ export const bookShipment = async (req, res) => {
     });
 
     if (wallet.availableBalance < invoiceTotal) {
-      return res.status(400).json({
-        message: `Insufficient wallet balance. Total cost is ₹${invoiceTotal.toFixed(2)}, available balance is ₹${wallet.availableBalance.toFixed(2)}.`
+      const draftShipmentId = `PHX-SH-${Date.now().toString().slice(-6)}`;
+      const draftInvoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+
+      const draftShipment = await Shipment.create({
+        shipmentId: draftShipmentId,
+        user: req.user._id,
+        store: wallet.storeName || (req.user.companyName || `${req.user.name}'s Store`),
+        customer: dest.name,
+        courierName: courier.toLowerCase() === "aramex" ? "Aramex" : "Phreight",
+        courier: courier.toLowerCase() === "aramex" ? "Aramex" : "Phreight",
+        weight: numericWeight,
+        length: l, width: w, height: h,
+        volumetricWeight: parseFloat(volumetricWeight.toFixed(2)),
+        chargeableWeight: parseFloat(chargeableWeight.toFixed(2)),
+        numberOfPieces,
+        productGroup: "EXP",
+        productType,
+        paymentType,
+        shipmentType,
+        productDescription: productDescription || "E-commerce Goods",
+        goodsOriginCountry,
+        shipmentValue: parseFloat(customsValue || 0.0),
+        currency: customsCurrency,
+        from: originWarehouse.addressName || originWarehouse.city,
+        to: `${dest.addressLine1}, ${dest.city}`,
+        receiverName: dest.name,
+        receiverMobile: dest.mobile,
+        receiverAddress: dest.addressLine1,
+        receiverCity: dest.city,
+        receiverState: dest.stateOrProvinceCode,
+        receiverCountry: dest.countryCode,
+        receiverPincode: dest.postCode,
+        pickupAddressId: originWarehouse._id,
+        customerId: customerId || null,
+        aramexBaseCost: baseRate,
+        marginApplied: marginRule,
+        marginAmount: parseFloat(marginAmount.toFixed(2)),
+        shippingCharge: parseFloat(shippingCharge.toFixed(2)),
+        gstAmount,
+        invoiceTotal,
+        charge: invoiceTotal,
+        courierShipmentId: "",
+        courierTrackingNumber: "",
+        courierStatus: "Draft",
+        status: "Draft",
+        invoiceNumber: draftInvoiceNumber,
+        labelUrl: "",
+        statusHistory: [{ status: "Draft", time: new Date() }],
+      });
+
+      await AuditLog.create({
+        userId: req.user._id,
+        action: "Merchant Saved Shipment as Draft (Insufficient Balance)",
+        module: "Shipments",
+        oldValue: "None",
+        newValue: "Draft",
+        ipAddress: req.ip || "127.0.0.1",
+      });
+
+      await Notification.create({
+        userId: req.user._id,
+        title: "Shipment Saved as Draft",
+        message: `Shipment ${draftShipmentId} saved as Draft due to insufficient wallet balance (Cost: ₹${invoiceTotal.toFixed(2)}, Available: ₹${wallet.availableBalance.toFixed(2)}). Recharge your wallet to reprocess it.`,
+        type: "Shipment Saved as Draft",
+      });
+
+      return res.status(201).json({
+        success: true,
+        isDraft: true,
+        message: `Insufficient wallet balance. Total cost is ₹${invoiceTotal.toFixed(2)}, available balance is ₹${wallet.availableBalance.toFixed(2)}. Shipment ${draftShipmentId} has been saved as Draft. Recharge your wallet to reprocess it.`,
+        shipment: draftShipment,
+        newBalance: wallet.availableBalance,
       });
     }
 
@@ -321,7 +713,11 @@ export const bookShipment = async (req, res) => {
       labelUrl = bookingResult.labelUrl;
       labelBufferBase64 = bookingResult.labelBufferBase64;
 
-    } else if (courier.toLowerCase() === "phreight" || courier.toLowerCase() === "shipglobal") {
+    } else if (
+      courier.toLowerCase() === "phreight" ||
+      courier.toLowerCase() === "phreights" ||
+      courier.toLowerCase() === "shipglobal"
+    ) {
       const nameParts = dest.name.split(" ");
       const firstName = nameParts[0] || dest.name;
       const lastName = nameParts.slice(1).join(" ") || "Customer";
@@ -532,7 +928,7 @@ export const getAllShipments = async (req, res) => {
       matchStage.user = new mongoose.Types.ObjectId(req.user._id);
     }
 
-    if (status !== "all") {
+    if (status && status !== "all" && status !== "All") {
       if (status === "Picked Up") {
         matchStage.status = { $in: ["Picked Up", "In Transit", "Delivered"] };
       } else if (status === "Dispatched") {
@@ -541,6 +937,8 @@ export const getAllShipments = async (req, res) => {
         matchStage.status = { $in: ["Failed Delivery", "Cancelled"] };
       } else if (status === "Scheduled") {
         matchStage.status = { $in: ["Booked", "Pending", "Label Generated"] };
+      } else {
+        matchStage.status = status;
       }
     }
 
@@ -1150,34 +1548,33 @@ export const confirmBulkUpload = async (req, res) => {
 
     if (!wallet) return res.status(400).json({ message: "Wallet not found. Please initialize your wallet." });
 
-    if (wallet.availableBalance < totalEstimatedCost) {
-      return res.status(400).json({
-        message: `Insufficient wallet balance. Batch cost is ₹${totalEstimatedCost.toFixed(2)}, available balance is ₹${wallet.availableBalance.toFixed(2)}.`
+    // Calculate how much we can hold from wallet (up to totalEstimatedCost)
+    const holdAmount = Math.max(0, Math.min(wallet.availableBalance, totalEstimatedCost));
+    const batchId = `BTCH-${Date.now().toString().slice(-6)}`;
+
+    if (holdAmount > 0) {
+      const openingBalance = wallet.availableBalance;
+      wallet.availableBalance -= holdAmount;
+      wallet.holdBalance += holdAmount;
+      wallet.balance = wallet.availableBalance;
+      await wallet.save();
+
+      holdTransaction = await WalletTransaction.create({
+        walletId: wallet._id,
+        userId: req.user._id,
+        transactionType: "Hold",
+        amount: -holdAmount,
+        currency: billingCurrency,
+        openingBalance,
+        closingBalance: wallet.availableBalance,
+        referenceId: batchId,
+        remarks: `Reserved funds for Bulk Batch ${batchId} (${validRows.length} shipments)`,
+        status: "HOLD",
       });
     }
 
-    // 2. Place Wallet HOLD
-    const openingBalance = wallet.availableBalance;
-    wallet.availableBalance -= totalEstimatedCost;
-    wallet.holdBalance += totalEstimatedCost;
-    wallet.balance = wallet.availableBalance;
-    await wallet.save();
-
-    const batchId = `BTCH-${Date.now().toString().slice(-6)}`;
-    holdTransaction = await WalletTransaction.create({
-      walletId: wallet._id,
-      userId: req.user._id,
-      transactionType: "Hold",
-      amount: -totalEstimatedCost,
-      currency: billingCurrency,
-      openingBalance,
-      closingBalance: wallet.availableBalance,
-      referenceId: batchId,
-      remarks: `Reserved funds for Bulk Batch ${batchId} (${validRows.length} shipments)`,
-      status: "HOLD",
-    });
-
     const successBookings = [];
+    const draftBookings = [];
     const failedBookings = [];
 
     let actualProcessedCost = 0.0;
@@ -1236,7 +1633,7 @@ export const confirmBulkUpload = async (req, res) => {
           });
           baseRate = parseFloat(rateRes.rate);
 
-        } else if (courier === "phreight" || courier === "shipglobal") {
+        } else if (courier === "phreight" || courier === "phreights" || courier === "shipglobal") {
           const sgRateRes = await calculateShipGlobalRate({
             weight: numericWeight,
             destinationCountry: dest.countryCode,
@@ -1276,6 +1673,61 @@ export const confirmBulkUpload = async (req, res) => {
         // Generate IDs
         const shipmentId = `PHX-SH-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
         const invoiceNumber = `INV-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
+
+        const canFund = holdAmount > 0 && (actualProcessedCost + invoiceTotal) <= holdAmount;
+
+        if (!canFund) {
+          // Save as Draft due to insufficient wallet funds
+          const draftShipment = await Shipment.create({
+            shipmentId,
+            user: req.user._id,
+            store: wallet ? wallet.storeName : (req.user.companyName || `${req.user.name}'s Store`),
+            customer: dest.name,
+            courierName: courier === "aramex" ? "Aramex" : "Phreight",
+            courier: courier === "aramex" ? "Aramex" : "Phreight",
+            weight: numericWeight,
+            length: l, width: w, height: h,
+            volumetricWeight: parseFloat(volumetricWeight.toFixed(2)),
+            chargeableWeight: parseFloat(chargeableWeight.toFixed(2)),
+            numberOfPieces,
+            productGroup: "EXP",
+            productType,
+            paymentType: "P",
+            shipmentType: "Parcel",
+            productDescription: row.productDescription || "Bulk consignment item",
+            goodsOriginCountry: "IN",
+            shipmentValue: customsValue || 10.0,
+            currency: customsCurrency,
+            from: originWarehouse.addressName || originWarehouse.city,
+            to: `${dest.addressLine1}, ${dest.city}`,
+            receiverName: dest.name,
+            receiverMobile: dest.mobile,
+            receiverAddress: dest.addressLine1,
+            receiverCity: dest.city,
+            receiverState: dest.stateOrProvinceCode,
+            receiverCountry: dest.countryCode,
+            receiverPincode: dest.postCode,
+            pickupAddressId: originWarehouse._id,
+            customerId: null,
+            aramexBaseCost: baseRate,
+            marginApplied: marginRule,
+            marginAmount: parseFloat(marginAmount.toFixed(2)),
+            shippingCharge: parseFloat(shippingCharge.toFixed(2)),
+            gstAmount,
+            invoiceTotal,
+            charge: invoiceTotal,
+            courierShipmentId: "",
+            courierTrackingNumber: "",
+            courierStatus: "Draft",
+            status: "Draft",
+            invoiceNumber,
+            labelUrl: "",
+            statusHistory: [{ status: "Draft", time: new Date() }],
+          });
+
+          draftBookings.push(draftShipment);
+          continue;
+        }
 
         let courierShipmentId = "";
         let courierTrackingNumber = "";
@@ -1330,7 +1782,7 @@ export const confirmBulkUpload = async (req, res) => {
           labelUrl = bookingResult.labelUrl;
           labelBufferBase64 = bookingResult.labelBufferBase64;
 
-        } else if (courier === "phreight" || courier === "shipglobal") {
+        } else if (courier === "phreight" || courier === "phreights" || courier === "shipglobal") {
           const nameParts = dest.name.split(" ");
           const firstName = nameParts[0] || dest.name;
           const lastName = nameParts.slice(1).join(" ") || "Customer";
@@ -1467,35 +1919,37 @@ export const confirmBulkUpload = async (req, res) => {
     }
 
     // 4. Final Ledger Adjustments
-    const unusedHoldDifference = totalEstimatedCost - actualProcessedCost;
+    if (holdAmount > 0) {
+      const unusedHoldDifference = holdAmount - actualProcessedCost;
 
-    wallet.holdBalance -= totalEstimatedCost; // Remove full hold
-    wallet.totalBalance -= actualProcessedCost; // Deduct only what processed
-    wallet.availableBalance += unusedHoldDifference; // Add back any unused held funds
-    wallet.balance = wallet.availableBalance;
-    await wallet.save();
+      wallet.holdBalance -= holdAmount; // Remove full hold
+      wallet.totalBalance -= actualProcessedCost; // Deduct only what processed
+      wallet.availableBalance += unusedHoldDifference; // Add back any unused held funds
+      wallet.balance = wallet.availableBalance;
+      await wallet.save();
 
-    // 5. Update Admin Wallet Liabilities
-    if (actualProcessedCost > 0) {
-      let adminWallet = await AdminWallet.findOne({ currency: billingCurrency });
-      if (!adminWallet) adminWallet = await AdminWallet.create({ currency: billingCurrency });
+      // 5. Update Admin Wallet Liabilities
+      if (actualProcessedCost > 0) {
+        let adminWallet = await AdminWallet.findOne({ currency: billingCurrency });
+        if (!adminWallet) adminWallet = await AdminWallet.create({ currency: billingCurrency });
 
-      adminWallet.totalGrossRevenue += actualProcessedCost;
-      adminWallet.gstPayables += totalGst;
-      adminWallet.netProfit += totalMargin;
-      adminWallet.aramexPayables += totalAramexPayable;
-      adminWallet.shipglobalPayables += totalShipGlobalPayable;
-      await adminWallet.save();
+        adminWallet.totalGrossRevenue += actualProcessedCost;
+        adminWallet.gstPayables += totalGst;
+        adminWallet.netProfit += totalMargin;
+        adminWallet.aramexPayables += totalAramexPayable;
+        adminWallet.shipglobalPayables += totalShipGlobalPayable;
+        await adminWallet.save();
 
-      holdTransaction.transactionType = "Debit";
-      holdTransaction.status = "Completed";
-      holdTransaction.remarks = `Bulk Debit: Completed ${successBookings.length} shipments. Debited ₹${actualProcessedCost.toFixed(2)}`;
-      holdTransaction.amount = -actualProcessedCost;
-      await holdTransaction.save();
-    } else {
-      holdTransaction.status = "Released";
-      holdTransaction.remarks = `Bulk Hold released: All bookings failed.`;
-      await holdTransaction.save();
+        holdTransaction.transactionType = "Debit";
+        holdTransaction.status = "Completed";
+        holdTransaction.remarks = `Bulk Debit: Completed ${successBookings.length} shipments. Debited ₹${actualProcessedCost.toFixed(2)}`;
+        holdTransaction.amount = -actualProcessedCost;
+        await holdTransaction.save();
+      } else {
+        holdTransaction.status = "Released";
+        holdTransaction.remarks = `Bulk Hold released: No shipments booked.`;
+        await holdTransaction.save();
+      }
     }
 
     await AuditLog.create({
@@ -1503,20 +1957,21 @@ export const confirmBulkUpload = async (req, res) => {
       action: "Merchant Completed Bulk Shipments Booking",
       module: "Shipments",
       oldValue: "HOLD",
-      newValue: `Booked: ${successBookings.length}`,
+      newValue: `Booked: ${successBookings.length}, Draft: ${draftBookings.length}`,
       ipAddress: req.ip || "127.0.0.1",
     });
 
     res.status(200).json({
-      message: `Batch complete: ${successBookings.length} booked, ${failedBookings.length} failed. Total debited ₹${actualProcessedCost.toFixed(2)}.`,
+      message: `Batch complete: ${successBookings.length} booked, ${draftBookings.length} saved as Draft (insufficient balance), ${failedBookings.length} failed. Total debited ₹${actualProcessedCost.toFixed(2)}.`,
       successBookings,
+      draftBookings,
       failedBookings,
     });
   } catch (error) {
     // Failsafe Release
     if (wallet && holdTransaction && holdTransaction.status === "HOLD") {
-      wallet.availableBalance += totalEstimatedCost;
-      wallet.holdBalance -= totalEstimatedCost;
+      wallet.availableBalance += holdAmount;
+      wallet.holdBalance -= holdAmount;
       wallet.balance = wallet.availableBalance;
       await wallet.save();
 
@@ -1695,27 +2150,66 @@ export const getDiscrepancies = async (req, res) => {
     let query = {};
 
     if (status === "Pending") {
-      query.discrepancyStatus = "Pending";
+      query.status = "Pending";
     } else if (status === "Resolved") {
-      query.discrepancyStatus = { $ne: "Pending" };
+      query.status = { $ne: "Pending" };
     }
 
     if (search) {
       const searchRegex = new RegExp(search, "i");
+      const matchedShipments = await Shipment.find({
+        $or: [
+          { shipmentId: searchRegex },
+          { courierTrackingNumber: searchRegex }
+        ]
+      }).select("_id");
+
+      const matchedUsers = await User.find({
+        $or: [
+          { name: searchRegex },
+          { email: searchRegex },
+          { companyName: searchRegex }
+        ]
+      }).select("_id");
+
       query.$or = [
-        { shipmentId: searchRegex },
-        { store: searchRegex },
-        { discrepancyDetails: searchRegex }
+        { adminRemarks: searchRegex },
+        { shipmentId: { $in: matchedShipments.map(s => s._id) } },
+        { userId: { $in: matchedUsers.map(u => u._id) } }
       ];
     }
 
     const totalItems = await WeightDiscrepancy.countDocuments(query);
-    const discrepancies = await WeightDiscrepancy.find(query)
+    const rawDiscrepancies = await WeightDiscrepancy.find(query)
         .populate("shipmentId")
         .populate("userId", "name email companyName")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
+
+    const discrepancies = rawDiscrepancies.map(d => {
+      const doc = d.toObject();
+      const shipment = doc.shipmentId || {};
+      const user = doc.userId || {};
+      const displayShipmentId = shipment.shipmentId || shipment.courierTrackingNumber || (shipment._id ? shipment._id.toString() : "N/A");
+      const displayStore = user.companyName || user.name || "Direct Merchant";
+      const displayCourier = shipment.courierName || "Aramex";
+      const rawStatus = doc.status || "Pending";
+      const displayStatus = rawStatus === "Approved" ? "Approved (Courier)" : rawStatus === "Rejected" ? "Approved (Merchant)" : rawStatus;
+
+      return {
+        ...doc,
+        shipmentDisplayId: displayShipmentId,
+        shipmentId: displayShipmentId,
+        store: displayStore,
+        courier: displayCourier,
+        weight: doc.sellerWeight ?? 0,
+        scannedWeight: doc.courierWeight ?? 0,
+        deltaCost: doc.additionalCharge ?? 0,
+        discrepancyStatus: displayStatus,
+        discrepancyDetails: doc.adminRemarks || ""
+      };
+    });
 
     res.status(200).json({
       discrepancies,
@@ -1979,4 +2473,108 @@ export const shipmentDropDownList = async (req, res) => {
       message: "Error while retrieving shipment drop-dwon list."
     })
   }
-}
+};
+
+/**
+ * Reprocess a single Draft shipment (Merchant or Admin)
+ */
+export const reprocessShipment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const shipment = await Shipment.findById(id);
+
+    if (!shipment) {
+      return res.status(404).json({ message: "Shipment not found." });
+    }
+
+    if (req.user && req.user.role === "Seller" && shipment.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Unauthorized to reprocess this shipment." });
+    }
+
+    if (shipment.status !== "Draft") {
+      return res.status(400).json({
+        message: `Only shipments in Draft status can be reprocessed. Current status: ${shipment.status}`
+      });
+    }
+
+    const result = await executeBookDraftShipment(shipment, req.user);
+
+    return res.status(200).json({
+      success: true,
+      message: `Shipment ${shipment.shipmentId} reprocessed and booked successfully! AWB: ${result.courierTrackingNumber}`,
+      shipment: result.shipment,
+      newBalance: result.walletBalance,
+    });
+  } catch (error) {
+    console.error("Reprocess Shipment Error:", error.message);
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Failed to reprocess shipment."
+    });
+  }
+};
+
+/**
+ * Bulk reprocess multiple Draft shipments for the logged-in merchant
+ */
+export const bulkReprocessShipments = async (req, res) => {
+  try {
+    const { shipmentIds } = req.body || {};
+    let query = { user: req.user._id, status: "Draft" };
+
+    if (shipmentIds && Array.isArray(shipmentIds) && shipmentIds.length > 0) {
+      query._id = { $in: shipmentIds };
+    }
+
+    const drafts = await Shipment.find(query).sort({ createdAt: 1 });
+    if (!drafts || drafts.length === 0) {
+      return res.status(400).json({ message: "No Draft shipments found to reprocess." });
+    }
+
+    let successCount = 0;
+    let failedCount = 0;
+    const errors = [];
+    const bookedShipments = [];
+
+    for (const draft of drafts) {
+      const wallet = await Wallet.findOne({ user: req.user._id, currency: "INR" });
+      const invoiceTotal = parseFloat(draft.invoiceTotal || draft.charge || 0);
+
+      if (!wallet || wallet.availableBalance < invoiceTotal) {
+        errors.push({
+          shipmentId: draft.shipmentId,
+          error: `Insufficient balance (Needs ₹${invoiceTotal.toFixed(2)}, Available ₹${wallet ? wallet.availableBalance.toFixed(2) : "0.00"})`
+        });
+        failedCount++;
+        continue;
+      }
+
+      try {
+        const result = await executeBookDraftShipment(draft, req.user);
+        successCount++;
+        bookedShipments.push(result.shipment);
+      } catch (err) {
+        errors.push({ shipmentId: draft.shipmentId, error: err.message });
+        failedCount++;
+      }
+    }
+
+    const latestWallet = await Wallet.findOne({ user: req.user._id, currency: "INR" });
+
+    return res.status(200).json({
+      success: true,
+      message: `Reprocessed ${successCount} shipment(s). ${failedCount > 0 ? `${failedCount} skipped or failed (insufficient balance or carrier error).` : ""}`,
+      successCount,
+      failedCount,
+      errors,
+      bookedShipments,
+      newBalance: latestWallet ? latestWallet.availableBalance : 0,
+    });
+  } catch (error) {
+    console.error("Bulk Reprocess Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Error during bulk reprocess."
+    });
+  }
+};

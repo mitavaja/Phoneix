@@ -30,15 +30,34 @@ export const generateInvoicePDF = async (req, res) => {
         }
 
         // 2. Fetch Delivered Shipments in Date Range
-        const shipments = await Shipment.find({
-            user: userId,
+        const shipmentsQuery = {
             status: "Delivered",
-            updatedAt: { $gte: fromDate,$lte: toDate }
-        }).sort({ updatedAt: 1 });
+            $or: [
+                { dateDelivered: { $gte: fromDate, $lte: toDate } },
+                { updatedAt: { $gte: fromDate, $lte: toDate } },
+                { createdAt: { $gte: fromDate, $lte: toDate } }
+            ]
+        };
+
+        const adminHasShipments = await Shipment.exists({ user: userId, status: "Delivered" });
+        if (user.role !== "Admin" || adminHasShipments) {
+            shipmentsQuery.user = userId;
+        }
+
+        let shipments = await Shipment.find(shipmentsQuery).sort({ dateDelivered: -1, updatedAt: -1 });
+
+        // If specific date range has no records, fallback to the latest delivered shipments for this account
+        if (!shipments || shipments.length === 0) {
+            const fallbackQuery = { status: "Delivered" };
+            if (user.role !== "Admin" || adminHasShipments) {
+                fallbackQuery.user = userId;
+            }
+            shipments = await Shipment.find(fallbackQuery).sort({ dateDelivered: -1, updatedAt: -1 }).limit(15);
+        }
 
         if (!shipments || shipments.length === 0) {
             return res.status(404).json({
-                message: `No delivered shipments found between ${moment(fromDate).format("DD MMM YYYY")} and ${moment(toDate).format("DD MMM YYYY")}.`
+                message: `No delivered shipments found for this account to generate tax invoice.`
             });
         }
 

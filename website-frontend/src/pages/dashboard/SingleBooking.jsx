@@ -249,12 +249,16 @@ const SingleBooking = () => {
             };
 
             const res = await API.post("/shipments/book", payload);
-            setBookingSuccess(`Shipment successfully booked! Tracking ID: ${res.data.shipment?.shipmentId}`);
-            await fetchWalletData();
+            if (res.data?.isDraft) {
+                setBookingSuccess(`Shipment saved as Draft due to insufficient wallet balance (ID: ${res.data.shipment?.shipmentId}). You can reprocess it anytime once you recharge your wallet.`);
+            } else {
+                setBookingSuccess(`Shipment successfully booked! Tracking ID: ${res.data.shipment?.shipmentId}`);
+            }
+            if (fetchWalletData) await fetchWalletData();
 
             setTimeout(() => {
                 navigate("/dashboard/shipments");
-            }, 1500);
+            }, 1800);
 
         } catch (err) {
             setBookingError(err.response?.data?.message || "Shipment booking failed.");
@@ -318,23 +322,13 @@ const SingleBooking = () => {
                             <span className="text-[#0A1F44] font-bold text-sm">Aramex</span>
                         </label>
 
-                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition shadow-sm ${singleForm.courier === "phreight" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-[#687280]/20 bg-white hover:border-[#FF6A00]/40"}`}>
-                            <input
-                                type="radio"
-                                name="courier"
-                                value="phreight"
-                                checked={singleForm.courier === "phreight"}
-                                onChange={() => {
-                                    setSingleForm({ ...singleForm, courier: "phreight", productType: "" });
-                                    setEstimateResult(null);
-                                }}
-                                className="hidden"
-                            />
-                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleForm.courier === "phreight" ? "border-[#FF6A00]" : "border-[#687280]"}`}>
-                                {singleForm.courier === "phreight" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                        <div className="border border-[#687280]/20 bg-gray-100/70 p-4 rounded-xl flex items-center justify-between cursor-not-allowed opacity-60 select-none">
+                            <div className="flex items-center gap-3">
+                                <div className="w-4 h-4 rounded-full border border-gray-400 flex items-center justify-center bg-gray-200"></div>
+                                <span className="text-gray-400 font-bold text-sm">Phreight</span>
                             </div>
-                            <span className="text-[#0A1F44] font-bold text-sm">Phreight</span>
-                        </label>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-200 text-gray-500 uppercase tracking-wider">Disabled</span>
+                        </div>
                     </div>
                 </div>
 

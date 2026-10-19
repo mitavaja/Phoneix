@@ -1348,7 +1348,7 @@ const Dashboard = () => {
                                 {sh.labelUrl ? (
                                     <a href={sh.labelUrl} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500 rounded text-[10px] font-semibold text-purple-400 hover:text-white transition inline-flex items-center gap-1">Label</a>
                                 ) : sh.labelPdfPath && (
-                                    <a href={`${import.meta.env.VITE_API_BASE_URL || ""}${sh.labelPdfPath}`} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500 rounded text-[10px] font-semibold text-purple-400 hover:text-white transition inline-flex items-center gap-1">Label</a>
+                                    <a href={`${import.meta.env.VITE_API_ROOT || "http://localhost:9000"}${sh.labelPdfPath}`} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-purple-500/10 border border-purple-500/30 hover:bg-purple-500 rounded text-[10px] font-semibold text-purple-400 hover:text-white transition inline-flex items-center gap-1">Label</a>
                                 )}
                                 {sh.status === "Booked" && !sh.manifestCode && (
                                     <button onClick={() => handleOpenPickupModal(sh)} className="px-2 py-1 bg-blue-500/20 border border-blue-500/30 hover:bg-blue-500 rounded text-[10px] font-semibold text-blue-400 hover:text-white transition inline-flex items-center gap-1">
@@ -1507,23 +1507,13 @@ const Dashboard = () => {
                           <span className="text-white font-bold text-sm">Aramex</span>
                         </label>
 
-                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${calcForm.courier === "phreights" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
-                          <input
-                              type="radio"
-                              name="calcCourier"
-                              value="phreights"
-                              checked={calcForm.courier === "phreights"}
-                              onChange={(e) => {
-                                setCalcForm({ ...calcForm, courier: "phreights", productType: "" });
-                                setCalcResult(null);
-                              }}
-                              className="hidden"
-                          />
-                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${calcForm.courier === "phreights" ? "border-[#FF6A00]" : "border-gray-500"}`}>
-                            {calcForm.courier === "phreights" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                        <div className="border border-white/5 bg-white/5 p-4 rounded-xl flex items-center justify-between cursor-not-allowed opacity-50 select-none">
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 rounded-full border border-gray-600 flex items-center justify-center bg-gray-800"></div>
+                            <span className="text-gray-400 font-bold text-sm">Phreight</span>
                           </div>
-                          <span className="text-white font-bold text-sm">phreights</span>
-                        </label>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-gray-400 uppercase tracking-wider">Disabled</span>
+                        </div>
                       </div>
                     </div>
 
@@ -1694,23 +1684,13 @@ const Dashboard = () => {
                           <span className="text-white font-bold text-sm">Aramex</span>
                         </label>
 
-                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${singleForm.courier === "phreights" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
-                          <input
-                              type="radio"
-                              name="courier"
-                              value="phreights"
-                              checked={singleForm.courier === "phreights"}
-                              onChange={(e) => {
-                                setSingleForm({ ...singleForm, courier: "phreights", productType: "" });
-                                setEstimateResult(null);
-                              }}
-                              className="hidden"
-                          />
-                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleForm.courier === "phreights" ? "border-[#FF6A00]" : "border-gray-500"}`}>
-                            {singleForm.courier === "phreights" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                        <div className="border border-white/5 bg-white/5 p-4 rounded-xl flex items-center justify-between cursor-not-allowed opacity-50 select-none">
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 rounded-full border border-gray-600 flex items-center justify-center bg-gray-800"></div>
+                            <span className="text-gray-400 font-bold text-sm">Phreight</span>
                           </div>
-                          <span className="text-white font-bold text-sm">phreights</span>
-                        </label>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-gray-400 uppercase tracking-wider">Disabled</span>
+                        </div>
                       </div>
                     </div>
 
@@ -2060,9 +2040,9 @@ const Dashboard = () => {
                             </div>
                         )}
 
-                        {bulkResult.summary.validCount > 0 && bulkResult.summary.hasSufficientFunds && user?.status === "Active" && (
+                        {bulkResult.summary.validCount > 0 && user?.status === "Active" && (
                             <button onClick={handleBulkConfirm} disabled={bulkConfirming} className="w-full bg-[#FF6A00] text-[#0A1F44] font-extrabold py-4 rounded-xl text-xs hover:brightness-110 active:scale-95 transition flex items-center justify-center gap-2">
-                              {bulkConfirming ? <span className="w-5 h-5 border-2 border-[#0A1F44] border-t-transparent rounded-full animate-spin"></span> : <><CheckCircle size={16} /> Confirm & Book Batch (Debits ₹{bulkResult.summary.totalEstimatedCost.toFixed(2)})</>}
+                              {bulkConfirming ? <span className="w-5 h-5 border-2 border-[#0A1F44] border-t-transparent rounded-full animate-spin"></span> : bulkResult.summary.hasSufficientFunds ? <><CheckCircle size={16} /> Confirm & Book Batch (Debits ₹{bulkResult.summary.totalEstimatedCost.toFixed(2)})</> : <><CheckCircle size={16} /> Confirm Batch (Save Unfunded as Draft)</>}
                             </button>
                         )}
 

@@ -9,7 +9,7 @@ import { generateToken } from "../utils/generateToken.js";
 import { isValidEmail, isValidPhone, isValidPassword } from "../utils/validation.js";
 
 // Helper to hash password with salt
-const hashPassword = (password) => {
+export const hashPassword = (password) => {
   return crypto.createHash("sha256").update(password + "phreight-salt-90382").digest("hex");
 };
 
@@ -158,6 +158,9 @@ export const loginUser = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password combination" });
     }
 
+    user.lastLogin = new Date();
+    await user.save();
+
     res.status(200).json({
       message: "Login successful",
       token: generateToken({ id: user._id, role: user.role }),
@@ -167,10 +170,87 @@ export const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         status: user.status,
+        lastLogin: user.lastLogin,
       },
     });
   } catch (error) {
     res.status(500).json({ message: "Internal server error during login", error: error.message });
+  }
+};
+
+export const pinLogin = async (req, res) => {
+  try {
+    const { email, pin } = req.body;
+
+    if (!pin) {
+      return res.status(400).json({ message: "Security PIN is required" });
+    }
+
+    let user;
+    if (email && email.trim()) {
+      user = await User.findOne({ email: email.trim().toLowerCase() });
+    }
+    if (!user) {
+      user = await User.findOne({ role: "Admin" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "Admin user account not found" });
+    }
+
+    if (user.status === "Pending") {
+      return res.status(403).json({ message: "Access forbidden: Account pending compliance review" });
+    }
+
+    if (user.status === "Blocked") {
+      return res.status(403).json({ message: "Access forbidden: Account suspended" });
+    }
+
+    // Check PIN against user.pin or SystemSetting
+    const SystemSetting = (await import("../models/SystemSetting.js")).default;
+    const settings = await SystemSetting.findOne({});
+    const expectedPin = user.pin || settings?.adminPin || settings?.aramexAccountPin || "1234";
+
+    if (pin.toString().trim() !== expectedPin.toString().trim()) {
+      return res.status(401).json({ message: "Invalid Security PIN" });
+    }
+
+    user.lastLogin = new Date();
+    await user.save();
+
+    res.status(200).json({
+      message: "PIN authentication successful",
+      token: generateToken({ id: user._id, role: user.role }),
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        lastLogin: user.lastLogin,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error during PIN login", error: error.message });
+  }
+};
+
+export const checkLoginMode = async (req, res) => {
+  try {
+    const email = req.query.email || "admin@phreight.com";
+    const user = await User.findOne({ email: email.trim().toLowerCase() }) || await User.findOne({ role: "Admin" });
+    if (!user || !user.lastLogin) {
+      return res.status(200).json({ within48Hours: false });
+    }
+    const elapsed = Date.now() - new Date(user.lastLogin).getTime();
+    const within48Hours = elapsed < 48 * 60 * 60 * 1000;
+    res.status(200).json({
+      within48Hours,
+      lastLogin: user.lastLogin,
+      email: user.email,
+    });
+  } catch (error) {
+    res.status(200).json({ within48Hours: false });
   }
 };
 
@@ -299,6 +379,8 @@ export const usersList = async (req, res) => {
         $project : {
           label : "$name",
           value : "$_id",
+          email: "$email",
+          companyName: "$companyName",
           _id: 0
         }
       }

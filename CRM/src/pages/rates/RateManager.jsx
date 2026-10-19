@@ -181,6 +181,40 @@ const RateManager = () => {
         ...merchantsList
     ];
 
+    const countryOptions = [
+        { label: "Global (*) - All Countries", value: "" },
+        { label: "AE - United Arab Emirates", value: "AE" },
+        { label: "US - United States", value: "US" },
+        { label: "GB - United Kingdom", value: "GB" },
+        { label: "IN - India", value: "IN" },
+        { label: "SA - Saudi Arabia", value: "SA" },
+        { label: "CA - Canada", value: "CA" },
+        { label: "AU - Australia", value: "AU" },
+        { label: "DE - Germany", value: "DE" },
+        { label: "FR - France", value: "FR" },
+        { label: "SG - Singapore", value: "SG" },
+        { label: "OM - Oman", value: "OM" },
+        { label: "KW - Kuwait", value: "KW" },
+        { label: "QA - Qatar", value: "QA" },
+        { label: "BH - Bahrain", value: "BH" },
+        { label: "MY - Malaysia", value: "MY" },
+        { label: "JP - Japan", value: "JP" },
+        { label: "CN - China", value: "CN" },
+        { label: "IT - Italy", value: "IT" },
+        { label: "ES - Spain", value: "ES" },
+        { label: "NL - Netherlands", value: "NL" },
+        { label: "CH - Switzerland", value: "CH" },
+        { label: "SE - Sweden", value: "SE" },
+        { label: "ZA - South Africa", value: "ZA" },
+        { label: "NZ - New Zealand", value: "NZ" },
+        { label: "TH - Thailand", value: "TH" },
+        { label: "ID - Indonesia", value: "ID" },
+        { label: "VN - Vietnam", value: "VN" },
+        { label: "TR - Turkey", value: "TR" },
+        { label: "BR - Brazil", value: "BR" },
+        { label: "MX - Mexico", value: "MX" }
+    ];
+
     return (
         <div className="space-y-8 select-none">
             {/* Title */}
@@ -201,34 +235,49 @@ const RateManager = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 gap-8">
 
-                {/* Margins Priority Rules Table (Left: 2 Cols) */}
-                <div className="lg:col-span-2 space-y-6">
+                {/* Margins Priority Rules Table (Full Width) */}
+                <div className="w-full space-y-6">
 
-                    {/* Filters Row */}
+                    {/* Filters & Search Row */}
                     <div
                         className="glass-card p-4 rounded-xl border border-[#687280]/20 flex flex-col md:flex-row gap-4 items-center justify-between">
-                        <div className="w-full md:w-64">
+                        <div className="w-full md:w-72">
+                            <label className="block text-[10px] text-[#687280] font-bold uppercase mb-1">Filter by User</label>
                             <CustomSelect
                                 options={tableFilterUsers}
                                 value={filterUserId}
                                 onChange={setFilterUserId}
+                                searchPlaceholder="Search merchant name, email..."
                             />
                         </div>
-                        <div className="relative w-full md:w-80">
-                            <input
-                                type="text"
-                                placeholder="Search Country Code or Type..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full px-4 py-2 pl-10 text-xs bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-lg text-[#0A1F44] focus:outline-none transition-all"
-                            />
-                            <svg className="w-4 h-4 text-gray-500 absolute left-3 top-2.5" fill="none"
-                                 viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round"
-                                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                            </svg>
+                        <div className="w-full md:flex-1 md:max-w-md">
+                            <label className="block text-[10px] text-[#687280] font-bold uppercase mb-1">Search Rates & Margins</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Search Merchant, Country (e.g. AE, US), Type..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full px-4 py-2.5 pl-10 pr-9 text-xs bg-white border border-[#687280]/30 focus:border-[#FF6A00] rounded-xl text-[#0A1F44] focus:outline-none transition-all shadow-sm"
+                                />
+                                <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none"
+                                     viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round"
+                                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                                {searchTerm && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchTerm("")}
+                                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100 transition"
+                                        title="Clear search"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -330,120 +379,122 @@ const RateManager = () => {
                     </div>
                 </div>
 
-                {/* Live Shipment Cost Calculator (Right: 1 Col) */}
-                <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 h-fit space-y-6">
-                    <div>
-                        <h3 className="text-sm font-bold text-[#0A1F44] mb-1">Live Pricing calculator Audit</h3>
-                        <p className="text-xs text-[#687280]">Verify base rate slabs and margin overrides with decoupled
-                            GST breakdown calculations.</p>
-                    </div>
-
-                    <form onSubmit={handleCalculate} className="space-y-4 text-xs">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-[#687280] font-semibold mb-1">Origin Country</label>
-                                <select
-                                    value={calcOrigin}
-                                    onChange={(e) => setCalcOrigin(e.target.value)}
-                                    className="w-full px-3 py-2 bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-lg text-[#0A1F44] focus:outline-none transition-all cursor-pointer"
-                                >
-                                    <option value="IN" className="bg-[#0A1F44]">India (IN)</option>
-                                    <option value="AE" className="bg-[#0A1F44]">United Arab Emirates (AE)</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-[#687280] font-semibold mb-1">Destination Country</label>
-                                <select
-                                    value={calcDest}
-                                    onChange={(e) => setCalcDest(e.target.value)}
-                                    className="w-full px-3 py-2 bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-lg text-[#0A1F44] focus:outline-none transition-all cursor-pointer"
-                                >
-                                    <option value="AE" className="bg-[#0A1F44]">United Arab Emirates (AE)</option>
-                                    <option value="SA" className="bg-[#0A1F44]">Saudi Arabia (SA)</option>
-                                    <option value="US" className="bg-[#0A1F44]">United States (US)</option>
-                                    <option value="GB" className="bg-[#0A1F44]">United Kingdom (GB)</option>
-                                    <option value="IN" className="bg-[#0A1F44]">India (IN)</option>
-                                </select>
-                            </div>
+                {/* Hidden: Live Pricing calculator Audit (Right: 1 Col) */}
+                {false && (
+                    <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 h-fit space-y-6">
+                        <div>
+                            <h3 className="text-sm font-bold text-[#0A1F44] mb-1">Live Pricing calculator Audit</h3>
+                            <p className="text-xs text-[#687280]">Verify base rate slabs and margin overrides with decoupled
+                                GST breakdown calculations.</p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <label className="block text-[#687280] font-semibold mb-1">Dead Weight (kg)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="1.5"
-                                    value={calcWeight}
-                                    onChange={(e) => setCalcWeight(e.target.value)}
-                                    className="w-full px-3 py-2 bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-lg text-[#0A1F44] focus:outline-none font-mono"
-                                    required
-                                />
+                        <form onSubmit={handleCalculate} className="space-y-4 text-xs">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[#687280] font-semibold mb-1">Origin Country</label>
+                                    <select
+                                        value={calcOrigin}
+                                        onChange={(e) => setCalcOrigin(e.target.value)}
+                                        className="w-full px-3 py-2 bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-lg text-[#0A1F44] focus:outline-none transition-all cursor-pointer"
+                                    >
+                                        <option value="IN" className="bg-[#0A1F44]">India (IN)</option>
+                                        <option value="AE" className="bg-[#0A1F44]">United Arab Emirates (AE)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[#687280] font-semibold mb-1">Destination Country</label>
+                                    <select
+                                        value={calcDest}
+                                        onChange={(e) => setCalcDest(e.target.value)}
+                                        className="w-full px-3 py-2 bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-lg text-[#0A1F44] focus:outline-none transition-all cursor-pointer"
+                                    >
+                                        <option value="AE" className="bg-[#0A1F44]">United Arab Emirates (AE)</option>
+                                        <option value="SA" className="bg-[#0A1F44]">Saudi Arabia (SA)</option>
+                                        <option value="US" className="bg-[#0A1F44]">United States (US)</option>
+                                        <option value="GB" className="bg-[#0A1F44]">United Kingdom (GB)</option>
+                                        <option value="IN" className="bg-[#0A1F44]">India (IN)</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-[#687280] font-semibold mb-1">Shipment Type</label>
-                                <select
-                                    value={calcShipmentType}
-                                    onChange={(e) => setCalcShipmentType(e.target.value)}
-                                    className="w-full px-3 py-2 bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-lg text-[#0A1F44] focus:outline-none cursor-pointer"
-                                >
-                                    <option value="Parcel" className="bg-[#0A1F44]">Parcel</option>
-                                    <option value="Document" className="bg-[#0A1F44]">Document</option>
-                                </select>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[#687280] font-semibold mb-1">Dead Weight (kg)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="1.5"
+                                        value={calcWeight}
+                                        onChange={(e) => setCalcWeight(e.target.value)}
+                                        className="w-full px-3 py-2 bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-lg text-[#0A1F44] focus:outline-none font-mono"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[#687280] font-semibold mb-1">Shipment Type</label>
+                                    <select
+                                        value={calcShipmentType}
+                                        onChange={(e) => setCalcShipmentType(e.target.value)}
+                                        className="w-full px-3 py-2 bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-lg text-[#0A1F44] focus:outline-none cursor-pointer"
+                                    >
+                                        <option value="Parcel" className="bg-[#0A1F44]">Parcel</option>
+                                        <option value="Document" className="bg-[#0A1F44]">Document</option>
+                                    </select>
+                                </div>
                             </div>
-                        </div>
 
-                        <button
-                            type="submit"
-                            disabled={calculating}
-                            className="w-full py-2.5 bg-[#FF6A00] hover:bg-orange-500 text-white font-extrabold rounded-xl transition-all shadow-md flex items-center justify-center"
-                        >
-                            {calculating ? "Calculating..." : "Run Calculator Audit"}
-                        </button>
-                    </form>
+                            <button
+                                type="submit"
+                                disabled={calculating}
+                                className="w-full py-2.5 bg-[#FF6A00] hover:bg-orange-500 text-white font-extrabold rounded-xl transition-all shadow-md flex items-center justify-center"
+                            >
+                                {calculating ? "Calculating..." : "Run Calculator Audit"}
+                            </button>
+                        </form>
 
-                    {calcError && (
-                        <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl">
-                            {calcError}
-                        </div>
-                    )}
+                        {calcError && (
+                            <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 text-xs rounded-xl">
+                                {calcError}
+                            </div>
+                        )}
 
-                    {calcResult && (
-                        <div
-                            className="p-4 bg-[#FF6A00]/5 border border-[#FF6A00]/20 text-[#FF6A00] rounded-xl space-y-3 text-xs animate-[fadeIn_0.3s_ease-out]">
+                        {calcResult && (
                             <div
-                                className="flex justify-between items-baseline font-bold border-b border-[#FF6A00]/10 pb-2">
-                                <span>INVOICE TOTAL:</span>
-                                <span
-                                    className="text-xl font-extrabold text-[#0A1F44]">₹{calcResult.invoiceTotal}</span>
-                            </div>
-                            <div className="text-[10px] text-[#687280] space-y-1.5">
-                                <div className="flex justify-between">
-                                    <span>Chargeable Weight:</span>
-                                    <span className="font-semibold text-white">{calcResult.chargeableWeight}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Carrier Base Cost:</span>
-                                    <span className="font-semibold text-white">₹{calcResult.aramexBaseCost}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Margin Applied:</span>
+                                className="p-4 bg-[#FF6A00]/5 border border-[#FF6A00]/20 text-[#FF6A00] rounded-xl space-y-3 text-xs animate-[fadeIn_0.3s_ease-out]">
+                                <div
+                                    className="flex justify-between items-baseline font-bold border-b border-[#FF6A00]/10 pb-2">
+                                    <span>INVOICE TOTAL:</span>
                                     <span
-                                        className="font-semibold text-white">{calcResult.marginApplied.type} ({calcResult.marginApplied.value})</span>
+                                        className="text-xl font-extrabold text-[#0A1F44]">₹{calcResult.invoiceTotal}</span>
+                                </div>
+                                <div className="text-[10px] text-[#687280] space-y-1.5">
+                                    <div className="flex justify-between">
+                                        <span>Chargeable Weight:</span>
+                                        <span className="font-semibold text-white">{calcResult.chargeableWeight}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Carrier Base Cost:</span>
+                                        <span className="font-semibold text-white">₹{calcResult.aramexBaseCost}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>Margin Applied:</span>
+                                        <span
+                                            className="font-semibold text-white">{calcResult.marginApplied.type} ({calcResult.marginApplied.value})</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Add Margin Rule Modal */}
             {isAddingMargin && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div
-                        className="glass-card w-full max-w-lg rounded-2xl border border-[#FF6A00]/20 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden bg-[#E5E7EB]">
+                        className="glass-card w-full max-w-lg rounded-2xl border border-[#FF6A00]/20 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-visible bg-[#E5E7EB]">
                         <div
-                            className="bg-[#0A1F44] px-6 py-4 border-b border-[#687280]/20 flex items-center justify-between text-white">
+                            className="bg-[#0A1F44] px-6 py-4 border-b border-[#687280]/20 flex items-center justify-between text-white rounded-t-2xl">
                             <div>
                                 <h3 className="font-extrabold">Create Margin Markup Rule</h3>
                                 <p className="text-[10px] text-gray-400">Configure priority profit markups matching
@@ -462,6 +513,8 @@ const RateManager = () => {
                                     options={formModalUsers}
                                     value={marginUserId}
                                     onChange={setMarginUserId}
+                                    placeholder="All Users (Global Defaults)"
+                                    searchPlaceholder="Search merchant name, company, email..."
                                 />
                             </div>
 
@@ -494,14 +547,13 @@ const RateManager = () => {
 
                             <div className="grid grid-cols-3 gap-4 border-t border-[#687280]/20 pt-3">
                                 <div className="space-y-1.5">
-                                    <label className="block text-gray-500 font-semibold">Country code (Optional)</label>
-                                    <input
-                                        type="text"
-                                        maxLength="2"
-                                        placeholder="e.g. AE"
+                                    <label className="block text-gray-500 font-semibold">Country (Optional)</label>
+                                    <CustomSelect
+                                        options={countryOptions}
                                         value={marginCountry}
-                                        onChange={(e) => setMarginCountry(e.target.value)}
-                                        className="w-full px-3 py-2 bg-white border border-[#687280]/20 rounded-lg text-[#0A1F44] uppercase"
+                                        onChange={setMarginCountry}
+                                        placeholder="GLOBAL (*)"
+                                        searchPlaceholder="Search country..."
                                     />
                                 </div>
                                 <div className="space-y-1.5">
