@@ -6,6 +6,29 @@ const RateManager = () => {
   const [rates, setRates] = useState([]);
   const [margins, setMargins] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredRates = rates.filter((r) => {
+    if (!searchTerm) return true;
+    const s = searchTerm.toLowerCase();
+    return (
+      (r.slabId && r.slabId.toLowerCase().includes(s)) ||
+      (r.carrier && r.carrier.toLowerCase().includes(s)) ||
+      r.weightLimit?.toString().includes(s)
+    );
+  });
+
+  const filteredMargins = margins.filter((m) => {
+    if (!searchTerm) return true;
+    const s = searchTerm.toLowerCase();
+    return (
+      (m.country && m.country.toLowerCase().includes(s)) ||
+      (m.type && m.type.toLowerCase().includes(s)) ||
+      (m.userId?.name && m.userId.name.toLowerCase().includes(s)) ||
+      (m.userId?.email && m.userId.email.toLowerCase().includes(s)) ||
+      m.value?.toString().includes(s)
+    );
+  });
 
   // Form states for adding slab
   const [newCarrier, setNewCarrier] = useState("Aramex");
@@ -203,8 +226,38 @@ const RateManager = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
         {/* Cost Matrix and Margins (Left: 2 Cols) */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-6">
           
+          {/* Search Box */}
+          <div className="glass-card p-4 rounded-xl border border-[#687280]/20 flex items-center justify-between">
+            <div className="relative w-full max-w-md">
+              <input
+                type="text"
+                placeholder="Search Carrier, Slab ID, Country Code, or Rule Type..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 pl-10 pr-9 text-xs bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-lg text-[#0A1F44] focus:outline-none transition-all"
+              />
+              <svg className="w-4 h-4 text-gray-500 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-2 text-gray-400 hover:text-gray-600 text-xs font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+            {searchTerm && (
+              <span className="text-[10px] text-[#FF6A00] font-bold">
+                Found {filteredRates.length} Slabs, {filteredMargins.length} Margins
+              </span>
+            )}
+          </div>
+
           {/* Base rates table */}
           <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 space-y-4">
             <h3 className="text-sm font-bold text-[#0A1F44] border-b border-[#687280]/10 pb-2">Active Carrier Base Tariff Tiers</h3>
@@ -226,7 +279,7 @@ const RateManager = () => {
                   {loading ? (
                     <tr><td colSpan="8" className="py-4 text-center">Loading pricing slabs...</td></tr>
                   ) : (
-                    rates.map((rate) => (
+                    filteredRates.map((rate) => (
                       <tr key={rate._id} className="hover:bg-[#E5E7EB]/30 transition-colors">
                         <td className="py-3 font-mono font-bold text-[#FF6A00]/80">{rate.slabId}</td>
                         <td className="py-3 font-semibold text-[#0A1F44]">{rate.carrier}</td>
@@ -274,7 +327,7 @@ const RateManager = () => {
                   {loading ? (
                     <tr><td colSpan="6" className="py-4 text-center">Loading margins rules...</td></tr>
                   ) : (
-                    margins.map((m, index) => {
+                    filteredMargins.map((m, index) => {
                       let priorityClass = "Priority 4: Global";
                       if (m.country && m.weightMin > 0) priorityClass = "Priority 1: Country + Weight";
                       else if (m.country) priorityClass = "Priority 2: Country";

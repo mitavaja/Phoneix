@@ -41,7 +41,32 @@ const Discrepancy = () => {
             });
 
             const res = await API.get(`/shipments/discrepancies/list?${queryParams.toString()}`);
-            setDisputes(res.data.discrepancies || []);
+            const normalized = (res.data.discrepancies || []).map((d) => {
+                const sId = typeof d.shipmentId === "object"
+                    ? (d.shipmentId?.shipmentId || d.shipmentId?.courierTrackingNumber || d.shipmentId?._id || "N/A")
+                    : (d.shipmentId || "N/A");
+                const st = d.store || d.userId?.companyName || d.userId?.name || "Direct Merchant";
+                const cr = d.courier || d.shipmentId?.courierName || "Aramex";
+                const wt = d.weight ?? d.sellerWeight ?? 0;
+                const scWt = d.scannedWeight ?? d.courierWeight ?? 0;
+                const dCost = d.deltaCost ?? d.additionalCharge ?? 0;
+                let dispStatus = d.discrepancyStatus || d.status || "Pending";
+                if (dispStatus === "Rejected") dispStatus = "Approved (Merchant)";
+                if (dispStatus === "Approved") dispStatus = "Approved (Courier)";
+                const details = d.discrepancyDetails || d.adminRemarks || "";
+                return {
+                    ...d,
+                    shipmentId: sId,
+                    store: st,
+                    courier: cr,
+                    weight: wt,
+                    scannedWeight: scWt,
+                    deltaCost: dCost,
+                    discrepancyStatus: dispStatus,
+                    discrepancyDetails: details,
+                };
+            });
+            setDisputes(normalized);
             setPaginationData(res.data.pagination || null);
         } catch (error) {
             console.warn("Express API discrepancies list unreachable. Using simulated dispute logs.", error.message);
@@ -224,14 +249,14 @@ const Discrepancy = () => {
                                     <td className="py-4">
                       <span
                           className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider ${
-                              d.discrepancyStatus === "Pending"
+                              (d.discrepancyStatus || d.status || "Pending") === "Pending"
                                   ? "bg-[#FF6A00]/10 text-[#FF6A00]"
-                                  : d.discrepancyStatus.includes("Merchant")
+                                  : (d.discrepancyStatus || d.status || "").toLowerCase().includes("merchant") || (d.discrepancyStatus || d.status) === "Rejected"
                                       ? "bg-green-100 text-green-600"
                                       : "bg-blue-100 text-blue-600"
                           }`}
                       >
-                        {d.discrepancyStatus}
+                        {d.discrepancyStatus || d.status || "Pending"}
                       </span>
                                     </td>
                                     <td className="py-4 text-right">
@@ -351,7 +376,7 @@ const Discrepancy = () => {
 
                         {/* Footer with compliance resolution controls */}
                         <div className="px-6 py-4 bg-[#0A1F44]/50 border-t border-[#687280]/20 flex gap-2">
-                            {selectedDispute.discrepancyStatus === "Pending" ? (
+                            {((selectedDispute.discrepancyStatus || selectedDispute.status || "Pending") === "Pending") ? (
                                 <>
                                     <button
                                         onClick={() => handleResolve(selectedDispute._id, "merchant")}
