@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import AuditLog from "../models/AuditLog.js";
 import Notification from "../models/Notification.js";
 import Coupon from "../models/Coupon.js";
+import WalletCategory from "../models/WalletCategory.js";
 import { createPaymentOrder, verifyPaymentSignature } from "../services/paymentService.js";
 import { sendWalletRechargeEmail } from "../services/emailService.js";
 import { reprocessDraftShipmentsForUser } from "./shipmentController.js";
@@ -321,6 +322,116 @@ export const addBalanceAdmin = async (req, res) => {
 };
 
 /**
+ * Admin Cut / Deduct Seller Balance (Admin/Moderator)
+ * Supports category-wise deduction (Weight Discrepancy, RTO Charges, Penalty, etc.)
+ */
+export const cutBalanceAdmin = async (req, res) => {
+  try {
+    const { storeName, amount, category, reference, memo, currency } = req.body;
+
+    if (!storeName || !amount || !category || !memo) {
+      return res.status(400).json({
+        message: "Target merchant store, deduction amount, category, and audit memo notes are required.",
+      });
+    }
+
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      return res.status(400).json({ message: "Amount must be a positive number greater than 0." });
+    }
+
+    const targetCurrency = currency || "INR";
+
+    // Find seller user
+    const user = await User.findOne({
+      $or: [
+        { name: storeName },
+        { companyName: storeName },
+        { email: storeName },
+      ],
+    });
+
+    // Find wallet by storeName or user and currency
+    let wallet = await Wallet.findOne({
+      $or: [
+        { storeName, currency: targetCurrency },
+        ...(user ? [{ user: user._id, currency: targetCurrency }] : []),
+      ],
+    });
+
+    if (!wallet) {
+      return res.status(404).json({
+        message: `Wallet for seller "${storeName}" (${targetCurrency}) not found.`,
+      });
+    }
+
+    const currentAvailable = wallet.availableBalance ?? wallet.balance ?? 0;
+    if (currentAvailable < numericAmount) {
+      return res.status(400).json({
+        message: `Insufficient balance: Current available balance is ${targetCurrency} ${currentAvailable.toFixed(2)}. Cannot cut ${targetCurrency} ${numericAmount.toFixed(2)}.`,
+      });
+    }
+
+    const openingBalance = currentAvailable;
+    const closingBalance = parseFloat((openingBalance - numericAmount).toFixed(2));
+
+    wallet.availableBalance = closingBalance;
+    wallet.totalBalance = parseFloat(((wallet.totalBalance || openingBalance) - numericAmount).toFixed(2));
+    wallet.balance = closingBalance;
+    await wallet.save();
+
+    const refId = reference || `CUT-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    // Create ledger transaction
+    const transaction = await WalletTransaction.create({
+      walletId: wallet._id,
+      userId: wallet.user,
+      transactionType: "Debit",
+      amount: -numericAmount,
+      currency: targetCurrency,
+      openingBalance,
+      closingBalance,
+      referenceId: refId,
+      remarks: `[${category}] ${memo}`,
+      description: `Admin balance deduction (${category}): ${memo}`,
+      status: "Completed",
+      createdBy: req.user.name || "Admin",
+    });
+
+    // Create Audit Log
+    await AuditLog.create({
+      userId: req.user._id,
+      action: `Admin Cut Balance: ${category} (${targetCurrency})`,
+      module: "Wallet",
+      oldValue: `Available: ${openingBalance}`,
+      newValue: `Available: ${closingBalance}`,
+      ipAddress: req.ip || "127.0.0.1",
+    });
+
+    // Create In-App Notification for seller
+    try {
+      await Notification.create({
+        userId: wallet.user,
+        title: `Wallet Balance Cut (${category})`,
+        message: `${targetCurrency} ${numericAmount.toFixed(2)} was deducted from your wallet for: ${category}. Reason: ${memo}`,
+        type: "Wallet Debited",
+      });
+    } catch (notifErr) {
+      console.warn("Notification error during cut balance:", notifErr.message);
+    }
+
+    res.status(200).json({
+      message: `Successfully cut ${targetCurrency} ${numericAmount.toFixed(2)} from ${storeName}'s wallet (${category}).`,
+      wallet,
+      transaction,
+    });
+  } catch (error) {
+    console.error("Cut balance error:", error);
+    res.status(500).json({ message: "Error processing balance deduction", error: error.message });
+  }
+};
+
+/**
  * Initiate Razorpay Recharge Order
  */
 export const rechargeWallet = async (req, res) => {
@@ -347,6 +458,10 @@ export const rechargeWallet = async (req, res) => {
       message: "Razorpay recharge order created successfully",
       orderDetails,
       keyId: process.env.RAZORPAY_KEY_ID || "your_key_id",
+      orderId: orderDetails.id,
+      amount: amountInINR,
+      currency: "INR",
+      isDemoMode: orderDetails.simulated === true,
     });
   } catch (error) {
     res.status(500).json({ message: "Error initiating payment gateway", error: error.message });
@@ -677,5 +792,133 @@ export const rejectBankTransfer = async (req, res) => {
     res.status(200).json({ message: "Bank transfer deposit request rejected successfully.", tx });
   } catch (error) {
     res.status(500).json({ message: "Error rejecting bank deposit request", error: error.message });
+  }
+};
+
+/**
+ * Get Wallet Categories (Credit or Debit)
+ * Auto-seeds defaults if none exist
+ */
+export const getWalletCategories = async (req, res) => {
+  try {
+    const { type } = req.query; // 'Credit' or 'Debit'
+    const query = {};
+    if (type) {
+      query.type = type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+    }
+
+    let categories = await WalletCategory.find(query).sort({ isDefault: -1, createdAt: 1 });
+
+    // If no categories exist for this type, seed defaults
+    if (categories.length === 0) {
+      const defaultCategories = [
+        // Credit (Add Balance) defaults
+        { name: "Insurance Claim", type: "Credit", sublabel: "Lost or damaged cargo settlement", isDefault: true },
+        { name: "Coupon", type: "Credit", sublabel: "Promotional or discount credit voucher", isDefault: true },
+        { name: "Cash Deposit", type: "Credit", sublabel: "Direct cash deposit to account", isDefault: true },
+        { name: "Bonus / Cashback", type: "Credit", sublabel: "Merchant volume incentive or referral reward", isDefault: true },
+        { name: "Bank Transfer", type: "Credit", sublabel: "Direct NEFT/RTGS/IMPS wire transfer receipt", isDefault: true },
+
+        // Debit (Cut Balance) defaults
+        { name: "Weight Discrepancy", type: "Debit", sublabel: "Carrier audit weight difference charges", isDefault: true },
+        { name: "RTO Charges", type: "Debit", sublabel: "Return to origin freight & logistics charges", isDefault: true },
+        { name: "Penalty / Violation", type: "Debit", sublabel: "Platform policy breach or KYC fine", isDefault: true },
+        { name: "Customs & Duty Adjustment", type: "Debit", sublabel: "Consignee unpaid duties or customs fee debit", isDefault: true },
+        { name: "Lost / Damaged Goods Fee", type: "Debit", sublabel: "Transit damage adjustment or inspection fees", isDefault: true },
+        { name: "Cancellation Fee", type: "Debit", sublabel: "Consignment cancellation after pickup/manifest", isDefault: true },
+        { name: "Manual Recovery / Correction", type: "Debit", sublabel: "Administrative ledger clawback or debit correction", isDefault: true },
+        { name: "Other / Miscellaneous", type: "Debit", sublabel: "Custom deduction reason specified in memo", isDefault: true },
+      ];
+
+      const toInsert = type
+        ? defaultCategories.filter(c => c.type === query.type)
+        : defaultCategories;
+
+      if (toInsert.length > 0) {
+        await WalletCategory.insertMany(toInsert);
+        categories = await WalletCategory.find(query).sort({ isDefault: -1, createdAt: 1 });
+      }
+    }
+
+    res.status(200).json(categories);
+  } catch (error) {
+    res.status(500).json({ message: "Error fetching wallet categories", error: error.message });
+  }
+};
+
+/**
+ * Create a new Wallet Category (Admin manually adds category)
+ */
+export const createWalletCategory = async (req, res) => {
+  try {
+    const { name, type, sublabel } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Category name is required" });
+    }
+
+    const normalizedType = type && type.toLowerCase() === "debit" ? "Debit" : "Credit";
+
+    // Check if category already exists for this type
+    const existing = await WalletCategory.findOne({
+      name: { $regex: new RegExp(`^${name.trim()}$`, "i") },
+      type: normalizedType
+    });
+
+    if (existing) {
+      return res.status(200).json({
+        message: "Category already exists",
+        category: existing
+      });
+    }
+
+    const newCategory = await WalletCategory.create({
+      name: name.trim(),
+      type: normalizedType,
+      sublabel: (sublabel || "").trim(),
+      isDefault: false,
+      createdBy: req.user?.name || "Admin"
+    });
+
+    res.status(201).json({
+      message: `Category '${newCategory.name}' added successfully!`,
+      category: newCategory
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error creating wallet category", error: error.message });
+  }
+};
+
+/**
+ * Delete a Wallet Category (Admin deletes category)
+ */
+export const deleteWalletCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ message: "Category ID or name is required" });
+    }
+
+    let category;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      category = await WalletCategory.findById(id);
+    }
+    if (!category) {
+      category = await WalletCategory.findOne({ name: id });
+    }
+
+    if (!category) {
+      return res.status(404).json({ message: "Category not found in database" });
+    }
+
+    await WalletCategory.findByIdAndDelete(category._id);
+
+    res.status(200).json({
+      message: `Category '${category.name}' deleted successfully!`,
+      deletedId: category._id,
+      deletedName: category.name
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error deleting wallet category", error: error.message });
   }
 };

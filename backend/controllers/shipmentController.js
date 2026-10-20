@@ -515,7 +515,7 @@ export const bookShipment = async (req, res) => {
 
       if (!sgRateRes.services || sgRateRes.services.length === 0) {
         return res.status(400).json({
-          message: "No Phreight services available for this route."
+          message: "No Phreights services available for this route."
         });
       }
 
@@ -570,8 +570,8 @@ export const bookShipment = async (req, res) => {
         user: req.user._id,
         store: wallet.storeName || (req.user.companyName || `${req.user.name}'s Store`),
         customer: dest.name,
-        courierName: courier.toLowerCase() === "aramex" ? "Aramex" : "Phreight",
-        courier: courier.toLowerCase() === "aramex" ? "Aramex" : "Phreight",
+        courierName: courier.toLowerCase() === "aramex" ? "Aramex" : "Phreights",
+        courier: courier.toLowerCase() === "aramex" ? "Aramex" : "Phreights",
         weight: numericWeight,
         length: l, width: w, height: h,
         volumetricWeight: parseFloat(volumetricWeight.toFixed(2)),
@@ -809,8 +809,8 @@ export const bookShipment = async (req, res) => {
       user: req.user._id,
       store: wallet.storeName,
       customer: dest.name,
-      courierName: courier === "aramex" ? "Aramex" : "Phreight",
-      courier: courier === "aramex" ? "Aramex" : "Phreight",
+      courierName: courier === "aramex" ? "Aramex" : "Phreights",
+      courier: courier === "aramex" ? "Aramex" : "Phreights",
       weight: numericWeight,
       length: l, width: w, height: h,
       volumetricWeight: parseFloat(volumetricWeight.toFixed(2)),
@@ -1332,7 +1332,8 @@ export const downloadInvoicePdf = async (req, res) => {
     // Invoice Header Logo & Business Information
     const logoPath = path.join(process.cwd(), "public/logo/phreights.png");
     if (fs.existsSync(logoPath)) {
-      doc.image(logoPath, 50, 40, { height: 42 });
+      doc.roundedRect(48, 36, 145, 48, 6).fill("#0A1F44");
+      doc.image(logoPath, 55, 40, { height: 40 });
     }
 
     doc.fontSize(20).fillColor("#FF6A00").text("PHOENIX COMMERCE", { align: "right" }).moveDown(0.2);
@@ -1641,7 +1642,7 @@ export const confirmBulkUpload = async (req, res) => {
           }, isTestMode);
 
           if (!sgRateRes.services || sgRateRes.services.length === 0) {
-            throw new Error("No Phreight services available for this route.");
+            throw new Error("No Phreights services available for this route.");
           }
 
           const matchedService = sgRateRes.services.find(s => s.title.toLowerCase() === productType.toLowerCase() || s.serviceName === productType);
@@ -1683,8 +1684,8 @@ export const confirmBulkUpload = async (req, res) => {
             user: req.user._id,
             store: wallet ? wallet.storeName : (req.user.companyName || `${req.user.name}'s Store`),
             customer: dest.name,
-            courierName: courier === "aramex" ? "Aramex" : "Phreight",
-            courier: courier === "aramex" ? "Aramex" : "Phreight",
+            courierName: courier === "aramex" ? "Aramex" : "Phreights",
+            courier: courier === "aramex" ? "Aramex" : "Phreights",
             weight: numericWeight,
             length: l, width: w, height: h,
             volumetricWeight: parseFloat(volumetricWeight.toFixed(2)),
@@ -1845,8 +1846,8 @@ export const confirmBulkUpload = async (req, res) => {
           user: req.user._id,
           store: wallet.storeName,
           customer: dest.name,
-          courierName: courier === "aramex" ? "Aramex" : "Phreight",
-          courier: courier === "aramex" ? "Aramex" : "Phreight",
+          courierName: courier === "aramex" ? "Aramex" : "Phreights",
+          courier: courier === "aramex" ? "Aramex" : "Phreights",
           weight: numericWeight,
           length: l, width: w, height: h,
           volumetricWeight: parseFloat(volumetricWeight.toFixed(2)),

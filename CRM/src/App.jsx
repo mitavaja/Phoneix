@@ -17,6 +17,7 @@ import VerifiedKYC from "./pages/kyc/VerifiedKYC";
 import RejectedKYC from "./pages/kyc/RejectedKYC";
 import WalletTransactions from "./pages/wallet/WalletTransactions";
 import AddBalance from "./pages/wallet/AddBalance";
+import CutBalance from "./pages/wallet/CutBalance";
 import RateManager from "./pages/rates/RateManager";
 import Shipments from "./pages/shipments/Shipments";
 import Delivered from "./pages/shipments/Delivered";
@@ -51,7 +52,7 @@ const App = () => {
                 <AdminLayout>
                   <Routes>
                     <Route path="dashboard" element={<Dashboard />} />
-                    
+
                     {/* Users */}
                     <Route path="users" element={<AllUsers />} />
                     <Route path="users/pending" element={<PendingUsers />} />
@@ -65,6 +66,7 @@ const App = () => {
                     {/* Wallet */}
                     <Route path="wallet" element={<WalletTransactions />} />
                     <Route path="wallet/add" element={<AddBalance />} />
+                    <Route path="wallet/cut" element={<CutBalance />} />
 
                     {/* Rates */}
                     <Route path="rates" element={<RateManager />} />
@@ -78,14 +80,14 @@ const App = () => {
                     <Route path="discrepancy" element={<Discrepancy />} />
                     <Route path="pickups" element={<Pickups />} />
                     <Route path="reports" element={<Reports />} />
-                    
+
                     {/* Support Tickets */}
                     <Route path="tickets/open" element={<OpenTickets />} />
                     <Route path="tickets/closed" element={<ClosedTickets />} />
 
                     <Route path="settings" element={<Settings />} />
                     <Route path="coupons" element={<CouponManager />} />
-                    
+
                     {/* Insurance Claims */}
                     <Route path="claims" element={<ClaimsManager />} />
 
@@ -114,4 +116,4 @@ const App = () => {
   );
 };
 
-export default App;
+export default App;
