@@ -52,12 +52,31 @@ export const getAllUsers = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
+    const role = req.query.role;
+
+    // Filter out Admin, Moderator, and any identity matching medot
+    const filter = {
+      role: { $nin: ["Admin", "admin", "Moderator", "moderator"] },
+      $and: [
+        { email: { $not: /medot/i } },
+        { name: { $not: /medot/i } },
+        { companyName: { $not: /medot/i } }
+      ]
+    };
+
+    if (role && role !== "all") {
+      if (role.toLowerCase() === "shipper" || role.toLowerCase() === "seller") {
+        filter.role = { $in: ["Seller", "Shipper", "seller", "shipper"] };
+      } else if (role.toLowerCase() === "consignee" || role.toLowerCase() === "buyer") {
+        filter.role = { $in: ["Buyer", "Consignee", "buyer", "consignee"] };
+      }
+    }
 
     const skip = (page - 1) * limit;
 
-    const totalUsers = await User.countDocuments({});
+    const totalUsers = await User.countDocuments(filter);
 
-    const users = await User.find({})
+    const users = await User.find(filter)
         .select("-password")
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -175,7 +194,10 @@ export const updateUserRole = async (req, res) => {
       return res.status(404).json({ message: "User profile not found" });
     }
 
-    user.role = role;
+    let assignedRole = role;
+    if (assignedRole === "Shipper") assignedRole = "Seller";
+    if (assignedRole === "Consignee") assignedRole = "Buyer";
+    user.role = assignedRole;
     await user.save();
 
     res.status(200).json({ message: `Success: Updated user role to ${role}`, user });

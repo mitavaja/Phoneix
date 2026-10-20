@@ -424,9 +424,9 @@ const AddBalance = () => {
             </h3>
             <div className="divide-y divide-[#687280]/10 max-h-[420px] overflow-y-auto custom-scrollbar">
               {loadingSellers ? (
-                <div className="py-6 text-center text-xs text-gray-500">Loading sellers...</div>
+                <div className="py-6 text-center text-xs text-gray-500">Loading shippers...</div>
               ) : sellers.length === 0 ? (
-                <div className="py-6 text-center text-xs text-gray-500">No sellers registered yet.</div>
+                <div className="py-6 text-center text-xs text-gray-500">No shippers registered yet.</div>
               ) : (
                 sellers.map((m, idx) => (
                   <div key={idx} className="py-2.5 flex justify-between items-center text-xs">
@@ -473,13 +473,13 @@ const AddBalance = () => {
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             {/* Target Merchant Store Dropdown with Search Box & Real Login Seller Names */}
             <CustomDropdown
-              label="Target Merchant Store *"
+              label="Target Merchant Shipper *"
               value={selectedStore}
               onChange={setSelectedStore}
               options={sellerOptions}
               searchable={true}
               searchPlaceholder="Search seller name, store, email..."
-              placeholder={loadingSellers ? "Loading sellers..." : "Select registered seller..."}
+              placeholder={loadingSellers ? "Loading shippers..." : "Select registered seller..."}
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

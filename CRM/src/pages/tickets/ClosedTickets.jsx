@@ -36,7 +36,7 @@ const ClosedTickets = () => {
             <thead>
               <tr className="border-b border-[#687280]/20 text-[#687280] font-medium">
                 <th className="pb-3 font-semibold">TICKET ID</th>
-                <th className="pb-3 font-semibold">SELLER STORE</th>
+                <th className="pb-3 font-semibold">SHIPPER STORE</th>
                 <th className="pb-3 font-semibold">INQUIRY CATEGORY</th>
                 <th className="pb-3 font-semibold">SUBJECT</th>
                 <th className="pb-3 font-semibold">RESOLUTION ARCHIVE DETAILS</th>

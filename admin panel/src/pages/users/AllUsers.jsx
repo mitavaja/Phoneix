@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import API from "../../services/api";
 
+const formatRole = (role) => {
+  if (!role) return "Shipper";
+  const r = String(role).toLowerCase();
+  if (r === "seller" || r === "shipper") return "Shipper";
+  if (r === "buyer" || r === "consignee") return "Consignee";
+  return role;
+};
+
 const AllUsers = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -157,7 +165,7 @@ const AllUsers = () => {
 
         {/* Roles Filter */}
         <div className="flex gap-2">
-          {["all", "Seller", "Buyer", "Moderator", "Admin"].map((role) => (
+          {["all", "Shipper", "Consignee"].map((role) => (
             <button
               key={role}
               onClick={() => setRoleFilter(role)}
@@ -205,7 +213,7 @@ const AllUsers = () => {
                       {user.companyName && <div className="text-[10px] text-gray-500 font-medium">{user.companyName}</div>}
                     </td>
                     <td className="py-4 font-mono text-[#687280]">{user.email}</td>
-                    <td className="py-4 font-semibold">{user.role}</td>
+                    <td className="py-4 font-semibold">{formatRole(user.role)}</td>
                     <td className="py-4">
                       <div className="font-bold text-[#0A1F44]">₹{(user.wallet?.availableBalance ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <div className="text-[9px] text-[#687280]">Total: ₹{(user.wallet?.totalBalance ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
@@ -277,7 +285,7 @@ const AllUsers = () => {
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <span>Merchant Workspace:</span>
                   <span className="text-[#FF6A00]">{selectedUser.name}</span>
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-white uppercase tracking-wider font-semibold">{selectedUser.role}</span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-white uppercase tracking-wider font-semibold">{formatRole(selectedUser.role)}</span>
                 </h2>
                 <p className="text-[11px] text-gray-300 font-mono mt-0.5">UID: {selectedUser._id}</p>
               </div>
@@ -396,7 +404,7 @@ const AllUsers = () => {
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200 text-gray-500 font-medium">
                         <th className="p-3 font-semibold">SHIPMENT ID</th>
-                        <th className="p-3 font-semibold">CUSTOMER</th>
+                        <th className="p-3 font-semibold">CONSIGNEE NAME</th>
                         <th className="p-3 font-semibold">ROUTE</th>
                         <th className="p-3 font-semibold">CARRIER / AWB</th>
                         <th className="p-3 font-semibold">CHARGEABLE WT</th>

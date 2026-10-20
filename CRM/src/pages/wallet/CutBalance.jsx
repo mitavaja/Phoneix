@@ -449,7 +449,7 @@ const CutBalance = () => {
               Cut Balance Terminal (Debit / Deduction)
             </h1>
             <p className="text-sm text-[#687280]">
-              Deduct seller wallet balance category-wise (Weight Discrepancy, RTO Charges, Penalties, Customs, etc.).
+              Deduct shipper wallet balance category-wise (Weight Discrepancy, RTO Charges, Penalties, Customs, etc.).
             </p>
           </div>
         </div>
@@ -461,10 +461,10 @@ const CutBalance = () => {
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold text-[#687280] uppercase tracking-wider">
-                Seller Accounts
+                Shipper Accounts
               </h3>
               <span className="text-[10px] text-gray-500 font-mono">
-                {sellers.length} registered
+                {sellers.length} registered shippers
               </span>
             </div>
 
@@ -473,7 +473,7 @@ const CutBalance = () => {
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search sellers..."
+                placeholder="Search shippers..."
                 value={sellerSearch}
                 onChange={(e) => setSellerSearch(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg text-[#0A1F44] focus:outline-none focus:border-[#FF6A00]"
@@ -482,7 +482,7 @@ const CutBalance = () => {
 
             <div className="divide-y divide-[#687280]/10 max-h-[460px] overflow-y-auto custom-scrollbar">
               {loadingSellers ? (
-                <div className="py-6 text-center text-xs text-gray-500">Loading sellers...</div>
+                <div className="py-6 text-center text-xs text-gray-500">Loading shippers...</div>
               ) : filteredSellersList.length === 0 ? (
                 <div className="py-6 text-center text-xs text-gray-500">No matching sellers found.</div>
               ) : (
@@ -536,7 +536,7 @@ const CutBalance = () => {
             <div className="p-4 bg-red-50 border border-red-500/20 text-red-700 rounded-xl space-y-2 text-xs animate-[fadeIn_0.3s_ease-out]">
               <div className="flex items-center gap-2 font-extrabold text-red-800">
                 <MinusCircle className="w-5 h-5 text-red-600" />
-                Seller Balance Successfully Deducted!
+                Shipper Balance Successfully Deducted!
               </div>
               <p className="text-[11px] text-gray-700 leading-relaxed">
                 Merchant <strong className="text-[#0A1F44]">{successMessage.merchant}</strong> wallet has been debited by <strong className="text-red-600">{successMessage.amount}</strong> under category <strong className="text-[#0A1F44]">"{successMessage.category}"</strong>.
@@ -551,13 +551,13 @@ const CutBalance = () => {
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
             {/* Target Merchant Store */}
             <CustomDropdown
-              label="Target Merchant Seller *"
+              label="Target Merchant Shipper *"
               value={selectedStore}
               onChange={setSelectedStore}
               options={sellerOptions}
               searchable={true}
               searchPlaceholder="Search seller name, store, email..."
-              placeholder={loadingSellers ? "Loading sellers..." : "Select registered seller..."}
+              placeholder={loadingSellers ? "Loading shippers..." : "Select registered seller..."}
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -704,7 +704,7 @@ const CutBalance = () => {
               ) : (
                 <>
                   <MinusCircle className="w-4 h-4" />
-                  Cut & Deduct Seller Balance
+                  Cut & Deduct Shipper Balance
                 </>
               )}
             </button>

@@ -207,9 +207,9 @@ const Discrepancy = () => {
                         <tr className="border-b border-[#687280]/20 text-[#687280] font-medium">
                             <th className="pb-3 font-semibold">DISPUTE ID</th>
                             <th className="pb-3 font-semibold">SHIPMENT ID</th>
-                            <th className="pb-3 font-semibold">MERCHANT STORE</th>
+                            <th className="pb-3 font-semibold">SHIPPER STORE</th>
                             <th className="pb-3 font-semibold">COURIER</th>
-                            <th className="pb-3 font-semibold text-center">DECLARED WEIGHT</th>
+                            <th className="pb-3 font-semibold text-center">SHIPPER WEIGHT</th>
                             <th className="pb-3 font-semibold text-center">COURIER SCANNED</th>
                             <th className="pb-3 font-semibold text-center">PENALTY AMOUNT</th>
                             <th className="pb-3 font-semibold">STATUS</th>

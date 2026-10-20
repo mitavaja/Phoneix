@@ -47,7 +47,7 @@ const Dashboard = () => {
       link: "/crm/wallet"
     },
     {
-      title: "System Active Sellers",
+      title: "System Active Shippers",
       value: metrics ? `${metrics.system.users} Accounts` : "0 Accounts",
       change: "Sync with DB Roster",
       isPositive: true,
@@ -170,7 +170,7 @@ const Dashboard = () => {
               <span className="text-xl font-extrabold text-[#0A1F44]">₹{metrics ? metrics.ledger.gstPayables.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : "0.00"}</span>
             </div>
             <div className="bg-[#E5E7EB]/30 p-4 rounded-xl border border-blue-500/20">
-              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block mb-1">Unspent Seller Wallets</span>
+              <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block mb-1">Unspent Shipper Wallets</span>
               <span className="text-xl font-extrabold text-[#0A1F44]">₹{metrics ? metrics.ledger.sellerLiabilities.toLocaleString('en-IN', { minimumFractionDigits: 2 }) : "0.00"}</span>
             </div>
           </div>

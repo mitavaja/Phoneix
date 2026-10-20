@@ -76,7 +76,7 @@ const OpenTickets = () => {
         <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 lg:col-span-1 flex flex-col gap-4">
           <div>
             <h3 className="text-sm font-bold text-[#0A1F44] mb-1">Inboxes ({tickets.length})</h3>
-            <p className="text-xs text-[#687280]">Open questions and dispute tickets from platform sellers.</p>
+            <p className="text-xs text-[#687280]">Open questions and dispute tickets from platform shippers.</p>
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-1 max-h-[460px]">
@@ -130,7 +130,7 @@ const OpenTickets = () => {
                   <p className="text-[10px] text-gray-500 font-medium mt-1">Ticket ID: {activeTicket.ticketId} | Opened: {new Date(activeTicket.createdAt).toLocaleString()}</p>
                 </div>
                 <div className="text-right">
-                  <span className="block text-[10px] text-gray-500 font-bold uppercase">Seller Store</span>
+                  <span className="block text-[10px] text-gray-500 font-bold uppercase">Shipper Store</span>
                   <span className="text-[#0A1F44] font-semibold text-xs">{activeTicket.userId?.companyName || "Merchant"}</span>
                   <span className="block text-[9px] text-gray-500">{activeTicket.userId?.email}</span>
                 </div>
@@ -192,7 +192,7 @@ const OpenTickets = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H8a2 2 0 01-2-2m14 0V9a2 2 0 00-2-2H6a2 2 0 00-2 2v4" />
               </svg>
               <h3 className="text-sm font-bold text-[#0A1F44] mb-1">No Ticket Selected</h3>
-              <p className="text-xs text-gray-500 max-w-xs">Select an open ticket inquiry from the sidebar inbox to read seller concerns and send immediate resolutions.</p>
+              <p className="text-xs text-gray-500 max-w-xs">Select an open ticket inquiry from the sidebar inbox to read shipper concerns and send immediate resolutions.</p>
             </div>
           )}
         </div>

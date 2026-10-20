@@ -166,12 +166,12 @@ const Shipments = () => {
                         <thead>
                         <tr className="border-b border-[#687280]/20 text-[#687280] font-medium">
                             <th className="pb-3 font-semibold">SHIPMENT ID / AWB</th>
-                            <th className="pb-3 font-semibold">MERCHANT STORE</th>
-                            <th className="pb-3 font-semibold">DESTINATION</th>
+                            <th className="pb-3 font-semibold">SHIPPER / STORE</th>
+                            <th className="pb-3 font-semibold">CONSIGNEE / DESTINATION</th>
                             <th className="pb-3 font-semibold text-center">WEIGHT</th>
                             <th className="pb-3 font-semibold text-right">CARRIER COST</th>
                             <th className="pb-3 font-semibold text-right">OUR MARGIN</th>
-                            <th className="pb-3 font-semibold text-right">SELLER BILLED</th>
+                            <th className="pb-3 font-semibold text-right">SHIPPER BILLED</th>
                             <th className="pb-3 font-semibold text-center">STATUS</th>
                             <th className="pb-3 font-semibold text-center">ACTIONS</th>
                         </tr>
@@ -202,8 +202,11 @@ const Shipments = () => {
                                         <span
                                             className="font-mono text-[10px] text-gray-500 block">AWB: {s.courierTrackingNumber || "Pending"}</span>
                                     </td>
-                                    <td className="py-4 font-semibold text-[#0A1F44]">{s.store}</td>
-                                    <td className="py-4 text-[#0A1F44]">{s.receiverCountry}</td>
+                                    <td className="py-4 font-semibold text-[#0A1F44]">{s.store || "Direct Shipper"}</td>
+                                    <td className="py-4 text-[#0A1F44]">
+                                        <div className="font-semibold text-[#0A1F44]">{s.customer || "Consignee"}</div>
+                                        <div className="text-[10px] text-gray-500 font-mono">{s.receiverCountry || ""}</div>
+                                    </td>
                                     <td className="py-4 text-center font-mono font-bold">{s.weight} kg</td>
 
                                     <td className="py-4 text-right font-mono font-semibold text-red-500">₹{s.baseCost?.toFixed(2) || s.aramexBaseCost?.toFixed(2) || "0.00"}</td>
@@ -290,7 +293,7 @@ const Shipments = () => {
                                     </div>
                                     <div
                                         className="flex justify-between border-b border-gray-200 pb-1 bg-[#0A1F44]/5 px-1">
-                                        <span className="font-bold text-[#0A1F44]">Billed to Seller:</span>
+                                        <span className="font-bold text-[#0A1F44]">Billed to Shipper:</span>
                                         <span
                                             className="font-mono text-[#0A1F44] font-bold">₹{selectedShipment.invoiceTotal?.toFixed(2) || "0.00"}</span>
                                     </div>
