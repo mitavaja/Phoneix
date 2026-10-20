@@ -93,7 +93,7 @@ const Login = () => {
 
           {/* Bottom: Footer note */}
           <div className="text-xs text-gray-400 font-semibold tracking-wide">
-            © {new Date().getFullYear()} Phreight Aggregator. All rights reserved.
+            © {new Date().getFullYear()} Phreights Aggregator. All rights reserved.
           </div>
         </div>
       </div>

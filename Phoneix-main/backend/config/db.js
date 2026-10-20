@@ -24,6 +24,11 @@ const connectDB = async () => {
       // Index might not exist or already dropped, which is fine
     }
 
+    // Update legacy admin email if exists
+    try {
+      await User.updateMany({ email: "admin@phreight.com" }, { $set: { email: "admin@phreights.com" } });
+    } catch (e) {}
+
     // Seed default admin if none exists
     const adminExists = await User.findOne({ role: "Admin" });
     if (!adminExists) {
@@ -32,7 +37,7 @@ const connectDB = async () => {
       const adminPassword = hashPassword("admin123");
       const defaultAdmin = await User.create({
         name: "Super Admin",
-        email: "admin@phreight.com",
+        email: "admin@phreights.com",
         password: adminPassword,
         role: "Admin",
         status: "Active",
@@ -45,7 +50,7 @@ const connectDB = async () => {
         balance: 1000000.0, // Give them 1M default balance
       });
 
-      console.log("Default Admin seeded successfully: admin@phreight.com / admin123");
+      console.log("Default Admin seeded successfully: admin@phreights.com / admin123");
     }
 
     // Seed default rate slabs if none exist
@@ -95,7 +100,7 @@ const connectDB = async () => {
         sections: {
           hero: {
             title: "Ship Globally At Lowest Slabs",
-            description: "Phreight International Courier Company helps you automate logistics booking, reconcile weight discrepancies, and ship smarter with real-time dynamic pricing rates.",
+            description: "Phreights International Courier Company helps you automate logistics booking, reconcile weight discrepancies, and ship smarter with real-time dynamic pricing rates.",
             cta1: "Start Shipping",
             cta2: "Calculate Rate"
           },
@@ -121,7 +126,7 @@ const connectDB = async () => {
           },
           howItWorks: {
             title: "How It Works",
-            description: "Simple steps to start shipping with Phreight",
+            description: "Simple steps to start shipping with Phreights",
             items: [
               { step: "01", title: "Signup", desc: "Create your account and complete KYC verification" },
               { step: "02", title: "Add Wallet", desc: "Recharge your wallet to start shipping" },
@@ -135,7 +140,7 @@ const connectDB = async () => {
             points: ["Real-time pricing", "Multiple courier options", "Transparent charges"]
           },
           whyChoose: {
-            title: "Why Choose Phreight",
+            title: "Why Choose Phreights",
             description: "Powerful features designed to simplify your shipping experience",
             items: [
               { title: "Lowest Shipping Rates", desc: "Get unbeatable prices with smart rate optimization", icon: "Wallet" },
@@ -148,14 +153,14 @@ const connectDB = async () => {
             title: "What Our Clients Say",
             description: "Trusted by sellers across India",
             items: [
-              { name: "Rahul Sharma", feedback: "Phreight made shipping super easy and affordable!" },
+              { name: "Rahul Sharma", feedback: "Phreights made shipping super easy and affordable!" },
               { name: "Priya Patel", feedback: "Best platform for international shipping. Highly recommended!" },
               { name: "Amit Verma", feedback: "Smooth dashboard and fast pickup service. Loved it!" }
             ]
           },
           cta: {
             title: "Ready to Scale Your Logistics?",
-            description: "Join thousands of merchants using Phreight to automate their shipping pipeline.",
+            description: "Join thousands of merchants using Phreights to automate their shipping pipeline.",
             buttonText: "Create Free Account"
           }
         }
@@ -164,12 +169,12 @@ const connectDB = async () => {
         page: "about",
         sections: {
           hero: {
-            title: "About Phreight International Courier Company",
+            title: "About Phreights International Courier Company",
             description: "We are redefining international shipping and global logistics for modern businesses with fast, reliable, and cost-effective delivery solutions."
           },
           whoWeAre: {
             title: "Who We Are",
-            description: "Phreight International Courier Company is a smart global shipping platform designed for sellers who want to scale globally. We integrate with top international logistics providers to deliver the best shipping experience with transparent pricing and fast, precise delivery.",
+            description: "Phreights International Courier Company is a smart global shipping platform designed for sellers who want to scale globally. We integrate with top international logistics providers to deliver the best shipping experience with transparent pricing and fast, precise delivery.",
             points: "✔ International Shipping & Global Courier\n✔ Automated Route & Tariff Calculation\n✔ Wallet-Based Secure Payment System\n✔ Real-Time GPS Tracking & Alerts"
           },
           missionVision: {
@@ -197,7 +202,7 @@ const connectDB = async () => {
           },
           cta: {
             title: "Ready to Start Shipping?",
-            description: "Join Phreight International Courier Company and grow your business globally.",
+            description: "Join Phreights International Courier Company and grow your business globally.",
             buttonText: "Get Started"
           }
         }
@@ -235,7 +240,7 @@ const connectDB = async () => {
           },
           featuresDetail: {
             title: "Powerful Shipping Platform",
-            description: "Phreight provides everything you need to manage shipping, calculate rates, track orders, and grow your business globally.",
+            description: "Phreights provides everything you need to manage shipping, calculate rates, track orders, and grow your business globally.",
             points: [
               "Automated rate calculation",
               "Wallet-based payments",
@@ -255,7 +260,7 @@ const connectDB = async () => {
           },
           cta: {
             title: "Start Shipping Today",
-            description: "Join Phreight and scale your business globally.",
+            description: "Join Phreights and scale your business globally.",
             buttonText: "Get Started"
           }
         }
@@ -268,7 +273,7 @@ const connectDB = async () => {
             description: "Have questions? We are here to help you."
           },
           info: {
-            email: "support@phreight.com",
+            email: "admin@phreights.com",
             phone: "+91 98765 43210",
             address: "Global Headquarters, India"
           }
@@ -281,12 +286,12 @@ const connectDB = async () => {
             description: "Smart global courier platform helping businesses deliver faster, cheaper, and with reliable international logistics."
           },
           contact: {
-            email: "support@phreight.com",
+            email: "admin@phreights.com",
             phone: "+91 98765 43210",
             address: "Global Headquarters, India"
           },
           copyright: {
-            text: "Phreight International Courier Company. All rights reserved."
+            text: "Phreights International Courier Company. All rights reserved."
           }
         }
       },
@@ -298,19 +303,19 @@ const connectDB = async () => {
           sections: [
             {
               heading: "1. Agreement to Terms",
-              text: "By accessing or using the Phreight International Courier Company logistics platform, you agree to be bound by these Terms and Conditions. If you do not agree, you must immediately cease all use of our services."
+              text: "By accessing or using the Phreights International Courier Company logistics platform, you agree to be bound by these Terms and Conditions. If you do not agree, you must immediately cease all use of our services."
             },
             {
               heading: "2. Services Offered",
-              text: "Phreight provides an international courier aggregation service. We do not operate our own fleet of transport vehicles; instead, we partner with premium global carriers (e.g. BlueDart Express, Delhivery Air, FedEx, DHL) to coordinate pickups and shipping services."
+              text: "Phreights provides an international courier aggregation service. We do not operate our own fleet of transport vehicles; instead, we partner with premium global carriers (e.g. BlueDart Express, Delhivery Air, FedEx, DHL) to coordinate pickups and shipping services."
             },
             {
               heading: "3. Wallet and Payments",
-              text: "Sellers must maintain a positive prepaid balance in their Phreight Wallet to book consignments. Charges are calculated dynamically based on weight, dimensions, and destination zone. Auto-debits occur upon booking verification."
+              text: "Sellers must maintain a positive prepaid balance in their Phreights Wallet to book consignments. Charges are calculated dynamically based on weight, dimensions, and destination zone. Auto-debits occur upon booking verification."
             },
             {
               heading: "4. Weight Discrepancies",
-              text: "All packages are subject to audit and weight reconciliation by the partner carriers. In the event of a weight discrepancy, Phreight reserves the right to deduct the adjustment amount directly from the seller's wallet balance."
+              text: "All packages are subject to audit and weight reconciliation by the partner carriers. In the event of a weight discrepancy, Phreights reserves the right to deduct the adjustment amount directly from the seller's wallet balance."
             }
           ]
         }
@@ -369,7 +374,7 @@ const connectDB = async () => {
             },
             {
               heading: "2. Wallet Credits",
-              text: "Upon successful cancellation, the exact deducted tariff charge is immediately credited back to the seller's Phreight Wallet. No cancellation penalties are applied for pre-pickup requests."
+              text: "Upon successful cancellation, the exact deducted tariff charge is immediately credited back to the seller's Phreights Wallet. No cancellation penalties are applied for pre-pickup requests."
             },
             {
               heading: "3. Failed Deliveries",
@@ -407,7 +412,7 @@ const connectDB = async () => {
           sections: [
             {
               heading: "1. Hazardous Materials",
-              text: "Sellers must never ship explosives, fireworks, flammable liquids, pressurized aerosols, corrosives, batteries, or bio-hazards via Phreight logistics partners. Non-compliance results in immediate account suspension."
+              text: "Sellers must never ship explosives, fireworks, flammable liquids, pressurized aerosols, corrosives, batteries, or bio-hazards via Phreights logistics partners. Non-compliance results in immediate account suspension."
             },
             {
               heading: "2. Restricted Commodities",
@@ -435,7 +440,7 @@ const connectDB = async () => {
               text: "International shipments are subject to local customs taxes, import duties, and clearing fees. Unless explicitly marked as DDP (Delivery Duty Paid), the recipient/consignee is liable to pay all local duties."
             },
             {
-              heading: "3. Customs Clearance Clearance delays due to missing paperwork, security audits, or unpaid import duties by the consignee are outside Phreight's service SLA commitments."
+              heading: "3. Customs Clearance Clearance delays due to missing paperwork, security audits, or unpaid import duties by the consignee are outside Phreights's service SLA commitments."
             }
           ]
         }
@@ -478,7 +483,7 @@ const connectDB = async () => {
       const defaultTestimonials = [
         {
           name: "Rahul Sharma",
-          description: "Phreight made shipping super easy and affordable!",
+          description: "Phreights made shipping super easy and affordable!",
           stars: 5
         },
         {
@@ -534,7 +539,8 @@ const connectDB = async () => {
     }
   } catch (error) {
     console.error("DB Error:", error.message);
-    process.exit(1);
+    console.warn("⚠️ MongoDB connection failed. Please ensure MongoDB is running (start-mongo.bat). Retrying in 5 seconds...");
+    setTimeout(connectDB, 5000);
   }
 };
 

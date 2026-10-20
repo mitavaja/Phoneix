@@ -365,9 +365,9 @@ const PolicyPage = () => {
 
             <div className="mt-8 pt-6 border-t border-[#687280]/10 text-center">
               <p className="text-xs text-[#687280]">
-                If you have questions regarding this document, contact the Phreight Compliance Team at{" "}
-                <a href="mailto:compliance@phreight.com" className="text-[#FF6A00] font-semibold hover:underline">
-                  compliance@phreight.com
+                If you have questions regarding this document, contact the Phreights Compliance Team at{" "}
+                <a href="mailto:admin@phreights.com" className="text-[#FF6A00] font-semibold hover:underline">
+                  admin@phreights.com
                 </a>
               </p>
             </div>

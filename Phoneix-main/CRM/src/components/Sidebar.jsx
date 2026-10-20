@@ -256,7 +256,7 @@ const Sidebar = () => {
             </button>
             <div
               className={`overflow-hidden transition-all duration-300 ${
-                openMenu === "wallet" ? "max-h-24 opacity-100 mt-1 mb-2" : "max-h-0 opacity-0"
+                openMenu === "wallet" ? "max-h-36 opacity-100 mt-1 mb-2" : "max-h-0 opacity-0"
               }`}
             >
               <ul className="ml-5 space-y-1 border-l border-white/10 pl-4 py-1">
@@ -278,6 +278,16 @@ const Sidebar = () => {
                     }`}
                   >
                     Add Balance
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/crm/wallet/cut"
+                    className={`block py-1.5 px-3 rounded-lg text-xs transition-colors ${
+                      isActive("/crm/wallet/cut") ? "text-[#FF6A00] font-semibold bg-[#FF6A00]/5" : "text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    Cut Balance
                   </Link>
                 </li>
               </ul>

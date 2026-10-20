@@ -18,6 +18,7 @@ const Register = () => {
     ownerName: "",
     mobileNumber: "",
     gstType: "Non-GST",
+    gstNumber: "",
     confirmPassword: "",
   });
 
@@ -66,6 +67,9 @@ const Register = () => {
     }
     if (currentStep === 2) {
       if (!form.companyName.trim()) return "Store / Company Name is required.";
+      if (form.gstType === "GST Registered" && !form.gstNumber.trim()) {
+        return "GST Number is required for GST Registered partners.";
+      }
     }
     if (currentStep === 3) {
       if (!files.panCard) return "PAN Card file is required.";
@@ -237,7 +241,7 @@ const Register = () => {
 
           {/* Bottom */}
           <div className="text-xs text-gray-400 font-semibold tracking-wide">
-            © {new Date().getFullYear()} Phreight Aggregator. All rights reserved.
+            © {new Date().getFullYear()} Phreights Aggregator. All rights reserved.
           </div>
         </div>
       </div>
@@ -480,6 +484,29 @@ const Register = () => {
                     </select>
                   </div>
                 </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs text-gray-400 block font-bold uppercase tracking-wider">
+                    GST Number {form.gstType === "GST Registered" ? <span className="text-[#FF6A00]">*</span> : <span className="text-gray-500 font-normal">(Optional)</span>}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
+                      <FileText size={16} />
+                    </span>
+                    <input
+                      type="text"
+                      name="gstNumber"
+                      placeholder="e.g. 24DYHPA2082J1ZL"
+                      value={form.gstNumber}
+                      onChange={(e) => {
+                        e.target.value = e.target.value.toUpperCase();
+                        handleChange(e);
+                      }}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300 uppercase font-mono"
+                    />
+                  </div>
+                  <span className="text-[10px] text-gray-500 block">Enter 15-digit Goods and Services Tax Identification Number (GSTIN)</span>
+                </div>
               </div>
             )}
 
@@ -549,6 +576,12 @@ const Register = () => {
                       <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider block">GST Type</span>
                       <span className="font-semibold text-white truncate block">{form.gstType}</span>
                     </div>
+                    {form.gstNumber && (
+                      <div className="col-span-2">
+                        <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider block">GST Number (GSTIN)</span>
+                        <span className="font-semibold text-[#FF6A00] font-mono tracking-wider block">{form.gstNumber}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="border-t border-[#687280]/20 pt-3">

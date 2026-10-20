@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import API from "../../services/api";
-import { ChevronDown, Check, Search } from "lucide-react";
+import { ChevronDown, Check, Search, Plus, X, Trash2 } from "lucide-react";
 
 // Custom Dropdown Component: Opens ONLY on Click (never hover), clean theme, optional search
 const CustomDropdown = ({
@@ -12,7 +12,8 @@ const CustomDropdown = ({
   searchable = false,
   searchPlaceholder = "Search...",
   disabled = false,
-  className = ""
+  className = "",
+  onDeleteOption = null
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -116,7 +117,22 @@ const CustomDropdown = ({
                         <span className="text-[10px] text-[#687280] font-normal">{optSublabel}</span>
                       )}
                     </div>
-                    {isSelected && <Check className="w-4 h-4 text-[#FF6A00] shrink-0 ml-2" />}
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      {isSelected && <Check className="w-4 h-4 text-[#FF6A00] shrink-0" />}
+                      {onDeleteOption && opt.isDeletable !== false && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteOption(opt);
+                          }}
+                          className="p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                          title="Delete Category"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })
@@ -137,6 +153,103 @@ const AddBalance = () => {
   const [currency, setCurrency] = useState("INR");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(null);
+
+  // Manageable categories for Add Balance (Credit)
+  const defaultCreditCategories = [
+    { name: "Insurance Claim", sublabel: "Lost or damaged cargo settlement" },
+    { name: "Coupon", sublabel: "Promotional or discount credit voucher" },
+    { name: "Cash Deposit", sublabel: "Direct cash deposit to account" },
+    { name: "Bonus / Cashback", sublabel: "Merchant volume incentive or referral reward" },
+    { name: "Bank Transfer", sublabel: "Direct NEFT/RTGS/IMPS wire transfer receipt" },
+  ];
+  const [categories, setCategories] = useState(defaultCreditCategories);
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatSublabel, setNewCatSublabel] = useState("");
+  const [isAddingCat, setIsAddingCat] = useState(false);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await API.get("/wallet/categories?type=Credit");
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setCategories(res.data);
+      }
+    } catch (e) {
+      console.warn("Could not fetch categories from server, using local defaults", e.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!newCatName.trim()) {
+      alert("Please enter a category name");
+      return;
+    }
+    setIsAddingCat(true);
+    try {
+      const res = await API.post("/wallet/categories", {
+        name: newCatName.trim(),
+        type: "Credit",
+        sublabel: newCatSublabel.trim(),
+      });
+      const created = res.data?.category || { name: newCatName.trim(), sublabel: newCatSublabel.trim() };
+      
+      setCategories((prev) => {
+        const exists = prev.some((c) => c.name.toLowerCase() === created.name.toLowerCase());
+        return exists ? prev : [...prev, created];
+      });
+      setTxType(created.name);
+      setShowAddCategoryModal(false);
+      setNewCatName("");
+      setNewCatSublabel("");
+      alert(`Category "${created.name}" added successfully!`);
+    } catch (err) {
+      console.error("Create category error:", err);
+      // Fallback local add
+      const fallbackCat = { name: newCatName.trim(), sublabel: newCatSublabel.trim() };
+      setCategories((prev) => [...prev, fallbackCat]);
+      setTxType(fallbackCat.name);
+      setShowAddCategoryModal(false);
+      setNewCatName("");
+      setNewCatSublabel("");
+    } finally {
+      setIsAddingCat(false);
+    }
+  };
+
+  const [deletingCatId, setDeletingCatId] = useState(null);
+
+  const handleDeleteCategory = async (catItem) => {
+    const catName = typeof catItem === "string" ? catItem : catItem.name || catItem.label || catItem.value;
+    const catId = catItem._id || catItem.id || catName;
+
+    if (!window.confirm(`Are you sure you want to delete category "${catName}"?`)) {
+      return;
+    }
+
+    setDeletingCatId(catId);
+    try {
+      await API.delete(`/wallet/categories/${encodeURIComponent(catId)}`);
+      setCategories((prev) => prev.filter((c) => c._id !== catId && c.name !== catName));
+      if (txType === catName) {
+        setTxType("");
+      }
+      alert(`Category "${catName}" deleted successfully!`);
+    } catch (err) {
+      console.error("Delete category error:", err);
+      setCategories((prev) => prev.filter((c) => (c._id && c._id !== catId) || c.name !== catName));
+      if (txType === catName) {
+        setTxType("");
+      }
+      alert(`Category "${catName}" removed.`);
+    } finally {
+      setDeletingCatId(null);
+    }
+  };
 
   // Real registered sellers loaded dynamically from MongoDB (No dummy data)
   const [sellers, setSellers] = useState([]);
@@ -279,11 +392,16 @@ const AddBalance = () => {
     { value: "GBP", label: "GBP (£)" },
   ];
 
-  // Exactly 2 options as requested: Insurance Claim and Coupon
-  const adjustmentTypeOptions = [
-    { value: "Insurance Claim", label: "Insurance Claim" },
-    { value: "Coupon", label: "Coupon" },
-  ];
+  // Dynamic categories with sublabels
+  const adjustmentTypeOptions = categories.map((c) => ({
+    value: c.name,
+    label: c.name,
+    sublabel: c.sublabel,
+    _id: c._id,
+    id: c._id,
+    name: c.name,
+    isDeletable: true,
+  }));
 
   return (
     <div className="space-y-8 select-none max-w-4xl mx-auto">
@@ -394,14 +512,27 @@ const AddBalance = () => {
                 </div>
               </div>
 
-              {/* Adjustment Category: Only Insurance Claim & Coupon */}
-              <CustomDropdown
-                label="Adjustment Type *"
-                value={txType}
-                onChange={setTxType}
-                options={adjustmentTypeOptions}
-                searchable={false}
-              />
+              {/* Adjustment Category with manual Add Category option */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="block text-[#687280] font-semibold text-xs">Adjustment Type *</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCategoryModal(true)}
+                    className="text-[11px] font-bold text-[#FF6A00] hover:text-orange-600 transition flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3 h-3" /> Add Category
+                  </button>
+                </div>
+                <CustomDropdown
+                  value={txType}
+                  onChange={setTxType}
+                  options={adjustmentTypeOptions}
+                  searchable={true}
+                  placeholder="Select or search category..."
+                  onDeleteOption={handleDeleteCategory}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -465,6 +596,121 @@ const AddBalance = () => {
           </form>
         </div>
       </div>
+
+      {/* 🏷️ ADD NEW CATEGORY MODAL */}
+      {showAddCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-100 overflow-hidden animate-[scaleIn_0.2s_ease-out]">
+            <div className="bg-[#0A1F44] px-6 py-4 flex items-center justify-between text-white">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-[#FF6A00]/20 rounded-lg text-[#FF6A00]">
+                  <Plus className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Add Credit Category</h3>
+                  <p className="text-[11px] text-gray-300">Create a custom category for balance additions</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddCategoryModal(false);
+                  setNewCatName("");
+                  setNewCatSublabel("");
+                }}
+                className="text-gray-400 hover:text-white transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCategory} className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#0A1F44]">
+                  Category Name <span className="text-[#FF6A00]">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="e.g. Volume Incentive, Vendor Bonus..."
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 focus:border-[#FF6A00] focus:bg-white rounded-xl text-xs font-semibold text-[#0A1F44] outline-none transition"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-[#0A1F44]">
+                  Description / Sublabel <span className="text-gray-400 font-normal">(Optional)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Monthly performance payout for high tier stores"
+                  value={newCatSublabel}
+                  onChange={(e) => setNewCatSublabel(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 focus:border-[#FF6A00] focus:bg-white rounded-xl text-xs font-medium text-[#0A1F44] outline-none transition"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddCategoryModal(false);
+                    setNewCatName("");
+                    setNewCatSublabel("");
+                  }}
+                  className="px-4 py-2.5 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-xl text-xs font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAddingCat || !newCatName.trim()}
+                  className="px-5 py-2.5 bg-[#FF6A00] hover:bg-orange-600 text-white font-extrabold rounded-xl text-xs transition disabled:opacity-50 shadow-md shadow-[#FF6A00]/20 flex items-center gap-1.5"
+                >
+                  {isAddingCat ? "Saving..." : "Add & Select Category"}
+                </button>
+              </div>
+
+              {/* Existing Categories List with Delete Option */}
+              <div className="border-t border-gray-100 pt-4 mt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
+                    Existing Categories ({categories.length})
+                  </span>
+                  <span className="text-[10px] text-gray-400">Click trash icon to delete</span>
+                </div>
+                <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
+                  {categories.map((cat, idx) => (
+                    <div
+                      key={cat._id || idx}
+                      className="flex items-center justify-between p-2 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200/60 transition group text-xs"
+                    >
+                      <div className="min-w-0 pr-2 text-left">
+                        <span className="font-semibold text-[#0A1F44] block truncate">{cat.name}</span>
+                        {cat.sublabel && (
+                          <span className="text-[10px] text-gray-500 block truncate">{cat.sublabel}</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteCategory(cat)}
+                        disabled={deletingCatId === (cat._id || cat.name)}
+                        className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition shrink-0"
+                        title={`Delete ${cat.name}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
