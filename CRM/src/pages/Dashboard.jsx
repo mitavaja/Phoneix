@@ -176,79 +176,81 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Server Status Table & Volume tracker (Untouched Original) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 lg:col-span-2">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-sm font-bold text-[#0A1F44]">Phreight Cloud Core Nodes</h3>
-                <p className="text-xs text-[#687280]">Live virtualization micro-services and server clusters performance.</p>
+        {/* Hidden: Phreights Cloud Core Nodes & Global System Locks */}
+        {false && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 lg:col-span-2">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-sm font-bold text-[#0A1F44]">Phreights Cloud Core Nodes</h3>
+                  <p className="text-xs text-[#687280]">Live virtualization micro-services and server clusters performance.</p>
+                </div>
+                <button onClick={() => alert("Rebalancing server node workloads...")} className="px-3.5 py-1.5 bg-[#FF6A00] text-black hover:bg-orange-500 rounded-xl text-xs font-bold transition-all shadow-md">
+                  Optimize Nodes
+                </button>
               </div>
-              <button onClick={() => alert("Rebalancing server node workloads...")} className="px-3.5 py-1.5 bg-[#FF6A00] text-black hover:bg-orange-500 rounded-xl text-xs font-bold transition-all shadow-md">
-                Optimize Nodes
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                  <tr className="border-b border-[#687280]/20 text-[#687280] font-medium">
+                    <th className="pb-3 font-semibold">CLUSTER ID</th>
+                    <th className="pb-3 font-semibold">LOCATION</th>
+                    <th className="pb-3 font-semibold">SERVICE LAYER</th>
+                    <th className="pb-3 font-semibold text-center">COMPUTE LOAD</th>
+                    <th className="pb-3 font-semibold text-center">NETWORK LATENCY</th>
+                    <th className="pb-3 font-semibold text-right">STATUS</th>
+                  </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#687280]/10 text-[#687280]">
+                  {serverNodes.map((n, idx) => (
+                      <tr key={idx} className="hover:bg-[#E5E7EB]/30 transition-colors">
+                        <td className="py-4 font-mono font-bold text-[#FF6A00]/80">{n.id}</td>
+                        <td className="py-4 font-semibold text-[#0A1F44]">{n.location}</td>
+                        <td className="py-4">{n.type}</td>
+                        <td className="py-4 text-center font-bold text-[#0A1F44]">{n.load}</td>
+                        <td className="py-4 text-center font-mono font-semibold text-[#FF6A00]/80">{n.ping}</td>
+                        <td className="py-4 text-right">
+                          <span className="inline-flex px-2.5 py-1 bg-green-100 text-green-600 rounded-full text-[9px] font-extrabold uppercase tracking-wider">{n.status}</span>
+                        </td>
+                      </tr>
+                  ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Global Configuration Controls */}
+            <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 flex flex-col justify-between h-[360px]">
+              <div>
+                <h3 className="text-sm font-bold text-[#0A1F44] mb-1">Global System Locks</h3>
+                <p className="text-xs text-[#687280]">Urgent settings adjustments requiring override auth.</p>
+              </div>
+              <div className="flex-1 my-4 space-y-3 overflow-y-auto custom-scrollbar pr-1">
+                <div className="p-3 bg-[#E5E7EB]/30 hover:bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-xl transition-all flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[#0A1F44]">Emergency Maintenance Mode</p>
+                    <p className="text-[10px] text-gray-500">Locks seller public signups</p>
+                  </div>
+                  <button onClick={() => alert("Maintenance Mode active status updated.")} className="px-3 py-1 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white rounded text-[10px] font-bold transition-all border border-red-500/20">
+                    Toggle Lock
+                  </button>
+                </div>
+                <div className="p-3 bg-[#E5E7EB]/30 hover:bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-xl transition-all flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[#0A1F44]">COD Remittances Limit</p>
+                    <p className="text-[10px] text-gray-500">Max limit per seller withdrawal</p>
+                  </div>
+                  <button onClick={() => alert("COD remittance thresholds updated.")} className="px-3 py-1 bg-[#FF6A00]/10 hover:bg-[#FF6A00] text-[#FF6A00] hover:text-black rounded text-[10px] font-bold transition-all border border-[#FF6A00]/20">
+                    Modify Limits
+                  </button>
+                </div>
+              </div>
+              <button onClick={() => alert("Platform cluster backup has been successfully stored to AWS S3 Glacier.")} className="w-full py-2.5 bg-[#FF6A00] text-black hover:bg-orange-500 font-bold rounded-xl text-xs transition-all tracking-wide shadow-lg">
+                Trigger Hot System Backup
               </button>
             </div>
-            <div className="overflow-x-auto custom-scrollbar">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                <tr className="border-b border-[#687280]/20 text-[#687280] font-medium">
-                  <th className="pb-3 font-semibold">CLUSTER ID</th>
-                  <th className="pb-3 font-semibold">LOCATION</th>
-                  <th className="pb-3 font-semibold">SERVICE LAYER</th>
-                  <th className="pb-3 font-semibold text-center">COMPUTE LOAD</th>
-                  <th className="pb-3 font-semibold text-center">NETWORK LATENCY</th>
-                  <th className="pb-3 font-semibold text-right">STATUS</th>
-                </tr>
-                </thead>
-                <tbody className="divide-y divide-[#687280]/10 text-[#687280]">
-                {serverNodes.map((n, idx) => (
-                    <tr key={idx} className="hover:bg-[#E5E7EB]/30 transition-colors">
-                      <td className="py-4 font-mono font-bold text-[#FF6A00]/80">{n.id}</td>
-                      <td className="py-4 font-semibold text-[#0A1F44]">{n.location}</td>
-                      <td className="py-4">{n.type}</td>
-                      <td className="py-4 text-center font-bold text-[#0A1F44]">{n.load}</td>
-                      <td className="py-4 text-center font-mono font-semibold text-[#FF6A00]/80">{n.ping}</td>
-                      <td className="py-4 text-right">
-                        <span className="inline-flex px-2.5 py-1 bg-green-100 text-green-600 rounded-full text-[9px] font-extrabold uppercase tracking-wider">{n.status}</span>
-                      </td>
-                    </tr>
-                ))}
-                </tbody>
-              </table>
-            </div>
           </div>
-
-          {/* Global Configuration Controls */}
-          <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 flex flex-col justify-between h-[360px]">
-            <div>
-              <h3 className="text-sm font-bold text-[#0A1F44] mb-1">Global System Locks</h3>
-              <p className="text-xs text-[#687280]">Urgent settings adjustments requiring override auth.</p>
-            </div>
-            <div className="flex-1 my-4 space-y-3 overflow-y-auto custom-scrollbar pr-1">
-              <div className="p-3 bg-[#E5E7EB]/30 hover:bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-xl transition-all flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-[#0A1F44]">Emergency Maintenance Mode</p>
-                  <p className="text-[10px] text-gray-500">Locks seller public signups</p>
-                </div>
-                <button onClick={() => alert("Maintenance Mode active status updated.")} className="px-3 py-1 bg-red-500/10 hover:bg-red-500 text-red-600 hover:text-white rounded text-[10px] font-bold transition-all border border-red-500/20">
-                  Toggle Lock
-                </button>
-              </div>
-              <div className="p-3 bg-[#E5E7EB]/30 hover:bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-xl transition-all flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-[#0A1F44]">COD Remittances Limit</p>
-                  <p className="text-[10px] text-gray-500">Max limit per seller withdrawal</p>
-                </div>
-                <button onClick={() => alert("COD remittance thresholds updated.")} className="px-3 py-1 bg-[#FF6A00]/10 hover:bg-[#FF6A00] text-[#FF6A00] hover:text-black rounded text-[10px] font-bold transition-all border border-[#FF6A00]/20">
-                  Modify Limits
-                </button>
-              </div>
-            </div>
-            <button onClick={() => alert("Platform cluster backup has been successfully stored to AWS S3 Glacier.")} className="w-full py-2.5 bg-[#FF6A00] text-black hover:bg-orange-500 font-bold rounded-xl text-xs transition-all tracking-wide shadow-lg">
-              Trigger Hot System Backup
-            </button>
-          </div>
-        </div>
+        )}
       </div>
   );
 };

@@ -293,11 +293,15 @@ const BulkUpload = () => {
                 };
 
                 const res = await API.post("/rates/calculate", payload);
-                const cost = res.data.invoiceTotal || 0;
+                const baseCharge = parseFloat(res.data.shippingCharge || 0);
+                const gst = parseFloat(res.data.gstAmount || (baseCharge * 0.18).toFixed(2));
+                const cost = parseFloat(res.data.invoiceTotal || (baseCharge + gst).toFixed(2));
                 totalCost += cost;
 
                 calculatedRows.push({
                     ...row,
+                    shippingCharge: baseCharge,
+                    gstAmount: gst,
                     invoiceTotal: cost,
                     serviceType: res.data.serviceType || row.productType
                 });
@@ -439,7 +443,7 @@ const BulkUpload = () => {
                         <div className="border border-[#687280]/20 bg-gray-100/70 p-4 rounded-xl flex items-center justify-between cursor-not-allowed opacity-60 select-none">
                             <div className="flex items-center gap-3">
                                 <div className="w-4 h-4 rounded-full border border-gray-400 flex items-center justify-center bg-gray-200"></div>
-                                <span className="text-gray-400 font-bold text-sm">Phreight</span>
+                                <span className="text-gray-400 font-bold text-sm">Phreights</span>
                             </div>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-200 text-gray-500 uppercase tracking-wider">Disabled</span>
                         </div>
@@ -485,6 +489,9 @@ const BulkUpload = () => {
                             <span className="text-2xl font-black text-[#FF6A00]">
                                 {ratesCalculated ? `₹${bulkResult.summary.totalEstimatedCost.toFixed(2)}` : "Pending Calculation"}
                             </span>
+                            {ratesCalculated && (
+                                <span className="block text-[10px] text-green-600 font-bold mt-0.5">Includes 18% GST</span>
+                            )}
                         </div>
                     </div>
 
@@ -531,27 +538,35 @@ const BulkUpload = () => {
                                 <table className="w-full text-left text-xs">
                                     <thead>
                                     <tr className="border-b border-[#687280]/20 text-[#687280] text-[10px] uppercase font-bold sticky top-0 bg-[#E5E7EB]/90 backdrop-blur-sm">
-                                        <th className="py-3 px-4 text-center">Row</th>
-                                        <th className="py-3 px-4">Customer Name</th>
-                                        <th className="py-3 px-4">Route</th>
-                                        <th className="py-3 px-4 text-center">Type / Weight</th>
-                                        <th className="py-3 px-4 text-right">Cost (Calculated)</th>
+                                        <th className="py-3 px-3 text-center">Row</th>
+                                        <th className="py-3 px-3">Customer Name</th>
+                                        <th className="py-3 px-3">Route</th>
+                                        <th className="py-3 px-3 text-center">Type / Weight</th>
+                                        <th className="py-3 px-3 text-right">Freight Base</th>
+                                        <th className="py-3 px-3 text-right">GST (18%)</th>
+                                        <th className="py-3 px-3 text-right font-black text-[#FF6A00]">Total Cost (incl. 18% GST)</th>
                                     </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[#687280]/10 text-[#0A1F44]">
                                     {bulkResult.validRows.map((val, idx) => (
                                         <tr key={idx} className="hover:bg-[#E5E7EB]/40 transition-colors">
-                                            <td className="py-2.5 px-4 text-center font-bold text-green-700">{val.line}</td>
-                                            <td className="py-2.5 px-4 font-semibold text-[#0A1F44]">{val.receiverName}</td>
-                                            <td className="py-2.5 px-4 text-[#687280]">
+                                            <td className="py-2.5 px-3 text-center font-bold text-green-700">{val.line}</td>
+                                            <td className="py-2.5 px-3 font-semibold text-[#0A1F44]">{val.receiverName}</td>
+                                            <td className="py-2.5 px-3 text-[#687280]">
                                                 {val.receiverCity}, {val.receiverCountry}
                                             </td>
-                                            <td className="py-2.5 px-4 text-center font-mono">
+                                            <td className="py-2.5 px-3 text-center font-mono">
                                                 <span className="block text-[10px] font-bold text-[#FF6A00]">{val.productType}</span>
                                                 {val.weight} kg
                                             </td>
-                                            <td className="py-2.5 px-4 text-right font-extrabold text-[#FF6A00]">
-                                                {ratesCalculated ? `₹${val.invoiceTotal?.toFixed(2)}` : "Pending"}
+                                            <td className="py-2.5 px-3 text-right font-medium text-[#0A1F44]">
+                                                {ratesCalculated ? `₹${Number(val.shippingCharge || 0).toFixed(2)}` : "-"}
+                                            </td>
+                                            <td className="py-2.5 px-3 text-right font-medium text-[#0A1F44]">
+                                                {ratesCalculated ? `₹${Number(val.gstAmount || 0).toFixed(2)}` : "-"}
+                                            </td>
+                                            <td className="py-2.5 px-3 text-right font-black text-[#FF6A00]">
+                                                {ratesCalculated ? `₹${Number(val.invoiceTotal || 0).toFixed(2)}` : "Pending"}
                                             </td>
                                         </tr>
                                     ))}

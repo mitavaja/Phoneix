@@ -36,8 +36,8 @@ const CMSManager = () => {
   const defaultTemplates = {
     header: {
       logo: {
-        text: "Phreight",
-        subtitle: "International Courier Company",
+        text: "",
+        subtitle: "",
         logoUrl: ""
       },
       navigation: [
@@ -70,7 +70,7 @@ const CMSManager = () => {
       },
       howItWorks: {
         title: "How It Works",
-        description: "Simple steps to start shipping with Phreight",
+        description: "Simple steps to start shipping with Phreights",
         items: [
           { step: "01", title: "Signup", desc: "Create your account and complete KYC verification" },
           { step: "02", title: "Add Wallet", desc: "Recharge your wallet to start shipping" },
@@ -84,7 +84,7 @@ const CMSManager = () => {
         points: ["Real-time pricing", "Multiple courier options", "Transparent charges"]
       },
       whyChoose: {
-        title: "Why Choose Phreight",
+        title: "Why Choose Phreights",
         description: "Powerful features designed to simplify your shipping experience",
         items: [
           { title: "Lowest Shipping Rates", desc: "Get unbeatable prices with smart rate optimization", icon: "Wallet" },
@@ -97,7 +97,7 @@ const CMSManager = () => {
         title: "What Our Clients Say",
         description: "Trusted by sellers across India",
         items: [
-          { name: "Rahul Sharma", feedback: "Phreight made shipping super easy and affordable!" },
+          { name: "Rahul Sharma", feedback: "Phreights made shipping super easy and affordable!" },
           { name: "Priya Patel", feedback: "Best platform for international shipping. Highly recommended!" },
           { name: "Amit Verma", feedback: "Smooth dashboard and fast pickup service. Loved it!" }
         ]

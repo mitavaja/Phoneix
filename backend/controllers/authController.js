@@ -28,7 +28,7 @@ const saveUploadedFile = (fileArray) => {
 
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role, companyName, ownerName, mobileNumber, gstType } = req.body;
+    const { name, email, password, role, companyName, ownerName, mobileNumber, gstType, gstNumber } = req.body;
 
     if (!name || !email || !password || !mobileNumber) {
       return res.status(400).json({ message: "Name, email, password, and mobileNumber parameters are required" });
@@ -67,6 +67,7 @@ export const registerUser = async (req, res) => {
       ownerName: ownerName || name,
       mobileNumber: mobileNumber || "",
       gstType: gstType === "GST Registered" ? "GST Registered" : "Non-GST",
+      gstNumber: (gstNumber || "").trim(),
     });
 
     // Create a wallet entry for the new merchant/user
@@ -98,7 +99,7 @@ export const registerUser = async (req, res) => {
         user: user._id,
         store: companyName || `${name}'s Store`,
         owner: ownerName || name,
-        taxId: gstType || "Non-GST",
+        taxId: gstNumber || gstType || "Non-GST",
         document: documentName,
         panCard,
         aadhaarCard,
@@ -237,7 +238,7 @@ export const pinLogin = async (req, res) => {
 
 export const checkLoginMode = async (req, res) => {
   try {
-    const email = req.query.email || "admin@phreight.com";
+    const email = req.query.email || "admin@phreights.com";
     const user = await User.findOne({ email: email.trim().toLowerCase() }) || await User.findOne({ role: "Admin" });
     if (!user || !user.lastLogin) {
       return res.status(200).json({ within48Hours: false });

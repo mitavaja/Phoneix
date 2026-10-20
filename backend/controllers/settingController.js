@@ -13,7 +13,7 @@ export const getSystemSettings = async (req, res) => {
       settings = await SystemSetting.create({
         maintenanceMode: false,
         codLimit: 50000,
-        adminEmail: "admin@phreight.com",
+        adminEmail: "admin@phreights.com",
         adminPin: "1234",
         aramexUsername: process.env.ARAMEX_USERNAME || "test.api@aramex.com",
         aramexPassword: process.env.ARAMEX_PASSWORD || "Aramex@12345",
@@ -28,12 +28,12 @@ export const getSystemSettings = async (req, res) => {
     
     // Mask sensitive fields so they are never returned in plain text
     const settingsObj = settings.toObject();
-    settingsObj.adminEmail = adminUser?.email || settings.adminEmail || "admin@phreight.com";
+    settingsObj.adminEmail = adminUser?.email || settings.adminEmail || "admin@phreights.com";
     settingsObj.adminPin = adminUser?.pin || settings.adminPin || "1234";
     settingsObj.adminPassword = "••••••••";
 
     // Keep Aramex API credentials authentic (not overwritten by admin credentials)
-    settingsObj.aramexUsername = (settings.aramexUsername && settings.aramexUsername !== "admin@phreight.com")
+    settingsObj.aramexUsername = (settings.aramexUsername && settings.aramexUsername !== "admin@phreights.com")
       ? settings.aramexUsername
       : (process.env.ARAMEX_USERNAME || "test.api@aramex.com");
     settingsObj.aramexAccountPin = settings.aramexAccountPin || process.env.ARAMEX_ACCOUNT_PIN || "654654";
@@ -134,7 +134,7 @@ export const updateSystemSettings = async (req, res) => {
     
     // Mask response output
     const settingsObj = settings.toObject();
-    settingsObj.adminEmail = adminUser?.email || settings.adminEmail || "admin@phreight.com";
+    settingsObj.adminEmail = adminUser?.email || settings.adminEmail || "admin@phreights.com";
     settingsObj.adminPin = adminUser?.pin || settings.adminPin || "1234";
     settingsObj.adminPassword = "••••••••";
     settingsObj.aramexUsername = settingsObj.adminEmail;
