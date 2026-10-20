@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
-import API from "../../services/api";
+import API, { resolveAssetUrl } from "../../services/api";
 import {
     Package,
     Search,
@@ -432,10 +432,10 @@ const Shipments = () => {
                                                 <a 
                                                     href={
                                                         sh.labelPdfPath 
-                                                            ? `${import.meta.env.VITE_API_ROOT || "http://localhost:9000"}${sh.labelPdfPath}`
+                                                            ? resolveAssetUrl(sh.labelPdfPath)
                                                             : (sh.labelUrl && !sh.labelUrl.includes("label_demo.pdf") 
                                                                 ? sh.labelUrl 
-                                                                : `${import.meta.env.VITE_API_ROOT || "http://localhost:9000"}/uploads/sample_shipping_label.pdf`)
+                                                                : resolveAssetUrl("/uploads/sample_shipping_label.pdf"))
                                                     } 
                                                     target="_blank" 
                                                     rel="noopener noreferrer" 

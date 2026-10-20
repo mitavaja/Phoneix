@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import API from "../../services/api";
+import API, { resolveAssetUrl } from "../../services/api";
 import Pagination from "../../components/Pagination";
 
 const VerifiedKYC = () => {

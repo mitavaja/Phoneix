@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 **/node_modules
 
 # Build files
@@ -7,13 +7,23 @@
 
 # Environment
 **/.env
+**/.env.*
 
 # Logs
 *.log
+*.log.*
 
 # OS
 .DS_Store
 Thumbs.db
 
+# Storage & Backups
 **/uploads
 backend/.env
+mongodb_data/
+*.patch
+phoenix-new-files-backup/
+Phoneix-main/
+FETCH_HEAD
+git
+{
