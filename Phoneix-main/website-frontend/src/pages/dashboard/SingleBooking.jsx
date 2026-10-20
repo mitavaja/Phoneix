@@ -183,7 +183,7 @@ const SingleBooking = () => {
             const res = await API.post("/rates/calculate", payload);
             setEstimateResult(res.data);
 
-            if (singleForm.courier === "phreight" && res.data.services?.length > 0) {
+            if ((singleForm.courier === "phreight" || singleForm.courier === "phreights") && res.data.services?.length > 0) {
                 setSingleForm(prev => ({ ...prev, productType: res.data.services[0].serviceName }));
             }
         } catch (err) {
@@ -249,12 +249,16 @@ const SingleBooking = () => {
             };
 
             const res = await API.post("/shipments/book", payload);
-            setBookingSuccess(`Shipment successfully booked! Tracking ID: ${res.data.shipment?.shipmentId}`);
-            await fetchWalletData();
+            if (res.data?.isDraft) {
+                setBookingSuccess(`Shipment saved as Draft due to insufficient wallet balance (ID: ${res.data.shipment?.shipmentId}). You can reprocess it anytime once you recharge your wallet.`);
+            } else {
+                setBookingSuccess(`Shipment successfully booked! Tracking ID: ${res.data.shipment?.shipmentId}`);
+            }
+            if (fetchWalletData) await fetchWalletData();
 
             setTimeout(() => {
                 navigate("/dashboard/shipments");
-            }, 1500);
+            }, 1800);
 
         } catch (err) {
             setBookingError(err.response?.data?.message || "Shipment booking failed.");
@@ -318,23 +322,13 @@ const SingleBooking = () => {
                             <span className="text-[#0A1F44] font-bold text-sm">Aramex</span>
                         </label>
 
-                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition shadow-sm ${singleForm.courier === "phreight" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-[#687280]/20 bg-white hover:border-[#FF6A00]/40"}`}>
-                            <input
-                                type="radio"
-                                name="courier"
-                                value="phreight"
-                                checked={singleForm.courier === "phreight"}
-                                onChange={() => {
-                                    setSingleForm({ ...singleForm, courier: "phreight", productType: "" });
-                                    setEstimateResult(null);
-                                }}
-                                className="hidden"
-                            />
-                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleForm.courier === "phreight" ? "border-[#FF6A00]" : "border-[#687280]"}`}>
-                                {singleForm.courier === "phreight" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                        <div className="border border-[#687280]/20 bg-gray-100/70 p-4 rounded-xl flex items-center justify-between cursor-not-allowed opacity-60 select-none">
+                            <div className="flex items-center gap-3">
+                                <div className="w-4 h-4 rounded-full border border-gray-400 flex items-center justify-center bg-gray-200"></div>
+                                <span className="text-gray-400 font-bold text-sm">Phreights</span>
                             </div>
-                            <span className="text-[#0A1F44] font-bold text-sm">Phreight</span>
-                        </label>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-200 text-gray-500 uppercase tracking-wider">Disabled</span>
+                        </div>
                     </div>
                 </div>
 
@@ -371,7 +365,11 @@ const SingleBooking = () => {
                             <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">2. Recipient Customer Details</h4>
                             <button
                                 type="button"
-                                onClick={() => setIsManualRecipient(!isManualRecipient)}
+                                onClick={() => {
+                                    const nextManual = !isManualRecipient;
+                                    setIsManualRecipient(nextManual);
+                                    setSingleForm(prev => ({ ...prev, isGuestRecipient: nextManual }));
+                                }}
                                 className="text-[10px] text-[#FF6A00] hover:text-[#0A1F44] font-bold transition flex items-center gap-1 bg-[#FF6A00]/10 px-2.5 py-1 rounded-lg"
                             >
                                 {isManualRecipient ? "Use Saved Directory" : <><Plus size={12} /> Add New Recipient Inline</>}
@@ -584,10 +582,10 @@ const SingleBooking = () => {
                 {/* Estimate Result Block */}
                 {estimateResult && (
                     <>
-                        {/* Phreight Multi-Service Cards */}
-                        {singleForm.courier === "phreight" && estimateResult.services && estimateResult.services.length > 0 ? (
+                        {/* Phreights Multi-Service Cards */}
+                        {(singleForm.courier === "phreight" || singleForm.courier === "phreights") && estimateResult.services && estimateResult.services.length > 0 ? (
                             <div className="bg-white p-6 rounded-2xl border-2 border-[#FF6A00]/40 shadow-xl space-y-4">
-                                <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Select Phreight Service Plan</h4>
+                                <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Select Phreights Service Plan</h4>
                                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
                                     {estimateResult.services.map((svc, idx) => {
                                         const isSelected = singleForm.productType === svc.serviceName;
@@ -602,9 +600,19 @@ const SingleBooking = () => {
                                                     {isSelected && <CheckCircle size={14} className="text-[#FF6A00]" />}
                                                 </div>
                                                 <p className="text-[10px] text-[#687280] mb-2">{svc.transitTime} {svc.notes ? `| ${svc.notes}` : ''}</p>
-                                                <div className="flex justify-between items-center mt-3 border-t border-[#687280]/15 pt-2">
-                                                    <span className="text-[10px] text-[#687280]">Total Payable</span>
-                                                    <span className="font-black text-[#FF6A00] text-sm">₹{svc.invoiceTotal.toFixed(2)}</span>
+                                                <div className="space-y-1 text-[11px] text-[#687280] mt-2 border-t border-[#687280]/15 pt-2">
+                                                    <div className="flex justify-between">
+                                                        <span>Freight Base:</span>
+                                                        <span className="font-semibold text-[#0A1F44]">₹{Number(svc.shippingCharge || 0).toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>GST (18%):</span>
+                                                        <span className="font-semibold text-[#0A1F44]">₹{Number(svc.gstAmount || 0).toFixed(2)}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center pt-1 border-t border-dashed border-[#687280]/20">
+                                                        <span className="font-bold text-[#0A1F44]">Total Payable:</span>
+                                                        <span className="font-black text-[#FF6A00] text-sm">₹{Number(svc.invoiceTotal || 0).toFixed(2)}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -621,11 +629,11 @@ const SingleBooking = () => {
                                     <div><span className="text-[#687280] block">Volumetric Weight:</span><span className="text-[#0A1F44] font-semibold">{estimateResult.volumetricWeight}</span></div>
                                 </div>
                                 <div className="border-t border-[#687280]/15 pt-3 flex flex-wrap justify-between items-center text-sm gap-2">
-                                    <div className="space-x-4">
-                                        <span className="text-[#687280]">Shipping Charge: <strong className="text-[#0A1F44]">₹{estimateResult.shippingCharge}</strong></span>
-                                        <span className="text-[#687280]">GST (18%): <strong className="text-[#0A1F44]">₹{estimateResult.gstAmount}</strong></span>
+                                    <div className="flex flex-wrap gap-x-6 gap-y-1">
+                                        <span className="text-[#687280]">Shipping Charge: <strong className="text-[#0A1F44]">₹{Number(estimateResult.shippingCharge || 0).toFixed(2)}</strong></span>
+                                        <span className="text-[#687280]">GST (18%): <strong className="text-[#0A1F44]">₹{Number(estimateResult.gstAmount || 0).toFixed(2)}</strong></span>
                                     </div>
-                                    <span className="text-lg font-black text-[#FF6A00]">Total Payable: ₹{estimateResult.invoiceTotal}</span>
+                                    <span className="text-lg font-black text-[#FF6A00]">Total Payable (incl. 18% GST): ₹{Number(estimateResult.invoiceTotal || 0).toFixed(2)}</span>
                                 </div>
                             </div>
                         )}
@@ -639,7 +647,7 @@ const SingleBooking = () => {
                     <button
                         type="button"
                         onClick={handleEstimateSingle}
-                        disabled={estimating || !singleForm.weight || (!singleForm.customerId && !singleForm.isGuestRecipient) || !singleForm.pickupAddressId}
+                        disabled={estimating || !singleForm.weight || (!singleForm.customerId && !singleForm.isGuestRecipient && !isManualRecipient) || !singleForm.pickupAddressId}
                         className="flex-1 bg-[#E5E7EB]/50 hover:bg-[#E5E7EB] border border-[#687280]/20 text-[#0A1F44] font-bold py-3.5 rounded-xl text-xs transition disabled:opacity-50 shadow-sm"
                     >
                         {estimating ? "Calculating..." : "Calculate Cost Quote"}
@@ -647,7 +655,7 @@ const SingleBooking = () => {
 
                     <button
                         type="submit"
-                        disabled={bookingLoading || user?.status !== "Active" || (singleForm.courier === "phreight" && !singleForm.productType)}
+                        disabled={bookingLoading || user?.status !== "Active" || ((singleForm.courier === "phreight" || singleForm.courier === "phreights") && !singleForm.productType)}
                         className="flex-1 bg-[#FF6A00] hover:bg-[#ff7b1a] text-white font-extrabold py-3.5 rounded-xl text-xs active:scale-95 transition disabled:opacity-50 flex items-center justify-center gap-2 shadow-md shadow-[#FF6A00]/20"
                     >
                         {bookingLoading ?

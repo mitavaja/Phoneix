@@ -293,11 +293,15 @@ const BulkUpload = () => {
                 };
 
                 const res = await API.post("/rates/calculate", payload);
-                const cost = res.data.invoiceTotal || 0;
+                const baseCharge = parseFloat(res.data.shippingCharge || 0);
+                const gst = parseFloat(res.data.gstAmount || (baseCharge * 0.18).toFixed(2));
+                const cost = parseFloat(res.data.invoiceTotal || (baseCharge + gst).toFixed(2));
                 totalCost += cost;
 
                 calculatedRows.push({
                     ...row,
+                    shippingCharge: baseCharge,
+                    gstAmount: gst,
                     invoiceTotal: cost,
                     serviceType: res.data.serviceType || row.productType
                 });
@@ -349,11 +353,21 @@ const BulkUpload = () => {
                 validRows: finalPayload
             });
 
-            toast.success(res.data.message || `Successfully booked ${finalPayload.length} shipments.`);
+            const bookedCount = res.data.successBookings?.length || 0;
+            const draftCount = res.data.draftBookings?.length || 0;
+
+            if (draftCount > 0 && bookedCount > 0) {
+                toast.success(`Booked ${bookedCount} shipment(s). ${draftCount} saved as Draft due to insufficient balance.`);
+            } else if (draftCount > 0) {
+                toast.info(`${draftCount} shipment(s) saved as Draft due to insufficient balance. Recharge your wallet to reprocess.`);
+            } else {
+                toast.success(res.data.message || `Successfully booked ${bookedCount} shipments.`);
+            }
+
             setBulkFile(null);
             setBulkResult(null);
             setRatesCalculated(false);
-            await fetchWalletData();
+            if (fetchWalletData) await fetchWalletData();
             navigate("/dashboard/shipments");
         } catch (err) {
             setBulkValidationError(err.response?.data?.message || "Failed to commit bulk bookings.");
@@ -426,13 +440,13 @@ const BulkUpload = () => {
                             <span className="text-[#0A1F44] font-bold text-sm">Aramex</span>
                         </label>
 
-                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition shadow-sm ${batchSettings.courier === "phreights" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-[#687280]/20 bg-white hover:border-[#FF6A00]/40"}`}>
-                            <input type="radio" value="phreights" checked={batchSettings.courier === "phreights"} onChange={() => { setBatchSettings({ ...batchSettings, courier: "phreights", productType: "" }); setBulkResult(null); setRatesCalculated(false); }} className="hidden" />
-                            <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${batchSettings.courier === "phreights" ? "border-[#FF6A00]" : "border-[#687280]"}`}>
-                                {batchSettings.courier === "phreights" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                        <div className="border border-[#687280]/20 bg-gray-100/70 p-4 rounded-xl flex items-center justify-between cursor-not-allowed opacity-60 select-none">
+                            <div className="flex items-center gap-3">
+                                <div className="w-4 h-4 rounded-full border border-gray-400 flex items-center justify-center bg-gray-200"></div>
+                                <span className="text-gray-400 font-bold text-sm">Phreights</span>
                             </div>
-                            <span className="text-[#0A1F44] font-bold text-sm">Phreight</span>
-                        </label>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-gray-200 text-gray-500 uppercase tracking-wider">Disabled</span>
+                        </div>
                     </div>
                 </div>
 
@@ -475,13 +489,19 @@ const BulkUpload = () => {
                             <span className="text-2xl font-black text-[#FF6A00]">
                                 {ratesCalculated ? `₹${bulkResult.summary.totalEstimatedCost.toFixed(2)}` : "Pending Calculation"}
                             </span>
+                            {ratesCalculated && (
+                                <span className="block text-[10px] text-green-600 font-bold mt-0.5">Includes 18% GST</span>
+                            )}
                         </div>
                     </div>
 
                     {!bulkResult.summary.hasSufficientFunds && ratesCalculated && (
-                        <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-4 rounded-xl flex items-center gap-2">
-                            <AlertTriangle size={15} className="shrink-0" />
-                            <span>Insufficient Funds! Your available wallet balance (₹{bulkResult.summary.walletAvailable.toFixed(2)}) is lower than the batch cost (₹{bulkResult.summary.totalEstimatedCost.toFixed(2)}).</span>
+                        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-4 rounded-xl flex items-center gap-2">
+                            <AlertTriangle size={16} className="shrink-0 text-amber-600" />
+                            <span>
+                                <strong>Insufficient Balance Notice:</strong> Your available wallet balance (₹{bulkResult.summary.walletAvailable.toFixed(2)}) is lower than the batch cost (₹{bulkResult.summary.totalEstimatedCost.toFixed(2)}).
+                                Any consignments exceeding available funds will be automatically <strong>saved as Draft</strong> in your manifest. Once you recharge your wallet, you can reprocess them.
+                            </span>
                         </div>
                     )}
 
@@ -518,27 +538,35 @@ const BulkUpload = () => {
                                 <table className="w-full text-left text-xs">
                                     <thead>
                                     <tr className="border-b border-[#687280]/20 text-[#687280] text-[10px] uppercase font-bold sticky top-0 bg-[#E5E7EB]/90 backdrop-blur-sm">
-                                        <th className="py-3 px-4 text-center">Row</th>
-                                        <th className="py-3 px-4">Customer Name</th>
-                                        <th className="py-3 px-4">Route</th>
-                                        <th className="py-3 px-4 text-center">Type / Weight</th>
-                                        <th className="py-3 px-4 text-right">Cost (Calculated)</th>
+                                        <th className="py-3 px-3 text-center">Row</th>
+                                        <th className="py-3 px-3">Customer Name</th>
+                                        <th className="py-3 px-3">Route</th>
+                                        <th className="py-3 px-3 text-center">Type / Weight</th>
+                                        <th className="py-3 px-3 text-right">Freight Base</th>
+                                        <th className="py-3 px-3 text-right">GST (18%)</th>
+                                        <th className="py-3 px-3 text-right font-black text-[#FF6A00]">Total Cost (incl. 18% GST)</th>
                                     </tr>
                                     </thead>
                                     <tbody className="divide-y divide-[#687280]/10 text-[#0A1F44]">
                                     {bulkResult.validRows.map((val, idx) => (
                                         <tr key={idx} className="hover:bg-[#E5E7EB]/40 transition-colors">
-                                            <td className="py-2.5 px-4 text-center font-bold text-green-700">{val.line}</td>
-                                            <td className="py-2.5 px-4 font-semibold text-[#0A1F44]">{val.receiverName}</td>
-                                            <td className="py-2.5 px-4 text-[#687280]">
+                                            <td className="py-2.5 px-3 text-center font-bold text-green-700">{val.line}</td>
+                                            <td className="py-2.5 px-3 font-semibold text-[#0A1F44]">{val.receiverName}</td>
+                                            <td className="py-2.5 px-3 text-[#687280]">
                                                 {val.receiverCity}, {val.receiverCountry}
                                             </td>
-                                            <td className="py-2.5 px-4 text-center font-mono">
+                                            <td className="py-2.5 px-3 text-center font-mono">
                                                 <span className="block text-[10px] font-bold text-[#FF6A00]">{val.productType}</span>
                                                 {val.weight} kg
                                             </td>
-                                            <td className="py-2.5 px-4 text-right font-extrabold text-[#FF6A00]">
-                                                {ratesCalculated ? `₹${val.invoiceTotal?.toFixed(2)}` : "Pending"}
+                                            <td className="py-2.5 px-3 text-right font-medium text-[#0A1F44]">
+                                                {ratesCalculated ? `₹${Number(val.shippingCharge || 0).toFixed(2)}` : "-"}
+                                            </td>
+                                            <td className="py-2.5 px-3 text-right font-medium text-[#0A1F44]">
+                                                {ratesCalculated ? `₹${Number(val.gstAmount || 0).toFixed(2)}` : "-"}
+                                            </td>
+                                            <td className="py-2.5 px-3 text-right font-black text-[#FF6A00]">
+                                                {ratesCalculated ? `₹${Number(val.invoiceTotal || 0).toFixed(2)}` : "Pending"}
                                             </td>
                                         </tr>
                                     ))}
@@ -560,13 +588,23 @@ const BulkUpload = () => {
                     )}
 
                     {/* Step 3: Confirm & Book Button */}
-                    {ratesCalculated && bulkResult.summary.validCount > 0 && bulkResult.summary.hasSufficientFunds && user?.status === "Active" && (
+                    {ratesCalculated && bulkResult.summary.validCount > 0 && user?.status === "Active" && (
                         <button
                             onClick={handleBulkConfirm}
                             disabled={bulkConfirming}
-                            className="w-full bg-[#FF6A00] hover:bg-[#ff7b1a] text-white font-extrabold py-4 rounded-xl text-xs shadow-md shadow-[#FF6A00]/20 active:scale-95 transition flex items-center justify-center gap-2"
+                            className={`w-full font-extrabold py-4 rounded-xl text-xs shadow-md active:scale-95 transition flex items-center justify-center gap-2 text-white ${
+                                bulkResult.summary.hasSufficientFunds
+                                    ? "bg-[#FF6A00] hover:bg-[#ff7b1a] shadow-[#FF6A00]/20"
+                                    : "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
+                            }`}
                         >
-                            {bulkConfirming ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span> : <><CheckCircle size={16} /> Confirm & Book Batch (Debits ₹{bulkResult.summary.totalEstimatedCost.toFixed(2)})</>}
+                            {bulkConfirming ? (
+                                <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                            ) : bulkResult.summary.hasSufficientFunds ? (
+                                <><CheckCircle size={16} /> Confirm & Book Batch (Debits ₹{bulkResult.summary.totalEstimatedCost.toFixed(2)})</>
+                            ) : (
+                                <><CheckCircle size={16} /> Confirm Batch (Save Unfunded as Draft)</>
+                            )}
                         </button>
                     )}
                 </div>

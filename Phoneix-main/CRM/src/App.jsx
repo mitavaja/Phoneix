@@ -17,6 +17,7 @@ import VerifiedKYC from "./pages/kyc/VerifiedKYC";
 import RejectedKYC from "./pages/kyc/RejectedKYC";
 import WalletTransactions from "./pages/wallet/WalletTransactions";
 import AddBalance from "./pages/wallet/AddBalance";
+import CutBalance from "./pages/wallet/CutBalance";
 import RateManager from "./pages/rates/RateManager";
 import Shipments from "./pages/shipments/Shipments";
 import Delivered from "./pages/shipments/Delivered";
@@ -65,6 +66,7 @@ const App = () => {
                     {/* Wallet */}
                     <Route path="wallet" element={<WalletTransactions />} />
                     <Route path="wallet/add" element={<AddBalance />} />
+                    <Route path="wallet/cut" element={<CutBalance />} />
 
                     {/* Rates */}
                     <Route path="rates" element={<RateManager />} />

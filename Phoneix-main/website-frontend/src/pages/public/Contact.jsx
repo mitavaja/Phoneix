@@ -15,7 +15,7 @@ const Contact = () => {
       description: "Have a question about international shipping, documentation, customs, booking or an existing shipment? Contact the PHREIGHTS support team."
     },
     info: {
-      email: "phoenixfreights@gmail.com",
+      email: "admin@phreights.com",
       phone: "Monday–Saturday: 10:00 AM–6:00 PM IST",
       address: "Surat, Gujarat, India"
     },

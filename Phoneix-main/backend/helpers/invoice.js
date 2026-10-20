@@ -37,11 +37,17 @@ export const generateInvoiceHTML = (invoice) => {
          .header{
          text-align:right;
          }
-         .logo-box img{
-         max-height: 65px;
-         width: auto;
+         .logo-box{
          display:inline-block;
-         margin-bottom:10px;
+         background-color: #0A1F44;
+         padding: 8px 16px;
+         border-radius: 8px;
+         margin-bottom: 10px;
+         }
+         .logo-box img{
+         max-height: 52px;
+         width: auto;
+         display:block;
          }
          /* TITLE */
          .invoice-title{
@@ -291,11 +297,14 @@ export const generateLogisticsInvoiceHTML = (data) => {
                  padding-bottom: 20px;
              }
              .logo-box {
-                 display: flex;
+                 display: inline-flex;
                  align-items: center;
+                 background-color: #0A1F44;
+                 padding: 8px 18px;
+                 border-radius: 8px;
              }
              .logo-box img {
-                 max-height: 70px;
+                 max-height: 52px;
                  width: auto;
                  display: block;
                  object-fit: contain;
