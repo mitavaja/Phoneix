@@ -1,4 +1,5 @@
 import Rate from "../models/Rate.js";
+import User from "../models/User.js";
 import MarginRule from "../models/MarginRule.js";
 import AuditLog from "../models/AuditLog.js";
 import PickupAddress from "../models/PickupAddress.js";
@@ -239,7 +240,11 @@ export const calculateShippingCost = async (req, res) => {
     // =============================================================
     // B. COURIER: PHREIGHT (SHIPGLOBAL)
     // ============================================================
-    else if (courier.toLowerCase() === "phreight" || courier.toLowerCase() === "shipglobal") {
+    else if (
+      courier.toLowerCase() === "phreight" ||
+      courier.toLowerCase() === "phreights" ||
+      courier.toLowerCase() === "shipglobal"
+    ) {
       const shipGlobalResult = await calculateShipGlobalRate({
         weight: numericWeight,
         destinationCountry: destination.countryCode,
@@ -322,13 +327,26 @@ export const getMargins = async (req, res) => {
       }
     }
 
-    // Apply global text search (e.g., country code or markup type)
+    // Apply global text search (e.g., country code, markup type, merchant name/email)
     if (search) {
       const searchRegex = new RegExp(search, "i");
+      const matchedUsers = await User.find({
+        $or: [
+          { name: searchRegex },
+          { email: searchRegex },
+          { companyName: searchRegex }
+        ]
+      }).select("_id");
+
       query.$or = [
         { country: searchRegex },
-        { type: searchRegex }
+        { type: searchRegex },
+        { userId: { $in: matchedUsers.map(u => u._id) } }
       ];
+
+      if ("global".includes(search.toLowerCase())) {
+        query.$or.push({ userId: null });
+      }
     }
 
     const totalItems = await MarginRule.countDocuments(query);

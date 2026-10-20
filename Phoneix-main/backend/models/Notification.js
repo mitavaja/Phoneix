@@ -17,7 +17,7 @@ const notificationSchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["KYC Approved", "Wallet Recharged", "Shipment Booked", "Pickup Scheduled", "Delivered", "Claim Updated", "Ticket Updated"],
+      enum: ["KYC Approved", "Wallet Recharged", "Wallet Debited", "Shipment Booked", "Pickup Scheduled", "Delivered", "Claim Updated", "Ticket Updated"],
       required: true,
     },
     isRead: {

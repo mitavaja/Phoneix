@@ -4,7 +4,7 @@
   "type": "module",
   "main": "app.js",
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "node init && nodemon server.js",
     "mongo": "\"C:\\Program Files\\MongoDB\\Server\\9.0\\bin\\mongod.exe\" --dbpath \"../../mongodb_data\""
   },
   "dependencies": {

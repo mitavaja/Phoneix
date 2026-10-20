@@ -35,6 +35,11 @@ const userSchema = new mongoose.Schema(
       enum: ["GST Registered", "Non-GST"],
       default: "Non-GST",
     },
+    gstNumber: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     role: {
       type: String,
       enum: ["Buyer", "Seller", "Moderator", "Admin", "Operations"],

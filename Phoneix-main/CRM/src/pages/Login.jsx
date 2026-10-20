@@ -34,7 +34,7 @@ const Login = () => {
     let isMounted = true;
     const verifyWindow = async () => {
       try {
-        const targetEmail = localStorage.getItem("adminEmail") || email || "admin@phreight.com";
+        const targetEmail = localStorage.getItem("adminEmail") || email || "admin@phreights.com";
         const res = await API.get(`/auth/check-login-mode?email=${encodeURIComponent(targetEmail)}`);
         if (!isMounted) return;
         if (res.data) {
@@ -152,7 +152,7 @@ const Login = () => {
             <Logo showText={true} theme="navy" size="md" className="justify-center" />
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white mt-1">
-            {isPinMode ? "Security PIN Unlock" : "Phreight CRM"}
+            {isPinMode ? "Security PIN Unlock" : "Phreights CRM"}
           </h1>
           <p className="text-xs text-gray-400 mt-1.5 text-center font-medium">
             {isPinMode 
@@ -264,7 +264,7 @@ const Login = () => {
                 <div className="relative">
                   <input
                     type="email"
-                    placeholder="admin@phreight.com"
+                    placeholder="admin@phreights.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full px-4 py-3 pl-11 text-sm bg-black/25 border border-white/10 focus:border-[#FF6A00] focus:ring-1 focus:ring-[#FF6A00] rounded-xl text-white placeholder-gray-500 focus:outline-none transition-all font-sans"
@@ -353,7 +353,7 @@ const Login = () => {
 
         {/* Decorative branding info */}
         <div className="mt-8 border-t border-white/10 pt-5 text-center text-[10px] text-gray-400 font-mono tracking-wider">
-          PHREIGHT LOGISTICS CORE GATEWAY
+          PHREIGHTS LOGISTICS CORE GATEWAY
         </div>
       </div>
     </div>

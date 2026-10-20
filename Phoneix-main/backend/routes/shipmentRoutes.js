@@ -16,7 +16,9 @@ import {
   validateBulkUpload,
   confirmBulkUpload,
   cancelShipment,
-  shipmentDropDownList
+  shipmentDropDownList,
+  reprocessShipment,
+  bulkReprocessShipments
 } from "../controllers/shipmentController.js";
 import { generateInvoicePDF } from "../controllers/invoiceController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
@@ -35,6 +37,8 @@ router.get("/delivered", getDeliveredShipments);
 router.get("/cancelled", getCancelledShipments);
 router.post("/pickup/schedule", schedulePickup);
 router.get("/generate-invoice", generateInvoicePDF);
+router.post("/bulk-reprocess", bulkReprocessShipments);
+router.post("/:id/reprocess", reprocessShipment);
 router.get("/:id/invoice", downloadInvoicePdf);
 router.post("/:id/cancel", cancelShipment);
 // Double-pass bulk uploads

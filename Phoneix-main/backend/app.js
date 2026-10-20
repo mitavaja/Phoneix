@@ -87,7 +87,7 @@ app.get("/api/menu", (req, res) => {
 
 // Health check
 app.get("/", (req, res) => {
-  res.json({ message: "Phreight E-Commerce Logistics Master API running...", status: "ONLINE" });
+  res.json({ message: "Phreights E-Commerce Logistics Master API running...", status: "ONLINE" });
 });
 
 export default app;

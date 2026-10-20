@@ -172,7 +172,7 @@ const Services = () => {
               {data?.cta?.title || "Start Shipping Today"}
             </h2>
             <p className="text-[#687280] max-w-xl mx-auto text-sm md:text-base leading-relaxed">
-              {data?.cta?.description || "Join Phreight and scale your business globally."}
+              {data?.cta?.description || "Join Phreights and scale your business globally."}
             </p>
           </div>
 
