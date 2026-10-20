@@ -5,12 +5,16 @@ import {
   getAllBalances,
   getAllTransactions,
   addBalanceAdmin,
+  cutBalanceAdmin,
   rechargeWallet,
   verifyRecharge,
   requestBankTransfer,
   getPendingBankTransfers,
   approveBankTransfer,
   rejectBankTransfer,
+  getWalletCategories,
+  createWalletCategory,
+  deleteWalletCategory,
 } from "../controllers/walletController.js";
 import { getDashboardMetrics } from  "../controllers/adminWalletController.js"
 import authMiddleware from "../middleware/authMiddleware.js";
@@ -33,7 +37,12 @@ router.get("/admin/metrics", roleMiddleware("Admin", "Moderator", "Operations"),
 router.get("/admin/transactions", roleMiddleware("Admin", "Moderator", "Operations"), getAllTransactions);
 router.get("/admin/bank-transfers", roleMiddleware("Admin", "Moderator", "Operations"), getPendingBankTransfers);
 router.post("/admin/add", roleMiddleware("Admin", "Moderator"), addBalanceAdmin);
+router.post("/admin/cut", roleMiddleware("Admin", "Moderator"), cutBalanceAdmin);
 router.put("/admin/bank-transfer/:id/approve", roleMiddleware("Admin", "Moderator"), approveBankTransfer);
 router.put("/admin/bank-transfer/:id/reject", roleMiddleware("Admin", "Moderator"), rejectBankTransfer);
+// Category Management (Admin / Moderator)
+router.get("/categories", getWalletCategories);
+router.post("/categories", roleMiddleware("Admin", "Moderator"), createWalletCategory);
+router.delete("/categories/:id", roleMiddleware("Admin", "Moderator"), deleteWalletCategory);
 
 export default router;

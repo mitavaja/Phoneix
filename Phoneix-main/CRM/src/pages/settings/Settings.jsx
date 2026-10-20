@@ -38,7 +38,7 @@ const Settings = () => {
           setOriginalSettings(res.data);
           setMaintenanceMode(res.data.maintenanceMode || false);
           setCodSurcharge(res.data.codLimit || 50000);
-          setAdminEmail(res.data.adminEmail || res.data.aramexUsername || "admin@phreight.com");
+          setAdminEmail(res.data.adminEmail || res.data.aramexUsername || "admin@phreights.com");
           setAdminPassword(res.data.adminPassword || "••••••••");
           setAdminPin(res.data.adminPin || res.data.aramexAccountPin || "1234");
           setAramexAccountNumber(res.data.aramexAccountNumber || "");
@@ -63,9 +63,6 @@ const Settings = () => {
         adminEmail,
         adminPassword,
         adminPin,
-        aramexUsername: adminEmail,
-        aramexPassword: adminPassword,
-        aramexAccountPin: adminPin,
         aramexAccountNumber,
         aramexAccountEntity,
         aramexAccountCountryCode,
@@ -88,7 +85,7 @@ const Settings = () => {
 
   const handleCancel = () => {
     if (originalSettings) {
-      setAdminEmail(originalSettings.adminEmail || originalSettings.aramexUsername || "admin@phreight.com");
+      setAdminEmail(originalSettings.adminEmail || originalSettings.aramexUsername || "admin@phreights.com");
       setAdminPassword(originalSettings.adminPassword || "••••••••");
       setAdminPin(originalSettings.adminPin || originalSettings.aramexAccountPin || "1234");
       setAramexAccountNumber(originalSettings.aramexAccountNumber || "");
@@ -286,7 +283,7 @@ const Settings = () => {
                       value={adminEmail}
                       onChange={(e) => setAdminEmail(e.target.value)}
                       className="w-full px-4 py-2.5 bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-xl text-[#0A1F44] focus:outline-none transition-all font-mono"
-                      placeholder="admin@phreight.com"
+                      placeholder="admin@phreights.com"
                     />
                   </div>
 

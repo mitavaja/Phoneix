@@ -122,7 +122,7 @@ const Reports = () => {
       {/* Title */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#0A1F44] tracking-tight">Phreight Executive Dashboard</h1>
+          <h1 className="text-2xl font-extrabold text-[#0A1F44] tracking-tight">Phreights Executive Dashboard</h1>
           <p className="text-sm text-[#687280]">Examine transactional telemetry, logistics metrics ratios, and platform user growth parameters.</p>
         </div>
         <div className="flex gap-2">

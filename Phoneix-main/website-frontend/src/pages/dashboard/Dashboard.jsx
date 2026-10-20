@@ -1507,23 +1507,13 @@ const Dashboard = () => {
                           <span className="text-white font-bold text-sm">Aramex</span>
                         </label>
 
-                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${calcForm.courier === "phreights" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
-                          <input
-                              type="radio"
-                              name="calcCourier"
-                              value="phreights"
-                              checked={calcForm.courier === "phreights"}
-                              onChange={(e) => {
-                                setCalcForm({ ...calcForm, courier: "phreights", productType: "" });
-                                setCalcResult(null);
-                              }}
-                              className="hidden"
-                          />
-                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${calcForm.courier === "phreights" ? "border-[#FF6A00]" : "border-gray-500"}`}>
-                            {calcForm.courier === "phreights" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                        <div className="border border-white/5 bg-white/5 p-4 rounded-xl flex items-center justify-between cursor-not-allowed opacity-50 select-none">
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 rounded-full border border-gray-600 flex items-center justify-center bg-gray-800"></div>
+                            <span className="text-gray-400 font-bold text-sm">Phreights</span>
                           </div>
-                          <span className="text-white font-bold text-sm">phreights</span>
-                        </label>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-gray-400 uppercase tracking-wider">Disabled</span>
+                        </div>
                       </div>
                     </div>
 
@@ -1694,23 +1684,13 @@ const Dashboard = () => {
                           <span className="text-white font-bold text-sm">Aramex</span>
                         </label>
 
-                        <label className={`cursor-pointer border p-4 rounded-xl flex items-center gap-3 transition ${singleForm.courier === "phreights" ? "border-[#FF6A00] bg-[#FF6A00]/10" : "border-white/10 bg-[#0A1F44] hover:border-white/30"}`}>
-                          <input
-                              type="radio"
-                              name="courier"
-                              value="phreights"
-                              checked={singleForm.courier === "phreights"}
-                              onChange={(e) => {
-                                setSingleForm({ ...singleForm, courier: "phreights", productType: "" });
-                                setEstimateResult(null);
-                              }}
-                              className="hidden"
-                          />
-                          <div className={`w-4 h-4 rounded-full border flex items-center justify-center ${singleForm.courier === "phreights" ? "border-[#FF6A00]" : "border-gray-500"}`}>
-                            {singleForm.courier === "phreights" && <div className="w-2 h-2 bg-[#FF6A00] rounded-full"></div>}
+                        <div className="border border-white/5 bg-white/5 p-4 rounded-xl flex items-center justify-between cursor-not-allowed opacity-50 select-none">
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 rounded-full border border-gray-600 flex items-center justify-center bg-gray-800"></div>
+                            <span className="text-gray-400 font-bold text-sm">Phreights</span>
                           </div>
-                          <span className="text-white font-bold text-sm">phreights</span>
-                        </label>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-white/10 text-gray-400 uppercase tracking-wider">Disabled</span>
+                        </div>
                       </div>
                     </div>
 
@@ -1912,9 +1892,19 @@ const Dashboard = () => {
                                             {isSelected && <CheckCircle size={14} className="text-[#FF6A00]" />}
                                           </div>
                                           <p className="text-[10px] text-gray-400 mb-2">{svc.transitTime} {svc.notes ? `| ${svc.notes}` : ''}</p>
-                                          <div className="flex justify-between items-center mt-3 border-t border-white/10 pt-2">
-                                            <span className="text-[10px] text-gray-500">Total Payable</span>
-                                            <span className="font-black text-[#FF6A00] text-sm">₹{svc.invoiceTotal.toFixed(2)}</span>
+                                          <div className="space-y-1 text-[11px] text-gray-400 mt-2 border-t border-white/10 pt-2">
+                                            <div className="flex justify-between">
+                                              <span>Freight Base:</span>
+                                              <span className="font-semibold text-white">₹{Number(svc.shippingCharge || 0).toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span>GST (18%):</span>
+                                              <span className="font-semibold text-white">₹{Number(svc.gstAmount || 0).toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center pt-1 border-t border-dashed border-white/10">
+                                              <span className="font-bold text-white">Total Payable:</span>
+                                              <span className="font-black text-[#FF6A00] text-sm">₹{Number(svc.invoiceTotal || 0).toFixed(2)}</span>
+                                            </div>
                                           </div>
                                         </div>
                                     );
@@ -1932,10 +1922,10 @@ const Dashboard = () => {
                                 </div>
                                 <div className="border-t border-white/10 pt-3 flex flex-wrap justify-between items-center text-sm gap-2">
                                   <div className="space-x-4">
-                                    <span className="text-[#687280]">Shipping Charge: <strong>₹{estimateResult.shippingCharge}</strong></span>
-                                    <span className="text-[#687280]">GST (18%): <strong>₹{estimateResult.gstAmount}</strong></span>
+                                    <span className="text-[#687280]">Shipping Charge: <strong>₹{Number(estimateResult.shippingCharge || 0).toFixed(2)}</strong></span>
+                                    <span className="text-[#687280]">GST (18%): <strong>₹{Number(estimateResult.gstAmount || 0).toFixed(2)}</strong></span>
                                   </div>
-                                  <span className="text-lg font-black text-[#FF6A00]">Total Payable: ₹{estimateResult.invoiceTotal}</span>
+                                  <span className="text-lg font-black text-[#FF6A00]">Total Payable (incl. 18% GST): ₹{Number(estimateResult.invoiceTotal || 0).toFixed(2)}</span>
                                 </div>
                               </div>
                           )}
@@ -2045,13 +2035,25 @@ const Dashboard = () => {
                                 <table className="w-full text-left text-xs bg-green-500/5">
                                   <thead>
                                   <tr className="border-b border-green-500/10 text-green-400 text-[10px] uppercase font-bold">
-                                    <th className="py-2.5 px-4 text-center">Row</th><th className="py-2.5 px-4">Customer Name</th><th className="py-2.5 px-4">Route</th><th className="py-2.5 px-4 text-center">Charge Weight</th><th className="py-2.5 px-4 text-right">Cost + GST</th>
+                                    <th className="py-2.5 px-3 text-center">Row</th>
+                                    <th className="py-2.5 px-3">Customer Name</th>
+                                    <th className="py-2.5 px-3">Route</th>
+                                    <th className="py-2.5 px-3 text-center">Charge Weight</th>
+                                    <th className="py-2.5 px-3 text-right">Freight Base</th>
+                                    <th className="py-2.5 px-3 text-right">GST (18%)</th>
+                                    <th className="py-2.5 px-3 text-right">Total (incl. 18% GST)</th>
                                   </tr>
                                   </thead>
                                   <tbody className="divide-y divide-green-500/10">
                                   {bulkResult.validRows.map((val, idx) => (
                                       <tr key={idx} className="hover:bg-green-500/10 transition-colors">
-                                        <td className="py-2 px-4 text-center font-bold text-green-400">{val.line}</td><td className="py-2 px-4 font-semibold">{val.customer}</td><td className="py-2 px-4">{val.receiverCity}, {val.receiverCountry} (from {val.pickupWarehouseName})</td><td className="py-2 px-4 text-center font-mono">{val.chargeableWeight} kg</td><td className="py-2 px-4 text-right font-bold text-white">₹{val.invoiceTotal.toFixed(2)}</td>
+                                        <td className="py-2 px-3 text-center font-bold text-green-400">{val.line}</td>
+                                        <td className="py-2 px-3 font-semibold">{val.customer}</td>
+                                        <td className="py-2 px-3">{val.receiverCity}, {val.receiverCountry} (from {val.pickupWarehouseName})</td>
+                                        <td className="py-2 px-3 text-center font-mono">{val.chargeableWeight} kg</td>
+                                        <td className="py-2 px-3 text-right text-gray-300">₹{Number(val.shippingCharge || 0).toFixed(2)}</td>
+                                        <td className="py-2 px-3 text-right text-gray-300">₹{Number(val.gstAmount || 0).toFixed(2)}</td>
+                                        <td className="py-2 px-3 text-right font-bold text-[#FF6A00]">₹{Number(val.invoiceTotal || 0).toFixed(2)}</td>
                                       </tr>
                                   ))}
                                   </tbody>
@@ -2060,9 +2062,9 @@ const Dashboard = () => {
                             </div>
                         )}
 
-                        {bulkResult.summary.validCount > 0 && bulkResult.summary.hasSufficientFunds && user?.status === "Active" && (
+                        {bulkResult.summary.validCount > 0 && user?.status === "Active" && (
                             <button onClick={handleBulkConfirm} disabled={bulkConfirming} className="w-full bg-[#FF6A00] text-[#0A1F44] font-extrabold py-4 rounded-xl text-xs hover:brightness-110 active:scale-95 transition flex items-center justify-center gap-2">
-                              {bulkConfirming ? <span className="w-5 h-5 border-2 border-[#0A1F44] border-t-transparent rounded-full animate-spin"></span> : <><CheckCircle size={16} /> Confirm & Book Batch (Debits ₹{bulkResult.summary.totalEstimatedCost.toFixed(2)})</>}
+                              {bulkConfirming ? <span className="w-5 h-5 border-2 border-[#0A1F44] border-t-transparent rounded-full animate-spin"></span> : bulkResult.summary.hasSufficientFunds ? <><CheckCircle size={16} /> Confirm & Book Batch (Debits ₹{bulkResult.summary.totalEstimatedCost.toFixed(2)})</> : <><CheckCircle size={16} /> Confirm Batch (Save Unfunded as Draft)</>}
                             </button>
                         )}
 

@@ -10,7 +10,7 @@ const systemSettingSchema = new mongoose.Schema(
       type: Number,
       default: 50000,
     },
-    adminEmail: { type: String, default: "admin@phreight.com" },
+    adminEmail: { type: String, default: "admin@phreights.com" },
     adminPassword: { type: String, default: "" },
     adminPin: { type: String, default: "1234" },
     aramexUsername: { type: String, default: "" },
