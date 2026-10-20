@@ -35,7 +35,7 @@ const AdminLayout = ({ children }) => {
   };
 
   return (
-    <div className="flex bg-[#E5E7EB] min-h-screen">
+    <div className="flex w-full max-w-full overflow-x-hidden bg-[#E5E7EB] min-h-screen">
       {/* Sidebar */}
       <Sidebar />
 

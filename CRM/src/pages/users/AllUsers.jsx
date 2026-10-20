@@ -24,7 +24,15 @@ const AllUsers = () => {
     setLoading(true);
     try {
       const res = await API.get(`/users?page=${page}&limit=${itemsPerPage}`);
-      setUsers(res.data.users || []);
+      setUsers((res.data.users || []).filter((u) => {
+        const isAdmin = String(u.role || "").toLowerCase() === "admin";
+        const identity = [u.name, u.companyName, u.email]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const isMedotro = identity.includes("medotro");
+        return !isAdmin && !isMedotro;
+      }));
       setPaginationData(res.data.pagination || null);
     } catch (error) {
       console.error("Express API user registry unreachable.", error.message);

@@ -13,6 +13,11 @@ const couponSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    category: {
+      type: String,
+      default: "General",
+      trim: true,
+    },
     couponType: {
       type: String,
       enum: ["Percentage", "Flat"],

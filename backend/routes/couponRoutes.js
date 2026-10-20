@@ -5,11 +5,19 @@ import {
   updateCoupon,
   deleteCoupon,
   getApplicableCoupons,
+  getCouponCategories,
+  createCouponCategory,
+  deleteCouponCategory,
 } from "../controllers/couponController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 import roleMiddleware from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
+
+// Category management endpoints
+router.get("/categories", authMiddleware, getCouponCategories);
+router.post("/categories", authMiddleware, roleMiddleware("Admin"), createCouponCategory);
+router.delete("/categories/:id", authMiddleware, roleMiddleware("Admin"), deleteCouponCategory);
 
 // Get applicable coupons for recharging merchant (authenticated)
 router.get("/applicable", authMiddleware, getApplicableCoupons);

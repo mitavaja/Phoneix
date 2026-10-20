@@ -91,7 +91,7 @@ const Sidebar = () => {
   };
 
   return (
-    <div className="w-64 h-screen bg-[#0A1F44] text-white fixed left-0 top-0 p-5 shadow-[4px_0_24px_rgba(0,0,0,0.25)] flex flex-col justify-between overflow-y-auto custom-scrollbar border-r border-[#687280]/20 select-none z-40">
+    <div className="w-64 h-screen bg-[#0A1F44] text-white fixed left-0 top-0 p-5 shadow-[4px_0_24px_rgba(0,0,0,0.25)] flex flex-col justify-between overflow-y-hidden border-r border-[#687280]/20 select-none z-40">
       <div>
         {/* Brand Header */}
         <div className="mb-6 mt-2 px-2 pb-4 border-b border-[#687280]/20 flex flex-col items-center text-center">
