@@ -59,7 +59,7 @@ const Login = () => {
           <div className="mb-3 p-2 bg-[#0A1F44]/60 rounded-2xl border border-white/10 shadow-inner flex justify-center">
             <Logo showText={true} theme="navy" size="md" className="justify-center" />
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-white mt-1">Phreight Control</h1>
+          <h1 className="text-2xl font-black tracking-tight text-white mt-1">Phreights Control</h1>
           <p className="text-xs text-gray-400 mt-1.5 font-medium">Website Editor & Platform Administration</p>
         </div>
 
@@ -83,7 +83,7 @@ const Login = () => {
             <div className="relative">
               <input
                 type="email"
-                placeholder="admin@phreight.com"
+                placeholder="admin@phreights.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 pl-11 text-sm bg-black/25 border border-white/10 focus:border-[#FF6A00] focus:ring-1 focus:ring-[#FF6A00] rounded-xl text-white placeholder-gray-500 focus:outline-none transition-all font-sans"
@@ -158,7 +158,7 @@ const Login = () => {
 
         {/* Decorative branding info */}
         <div className="mt-8 border-t border-white/10 pt-5 text-center text-[10px] text-gray-400 font-mono tracking-wider">
-          PHREIGHT LOGISTICS CORE GATEWAY
+          PHREIGHTS LOGISTICS CORE GATEWAY
         </div>
       </div>
     </div>

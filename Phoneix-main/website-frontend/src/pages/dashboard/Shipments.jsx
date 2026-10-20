@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useOutletContext, useNavigate } from "react-router-dom";
 import API from "../../services/api";
 import {
     Package,
@@ -22,10 +23,15 @@ import Pagination from "../../components/Pagination";
 import moment from "moment";
 
 const Shipments = () => {
+    const { user, wallet, fetchWalletData } = useOutletContext() || {};
+    const navigate = useNavigate();
+
     const [shipments, setShipments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("All");
+    const [reprocessingId, setReprocessingId] = useState(null);
+    const [bulkReprocessing, setBulkReprocessing] = useState(false);
 
     // Pagination states
     const [currentPage, setCurrentPage] = useState(1);
@@ -231,6 +237,35 @@ const Shipments = () => {
         }
     };
 
+    const handleReprocessShipment = async (shDbId, shId) => {
+        setReprocessingId(shDbId);
+        try {
+            const res = await API.post(`/shipments/${shDbId}/reprocess`);
+            toast.success(res.data?.message || `Shipment ${shId} reprocessed and booked successfully!`);
+            await refreshShipments(currentPage);
+            if (fetchWalletData) await fetchWalletData();
+        } catch (err) {
+            const msg = err.response?.data?.message || "Failed to reprocess shipment.";
+            toast.error(msg);
+        } finally {
+            setReprocessingId(null);
+        }
+    };
+
+    const handleBulkReprocess = async () => {
+        setBulkReprocessing(true);
+        try {
+            const res = await API.post("/shipments/bulk-reprocess");
+            toast.success(res.data?.message || "Draft shipments reprocessed successfully!");
+            await refreshShipments(currentPage);
+            if (fetchWalletData) await fetchWalletData();
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to reprocess draft shipments.");
+        } finally {
+            setBulkReprocessing(false);
+        }
+    };
+
     const filteredShipments = shipments.filter(sh => {
         const matchesSearch = sh.shipmentId.toLowerCase().includes(searchQuery.toLowerCase()) || sh.customer.toLowerCase().includes(searchQuery.toLowerCase()) || (sh.courierTrackingNumber && sh.courierTrackingNumber.toLowerCase().includes(searchQuery.toLowerCase()));
         const matchesStatus = statusFilter === "All" || sh.status === statusFilter;
@@ -239,6 +274,9 @@ const Shipments = () => {
 
     const getStatusBadge = (status) => {
         const s = (status || "").toLowerCase();
+        if (s === "draft") {
+            return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">Draft</span>;
+        }
         if (s === "delivered") {
             return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700 border border-green-200">Delivered</span>;
         }
@@ -263,6 +301,16 @@ const Shipments = () => {
                     <p className="text-sm text-[#687280]">Inspect logistical bookings, sync live tracking steps, and generate invoices.</p>
                 </div>
                 <div className="flex items-center gap-3 w-full md:w-auto justify-end flex-wrap">
+                    {shipments.filter(s => s.status === "Draft").length > 0 && (
+                        <button
+                            onClick={handleBulkReprocess}
+                            disabled={bulkReprocessing}
+                            className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm disabled:opacity-50"
+                            title="Reprocess all pending Draft shipments"
+                        >
+                            <RefreshCw size={14} className={bulkReprocessing ? "animate-spin" : ""} /> Reprocess All Drafts ({shipments.filter(s => s.status === "Draft").length})
+                        </button>
+                    )}
                     <button
                         onClick={() => setInvoiceModalOpen(true)}
                         className="flex items-center gap-2 bg-white border border-[#FF6A00]/50 text-[#FF6A00] hover:bg-[#FF6A00] hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm"
@@ -361,6 +409,18 @@ const Shipments = () => {
                                         <td className="py-3.5 px-4 text-right font-extrabold text-[#0A1F44]">₹{sh.invoiceTotal?.toFixed(2)}</td>
                                         <td className="py-3.5 px-4 text-center">{getStatusBadge(sh.status)}</td>
                                         <td className="py-3.5 px-4 text-center space-x-1.5 flex justify-center items-center">
+                                            {sh.status === "Draft" && (
+                                                <button
+                                                    onClick={() => handleReprocessShipment(sh._id, sh.shipmentId)}
+                                                    disabled={reprocessingId === sh._id}
+                                                    className="px-2.5 py-1 bg-amber-50 border border-amber-300 hover:bg-amber-600 hover:text-white rounded-lg text-[10px] font-bold text-amber-700 transition inline-flex items-center gap-1 shadow-sm disabled:opacity-50"
+                                                    title="Reprocess and book with carrier"
+                                                >
+                                                    <RefreshCw size={11} className={reprocessingId === sh._id ? "animate-spin" : ""} />
+                                                    {reprocessingId === sh._id ? "Booking..." : "Reprocess"}
+                                                </button>
+                                            )}
+
                                             <button 
                                                 onClick={() => toggleExpandShipment(sh.courierTrackingNumber || sh.shipmentId, sh._id)} 
                                                 className="px-2.5 py-1 bg-white border border-[#687280]/20 hover:border-[#FF6A00] rounded-lg text-[10px] font-bold text-[#0A1F44] transition inline-flex items-center gap-1 shadow-sm"
@@ -368,10 +428,21 @@ const Shipments = () => {
                                                 Track {expandedShipmentId === (sh.courierTrackingNumber || sh.shipmentId) ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
                                             </button>
 
-                                            {sh.labelUrl ? (
-                                                <a href={sh.labelUrl} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-purple-50 border border-purple-200 hover:bg-purple-600 hover:text-white rounded-lg text-[10px] font-bold text-purple-700 transition inline-flex items-center gap-1 shadow-sm">Label</a>
-                                            ) : sh.labelPdfPath && (
-                                                <a href={`${import.meta.env.VITE_API_ROOT || "http://localhost:9000"}${sh.labelPdfPath}`} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-purple-50 border border-purple-200 hover:bg-purple-600 hover:text-white rounded-lg text-[10px] font-bold text-purple-700 transition inline-flex items-center gap-1 shadow-sm">Label</a>
+                                            {(sh.labelUrl || sh.labelPdfPath || ["Booked", "Pickup Scheduled", "Picked Up", "In Transit", "Out For Delivery", "Delivered"].includes(sh.status)) && (
+                                                <a 
+                                                    href={
+                                                        sh.labelPdfPath 
+                                                            ? `${import.meta.env.VITE_API_ROOT || "http://localhost:9000"}${sh.labelPdfPath}`
+                                                            : (sh.labelUrl && !sh.labelUrl.includes("label_demo.pdf") 
+                                                                ? sh.labelUrl 
+                                                                : `${import.meta.env.VITE_API_ROOT || "http://localhost:9000"}/uploads/sample_shipping_label.pdf`)
+                                                    } 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    className="px-2 py-1 bg-purple-50 border border-purple-200 hover:bg-purple-600 hover:text-white rounded-lg text-[10px] font-bold text-purple-700 transition inline-flex items-center gap-1 shadow-sm"
+                                                >
+                                                    Label
+                                                </a>
                                             )}
 
                                             {sh.status === "Booked" && !sh.manifestCode && (

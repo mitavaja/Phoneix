@@ -9,7 +9,6 @@ mongodb_data/
 **/.vite/
 
 # Secret Environment Files
-**/.env
 **/.env*.local
 backend/.env
 Phoneix-main/backend/.env
@@ -21,5 +20,5 @@ Phoneix-main/backend/.env
 Thumbs.db
 
 # Environment configuration files
-**/.env.*
 !**/.env.example
+config.bat

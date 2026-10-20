@@ -181,6 +181,40 @@ const RateManager = () => {
         ...merchantsList
     ];
 
+    const countryOptions = [
+        { label: "Global (*) - All Countries", value: "" },
+        { label: "AE - United Arab Emirates", value: "AE" },
+        { label: "US - United States", value: "US" },
+        { label: "GB - United Kingdom", value: "GB" },
+        { label: "IN - India", value: "IN" },
+        { label: "SA - Saudi Arabia", value: "SA" },
+        { label: "CA - Canada", value: "CA" },
+        { label: "AU - Australia", value: "AU" },
+        { label: "DE - Germany", value: "DE" },
+        { label: "FR - France", value: "FR" },
+        { label: "SG - Singapore", value: "SG" },
+        { label: "OM - Oman", value: "OM" },
+        { label: "KW - Kuwait", value: "KW" },
+        { label: "QA - Qatar", value: "QA" },
+        { label: "BH - Bahrain", value: "BH" },
+        { label: "MY - Malaysia", value: "MY" },
+        { label: "JP - Japan", value: "JP" },
+        { label: "CN - China", value: "CN" },
+        { label: "IT - Italy", value: "IT" },
+        { label: "ES - Spain", value: "ES" },
+        { label: "NL - Netherlands", value: "NL" },
+        { label: "CH - Switzerland", value: "CH" },
+        { label: "SE - Sweden", value: "SE" },
+        { label: "ZA - South Africa", value: "ZA" },
+        { label: "NZ - New Zealand", value: "NZ" },
+        { label: "TH - Thailand", value: "TH" },
+        { label: "ID - Indonesia", value: "ID" },
+        { label: "VN - Vietnam", value: "VN" },
+        { label: "TR - Turkey", value: "TR" },
+        { label: "BR - Brazil", value: "BR" },
+        { label: "MX - Mexico", value: "MX" }
+    ];
+
     return (
         <div className="space-y-8 select-none">
             {/* Title */}
@@ -206,29 +240,44 @@ const RateManager = () => {
                 {/* Margins Priority Rules Table (Full Width) */}
                 <div className="w-full space-y-6">
 
-                    {/* Filters Row */}
+                    {/* Filters & Search Row */}
                     <div
                         className="glass-card p-4 rounded-xl border border-[#687280]/20 flex flex-col md:flex-row gap-4 items-center justify-between">
-                        <div className="w-full md:w-64">
+                        <div className="w-full md:w-72">
+                            <label className="block text-[10px] text-[#687280] font-bold uppercase mb-1">Filter by User</label>
                             <CustomSelect
                                 options={tableFilterUsers}
                                 value={filterUserId}
                                 onChange={setFilterUserId}
+                                searchPlaceholder="Search merchant name, email..."
                             />
                         </div>
-                        <div className="relative w-full md:w-80">
-                            <input
-                                type="text"
-                                placeholder="Search Country Code or Type..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full px-4 py-2 pl-10 text-xs bg-[#E5E7EB]/40 border border-[#687280]/20 focus:border-[#FF6A00]/30 rounded-lg text-[#0A1F44] focus:outline-none transition-all"
-                            />
-                            <svg className="w-4 h-4 text-gray-500 absolute left-3 top-2.5" fill="none"
-                                 viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round"
-                                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                            </svg>
+                        <div className="w-full md:flex-1 md:max-w-md">
+                            <label className="block text-[10px] text-[#687280] font-bold uppercase mb-1">Search Rates & Margins</label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Search Merchant, Country (e.g. AE, US), Type..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full px-4 py-2.5 pl-10 pr-9 text-xs bg-white border border-[#687280]/30 focus:border-[#FF6A00] rounded-xl text-[#0A1F44] focus:outline-none transition-all shadow-sm"
+                                />
+                                <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none"
+                                     viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round"
+                                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                                {searchTerm && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchTerm("")}
+                                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full hover:bg-gray-100 transition"
+                                        title="Clear search"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -443,9 +492,9 @@ const RateManager = () => {
             {isAddingMargin && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div
-                        className="glass-card w-full max-w-lg rounded-2xl border border-[#FF6A00]/20 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden bg-[#E5E7EB]">
+                        className="glass-card w-full max-w-lg rounded-2xl border border-[#FF6A00]/20 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-visible bg-[#E5E7EB]">
                         <div
-                            className="bg-[#0A1F44] px-6 py-4 border-b border-[#687280]/20 flex items-center justify-between text-white">
+                            className="bg-[#0A1F44] px-6 py-4 border-b border-[#687280]/20 flex items-center justify-between text-white rounded-t-2xl">
                             <div>
                                 <h3 className="font-extrabold">Create Margin Markup Rule</h3>
                                 <p className="text-[10px] text-gray-400">Configure priority profit markups matching
@@ -464,6 +513,8 @@ const RateManager = () => {
                                     options={formModalUsers}
                                     value={marginUserId}
                                     onChange={setMarginUserId}
+                                    placeholder="All Users (Global Defaults)"
+                                    searchPlaceholder="Search merchant name, company, email..."
                                 />
                             </div>
 
@@ -496,14 +547,13 @@ const RateManager = () => {
 
                             <div className="grid grid-cols-3 gap-4 border-t border-[#687280]/20 pt-3">
                                 <div className="space-y-1.5">
-                                    <label className="block text-gray-500 font-semibold">Country code (Optional)</label>
-                                    <input
-                                        type="text"
-                                        maxLength="2"
-                                        placeholder="e.g. AE"
+                                    <label className="block text-gray-500 font-semibold">Country (Optional)</label>
+                                    <CustomSelect
+                                        options={countryOptions}
                                         value={marginCountry}
-                                        onChange={(e) => setMarginCountry(e.target.value)}
-                                        className="w-full px-3 py-2 bg-white border border-[#687280]/20 rounded-lg text-[#0A1F44] uppercase"
+                                        onChange={setMarginCountry}
+                                        placeholder="GLOBAL (*)"
+                                        searchPlaceholder="Search country..."
                                     />
                                 </div>
                                 <div className="space-y-1.5">

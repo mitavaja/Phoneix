@@ -112,7 +112,7 @@ const Dashboard = () => {
         <div className="glass-card p-6 rounded-2xl border border-[#687280]/20 lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-sm font-bold text-[#0A1F44]">Phreight Cloud Core Nodes</h3>
+              <h3 className="text-sm font-bold text-[#0A1F44]">Phreights Cloud Core Nodes</h3>
               <p className="text-xs text-[#687280]">Live virtualization micro-services and server clusters performance.</p>
             </div>
             <button

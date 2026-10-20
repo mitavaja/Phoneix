@@ -15,7 +15,7 @@ export const submitContact = async (req, res) => {
       message,
     });
 
-    res.status(201).json({ message: "Support ticket recorded. Phreight team alerted.", newMessage });
+    res.status(201).json({ message: "Support ticket recorded. Phreights team alerted.", newMessage });
   } catch (error) {
     res.status(500).json({ message: "Error submitting support request", error: error.message });
   }

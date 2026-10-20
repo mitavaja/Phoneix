@@ -110,7 +110,7 @@ const Logo = ({ className = "", showText = true, theme = "navy", size = "md", te
         </svg>
       )}
 
-      {showText && displayText && (
+      {showText && displayText && !displayLogoUrl && (
         <div className="flex flex-col select-none leading-none">
           <span
             className={`font-black tracking-wider uppercase ${sizeClasses.text}`}
