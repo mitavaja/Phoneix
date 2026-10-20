@@ -7,8 +7,14 @@ const __dirname = path.dirname(__filename);
 
 export const getLogoDataUri = () => {
     try {
-        const logoPath = path.join(__dirname, "../public/logo/phreights.png");
-        if (fs.existsSync(logoPath)) {
+        const candidateLogoPaths = [
+            path.join(__dirname, "../public/logo/phreights.png"),
+            path.join(process.cwd(), "public/logo/phreights.png"),
+            path.join(process.cwd(), "backend/public/logo/phreights.png"),
+            path.join(__dirname, "../../public/logo/phreights.png")
+        ];
+        const logoPath = candidateLogoPaths.find((p) => fs.existsSync(p));
+        if (logoPath) {
             const buf = fs.readFileSync(logoPath);
             return `data:image/png;base64,${buf.toString("base64")}`;
         }

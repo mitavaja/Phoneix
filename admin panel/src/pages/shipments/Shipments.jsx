@@ -98,7 +98,7 @@ const Shipments = () => {
                   : "bg-[#E5E7EB]/40 text-[#687280] hover:text-[#0A1F44] border-[#687280]/20"
               }`}
             >
-              {status === "all" ? "All Shipments" : status}
+              {status === "all" ? "All Shipments" : status === "Cancelled" ? "Hold Shipment" : status}
             </button>
           ))}
         </div>
@@ -145,7 +145,7 @@ const Shipments = () => {
                         className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider bg-[#E5E7EB] border border-[#687280]/20 text-[#0A1F44] cursor-pointer focus:outline-none focus:border-[#FF6A00]/50 ${
                           s.status === "Delivered"
                             ? "text-green-600 border-green-500/20"
-                            : s.status === "Cancelled"
+                            : (s.status === "Cancelled" || s.status === "Hold")
                             ? "text-red-600 border-red-500/20"
                             : s.status === "In Transit" || s.status === "Out for Delivery"
                             ? "text-[#FF6A00] border-[#FF6A00]/20"
@@ -156,7 +156,7 @@ const Shipments = () => {
                         <option value="In Transit" className="bg-[#0A1F44]">In Transit</option>
                         <option value="Out for Delivery" className="bg-[#0A1F44]">Out for Delivery</option>
                         <option value="Delivered" className="bg-[#0A1F44]">Delivered</option>
-                        <option value="Cancelled" className="bg-[#0A1F44]">Cancelled</option>
+                        <option value="Cancelled" className="bg-[#0A1F44]">Hold Shipment</option>
                       </select>
                     </td>
                     <td className="py-4 text-right">

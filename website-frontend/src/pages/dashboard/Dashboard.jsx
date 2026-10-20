@@ -1013,7 +1013,8 @@ const Dashboard = () => {
       case "Delivered":
         return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-500/10 text-green-500 border border-green-500/20">Delivered</span>;
       case "Cancelled":
-        return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-500 border border-red-500/20">Cancelled</span>;
+      case "Hold":
+        return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-500 border border-red-500/20">Hold Shipment</span>;
       default:
         return <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-500/10 text-gray-500 border border-gray-500/20">{status}</span>;
     }
@@ -1307,7 +1308,7 @@ const Dashboard = () => {
                           <option value="Pickup Scheduled" className="bg-[#0A1F44]">Pickup Scheduled</option>
                           <option value="In Transit" className="bg-[#0A1F44]">In Transit</option>
                           <option value="Delivered" className="bg-[#0A1F44]">Delivered</option>
-                          <option value="Cancelled" className="bg-[#0A1F44]">Cancelled</option>
+                          <option value="Cancelled" className="bg-[#0A1F44]">Hold Shipment</option>
                         </select>
                       </div>
                       <button onClick={handleExportCSV} className="flex items-center gap-2 bg-[#FF6A00]/10 border border-[#FF6A00]/30 text-[#FF6A00] hover:bg-[#FF6A00] hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition">

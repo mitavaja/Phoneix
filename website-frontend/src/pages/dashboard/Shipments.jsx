@@ -268,7 +268,7 @@ const Shipments = () => {
 
     const filteredShipments = shipments.filter(sh => {
         const matchesSearch = sh.shipmentId.toLowerCase().includes(searchQuery.toLowerCase()) || sh.customer.toLowerCase().includes(searchQuery.toLowerCase()) || (sh.courierTrackingNumber && sh.courierTrackingNumber.toLowerCase().includes(searchQuery.toLowerCase()));
-        const matchesStatus = statusFilter === "All" || sh.status === statusFilter;
+        const matchesStatus = statusFilter === "All" || sh.status === statusFilter || (statusFilter === "Cancelled" && (sh.status === "Cancelled" || sh.status === "Hold"));
         return matchesSearch && matchesStatus;
     });
 
@@ -280,8 +280,8 @@ const Shipments = () => {
         if (s === "delivered") {
             return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-green-100 text-green-700 border border-green-200">Delivered</span>;
         }
-        if (s === "cancelled") {
-            return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 border border-red-200">Cancelled</span>;
+        if (s === "cancelled" || s === "hold" || s === "hold shipment") {
+            return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 border border-red-200">Hold Shipment</span>;
         }
         if (s === "in transit" || s === "out for delivery") {
             return <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-orange-100 text-orange-700 border border-orange-200">In Transit</span>;
@@ -356,7 +356,7 @@ const Shipments = () => {
                             <option value="Pickup Scheduled">Pickup Scheduled</option>
                             <option value="In Transit">In Transit</option>
                             <option value="Delivered">Delivered</option>
-                            <option value="Cancelled">Cancelled</option>
+                            <option value="Cancelled">Hold Shipment</option>
                         </select>
                     </div>
                 </div>

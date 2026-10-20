@@ -934,7 +934,9 @@ export const getAllShipments = async (req, res) => {
       } else if (status === "Dispatched") {
         matchStage.status = { $in: ["Pickup Requested", "Pickup Scheduled"] };
       } else if (status === "Exception") {
-        matchStage.status = { $in: ["Failed Delivery", "Cancelled"] };
+        matchStage.status = { $in: ["Failed Delivery", "Cancelled", "Hold", "HOLD"] };
+      } else if (status.toLowerCase() === "hold" || status.toLowerCase() === "cancelled") {
+        matchStage.status = { $in: ["Cancelled", "Hold", "HOLD"] };
       } else if (status === "Scheduled") {
         matchStage.status = { $in: ["Booked", "Pending", "Label Generated"] };
       } else {
@@ -1330,8 +1332,14 @@ export const downloadInvoicePdf = async (req, res) => {
     doc.pipe(res);
 
     // Invoice Header Logo & Business Information
-    const logoPath = path.join(process.cwd(), "public/logo/phreights.png");
-    if (fs.existsSync(logoPath)) {
+    const candidateLogoPaths = [
+      path.join(process.cwd(), "backend/public/logo/phreights.png"),
+      path.join(process.cwd(), "public/logo/phreights.png"),
+      path.join(__dirname, "../public/logo/phreights.png"),
+      path.join(__dirname, "../../public/logo/phreights.png")
+    ];
+    const logoPath = candidateLogoPaths.find((p) => fs.existsSync(p));
+    if (logoPath) {
       doc.roundedRect(48, 36, 145, 48, 6).fill("#0A1F44");
       doc.image(logoPath, 55, 40, { height: 40 });
     }

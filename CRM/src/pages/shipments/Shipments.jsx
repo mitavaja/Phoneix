@@ -103,7 +103,7 @@ const Shipments = () => {
     const getStatusBadgeColor = (status) => {
         const s = (status || "").toLowerCase();
         if (s === "delivered") return "bg-green-100 text-green-700 border-green-200";
-        if (s === "cancelled") return "bg-red-100 text-red-700 border-red-200";
+        if (s === "cancelled" || s === "hold" || s === "hold shipment") return "bg-red-100 text-red-700 border-red-200";
         if (s === "in transit" || s === "out for delivery") return "bg-orange-100 text-orange-700 border-orange-200";
         if (s === "pickup scheduled") return "bg-purple-100 text-purple-700 border-purple-200";
         return "bg-blue-100 text-blue-700 border-blue-200"; // Booked / Draft
@@ -143,7 +143,7 @@ const Shipments = () => {
                 </div>
 
                 <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1 w-full md:w-auto">
-                    {["all", "Booked", "Pickup Scheduled", "In Transit", "Delivered", "Cancelled"].map((status) => (
+                    {["all", "Draft", "Booked", "Pickup Scheduled", "In Transit", "Delivered", "Hold"].map((status) => (
                         <button
                             key={status}
                             onClick={() => setStatusFilter(status)}
@@ -153,7 +153,7 @@ const Shipments = () => {
                                     : "bg-[#E5E7EB]/40 text-[#687280] hover:text-[#0A1F44] border-[#687280]/20"
                             }`}
                         >
-                            {status === "all" ? "All Shipments" : status}
+                            {status === "all" ? "All Shipments" : status === "Hold" ? "Hold Shipment" : status}
                         </button>
                     ))}
                 </div>
@@ -217,7 +217,7 @@ const Shipments = () => {
                                     <td className="py-4 text-center">
                           <span
                               className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider border ${getStatusBadgeColor(s.status)}`}>
-                            {s.status}
+                            {s.status === "Cancelled" || s.status === "Hold" ? "Hold Shipment" : s.status}
                           </span>
                                     </td>
 

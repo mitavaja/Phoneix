@@ -59,11 +59,11 @@ const Cancelled = () => {
       {/* Title */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-extrabold text-[#0A1F44] tracking-tight">Cancelled & RTO Shipments</h1>
+          <h1 className="text-2xl font-extrabold text-[#0A1F44] tracking-tight">Hold & RTO Shipments</h1>
           <p className="text-sm text-[#687280]">Review platform-failed dispatches, manage Return-to-Origin (RTO) penalty charges, and authorize wallet refunds.</p>
         </div>
         <div className="glass-card px-4 py-2 rounded-xl border border-red-500/20 text-red-600 text-center font-bold text-xs bg-red-500/5">
-          {cancellations.length} Cancelled Logs
+          {cancellations.length} Hold Logs
         </div>
       </div>
 
@@ -95,7 +95,7 @@ const Cancelled = () => {
                 <th className="pb-3 font-semibold">COURIER</th>
                 <th className="pb-3 font-semibold">CANCELLATION/RTO EXCEPTION DETAIL</th>
                 <th className="pb-3 font-semibold">RTO FEE CHARGED</th>
-                <th className="pb-3 font-semibold">CANCELLED DATE</th>
+                <th className="pb-3 font-semibold">HOLD / CANCEL DATE</th>
                 <th className="pb-3 font-semibold text-center">REFUND STATUS</th>
                 <th className="pb-3 font-semibold text-right">ADMIN DECISION</th>
               </tr>
@@ -104,7 +104,7 @@ const Cancelled = () => {
               {loading ? (
                 <tr>
                   <td colSpan="9" className="py-8 text-center text-gray-500">
-                    Loading cancelled shipments log...
+                    Loading hold shipments log...
                   </td>
                 </tr>
               ) : (
@@ -154,7 +154,7 @@ const Cancelled = () => {
               {!loading && filteredCancellations.length === 0 && (
                 <tr>
                   <td colSpan="9" className="py-12 text-center text-gray-500 font-semibold">
-                    🎉 Splendid! No cancelled shipments match search parameters.
+                    🎉 Splendid! No hold shipments match search parameters.
                   </td>
                 </tr>
               )}
