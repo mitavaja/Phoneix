@@ -135,7 +135,12 @@ const SingleBooking = () => {
 
         try {
             if (isManualRecipient) {
-                if (!singleForm.receiverName || !singleForm.receiverMobile || !singleForm.receiverAddress || !singleForm.receiverCity || !singleForm.receiverState || !singleForm.receiverCountry || !singleForm.receiverPincode) {
+                if (!singleForm.receiverCountry) {
+                    setBookingError("Destination Country is compulsory.");
+                    setEstimating(false);
+                    return;
+                }
+                if (!singleForm.receiverName || !singleForm.receiverMobile || !singleForm.receiverAddress || !singleForm.receiverCity || !singleForm.receiverState) {
                     setBookingError("Please complete all required recipient fields.");
                     setEstimating(false);
                     return;
@@ -149,7 +154,7 @@ const SingleBooking = () => {
                             addressLine1: singleForm.receiverAddress,
                             city: singleForm.receiverCity,
                             stateOrProvinceCode: singleForm.receiverState,
-                            postCode: singleForm.receiverPincode,
+                            postCode: singleForm.receiverPincode || "",
                             countryCode: singleForm.receiverCountry,
                         });
                         if (newCustRes.data?.data) {
@@ -202,7 +207,12 @@ const SingleBooking = () => {
 
         try {
             if (isManualRecipient) {
-                if (!singleForm.receiverName || !singleForm.receiverMobile || !singleForm.receiverAddress || !singleForm.receiverCity || !singleForm.receiverState || !singleForm.receiverCountry || !singleForm.receiverPincode) {
+                if (!singleForm.receiverCountry) {
+                    setBookingError("Destination Country is compulsory.");
+                    setBookingLoading(false);
+                    return;
+                }
+                if (!singleForm.receiverName || !singleForm.receiverMobile || !singleForm.receiverAddress || !singleForm.receiverCity || !singleForm.receiverState) {
                     setBookingError("Please complete all required recipient fields.");
                     setBookingLoading(false);
                     return;
@@ -216,7 +226,7 @@ const SingleBooking = () => {
                             addressLine1: singleForm.receiverAddress,
                             city: singleForm.receiverCity,
                             stateOrProvinceCode: singleForm.receiverState,
-                            postCode: singleForm.receiverPincode,
+                            postCode: singleForm.receiverPincode || "",
                             countryCode: singleForm.receiverCountry,
                         });
                         if (newCustRes.data?.data) {
@@ -424,7 +434,7 @@ const SingleBooking = () => {
                                         <input type="text" placeholder="State / Province *" value={singleForm.receiverState} onChange={(e) => setSingleForm({ ...singleForm, receiverState: e.target.value.toUpperCase() })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs uppercase shadow-sm" required />
                                     </div>
                                     <div>
-                                        <input type="text" placeholder="Pincode *" value={singleForm.receiverPincode} onChange={(e) => setSingleForm({ ...singleForm, receiverPincode: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
+                                        <input type="text" placeholder="Zip / Postal Code (Optional)" value={singleForm.receiverPincode} onChange={(e) => setSingleForm({ ...singleForm, receiverPincode: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                                     </div>
                                 </div>
 
