@@ -77,8 +77,9 @@ const WalletLedger = () => {
                 key: orderRes.data.keyId,
                 amount: Math.round(orderRes.data.amount * 100),
                 currency: orderRes.data.currency,
-                name: "Phoenix Aggregator",
+                name: "Phreights",
                 description: `Wallet Recharge: ${orderRes.data.currency} ${orderRes.data.amount}`,
+                image: `${window.location.origin}/phreights-logo.png`,
                 order_id: orderRes.data.orderId,
                 handler: async function (response) {
                     try {
@@ -105,7 +106,7 @@ const WalletLedger = () => {
                     contact: user?.mobileNumber || "",
                 },
                 theme: {
-                    color: "#FF6A00",
+                    color: "#0A1F44",
                 },
             };
 
@@ -423,22 +424,22 @@ const WalletLedger = () => {
                     <div className="w-full max-w-2xl bg-white rounded-3xl overflow-hidden shadow-2xl border border-gray-200 flex flex-col md:flex-row text-gray-800 font-sans">
 
                         {/* Left Header Panel */}
-                        <div className="w-full md:w-5/12 bg-gradient-to-b from-[#FF6A00] to-[#e05b00] p-6 text-white flex flex-col justify-between relative overflow-hidden">
+                        <div className="w-full md:w-5/12 bg-gradient-to-b from-[#0A1F44] to-[#071630] p-6 text-white flex flex-col justify-between relative overflow-hidden border-r border-[#687280]/20">
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs uppercase tracking-widest font-bold opacity-80">Razorpay Simulation</span>
-                                    <span className="text-[9px] bg-white/20 px-2 py-0.5 rounded-full font-bold">TEST MODE</span>
+                                    <img src="/phreights-logo.png" alt="Phreights Logo" className="h-7 w-auto object-contain" />
+                                    <span className="text-[9px] bg-white/15 px-2 py-0.5 rounded-full font-bold text-gray-200">PAYMENT</span>
                                 </div>
 
                                 <div>
-                                    <span className="text-xs opacity-75">Payable Amount</span>
-                                    <h2 className="text-3xl font-black mt-0.5">₹{razorpayOrderData.amount.toFixed(2)}</h2>
+                                    <span className="text-xs text-gray-300">Payable Amount</span>
+                                    <h2 className="text-3xl font-black mt-0.5 text-white">₹{razorpayOrderData.amount.toFixed(2)}</h2>
                                 </div>
                             </div>
 
-                            <div className="space-y-1 text-xs opacity-85 mt-6">
-                                <p>Order: <span className="font-mono text-[10px]">{razorpayOrderData.orderId}</span></p>
-                                <p>Merchant: Phoenix Logistics Node</p>
+                            <div className="space-y-1 text-xs text-gray-300 mt-6">
+                                <p>Order: <span className="font-mono text-[10px] text-gray-200">{razorpayOrderData.orderId}</span></p>
+                                <p>Merchant: <span className="font-semibold text-white">Phreights Logistics</span></p>
                             </div>
                         </div>
 
