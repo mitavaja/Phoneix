@@ -32,7 +32,7 @@ const RateCalculator = () => {
     const [calcLoading, setCalcLoading] = useState(false);
     const [calcError, setCalcError] = useState("");
 
-    const [isManualRecipient, setIsManualRecipient] = useState(false);
+    const [isManualRecipient, setIsManualRecipient] = useState(true);
     const [saveManualRecipient, setSaveManualRecipient] = useState(false);
 
     useEffect(() => {
@@ -69,29 +69,16 @@ const RateCalculator = () => {
 
         try {
             if (isManualRecipient) {
-                if (!calcForm.receiverName || !calcForm.receiverMobile || !calcForm.receiverAddress || !calcForm.receiverCity || !calcForm.receiverState || !calcForm.receiverCountry || !calcForm.receiverPincode) {
-                    setCalcError("Please complete all required recipient fields.");
+                if (!calcForm.receiverCountry) {
+                    setCalcError("Destination Country is compulsory.");
                     setCalcLoading(false);
                     return;
                 }
-
-                if (saveManualRecipient) {
-                    try {
-                        const newCustRes = await API.post("/recipient-customer", {
-                            name: calcForm.receiverName,
-                            mobile: calcForm.receiverMobile,
-                            addressLine1: calcForm.receiverAddress,
-                            city: calcForm.receiverCity,
-                            stateOrProvinceCode: calcForm.receiverState,
-                            postCode: calcForm.receiverPincode,
-                            countryCode: calcForm.receiverCountry,
-                        });
-                        if (newCustRes.data?.data) {
-                            setCustomers(prev => [...prev, newCustRes.data.data]);
-                        }
-                    } catch (custErr) {
-                        console.error("Could not background save customer", custErr);
-                    }
+            } else {
+                if (!calcForm.customerId) {
+                    setCalcError("Please select a destination customer or enter destination directly.");
+                    setCalcLoading(false);
+                    return;
                 }
             }
 
@@ -105,13 +92,13 @@ const RateCalculator = () => {
                 height: calcForm.height ? parseFloat(calcForm.height) : 0,
                 productGroup: calcForm.productGroup,
                 productType: calcForm.courier === "aramex" ? calcForm.productType : undefined,
-                receiverName: calcForm.receiverName,
-                receiverMobile: calcForm.receiverMobile,
-                receiverAddressLine1: calcForm.receiverAddress,
-                receiverCity: calcForm.receiverCity,
-                receiverState: calcForm.receiverState,
+                receiverName: "Guest Recipient",
+                receiverMobile: "0000000000",
+                receiverAddressLine1: "N/A",
+                receiverCity: calcForm.receiverCity || "N/A",
+                receiverState: calcForm.receiverState || "N/A",
                 receiverCountry: calcForm.receiverCountry,
-                receiverPincode: calcForm.receiverPincode,
+                receiverPincode: calcForm.receiverPincode || "",
             };
 
             const res = await API.post("/rates/calculate", payload);
@@ -215,7 +202,7 @@ const RateCalculator = () => {
                                 onClick={() => setIsManualRecipient(!isManualRecipient)}
                                 className="text-[10px] text-[#FF6A00] hover:text-[#0A1F44] font-bold transition flex items-center gap-1 bg-[#FF6A00]/10 px-2.5 py-1 rounded-lg"
                             >
-                                {isManualRecipient ? "Use Saved Directory" : <><Plus size={12} /> Add New Recipient Inline</>}
+                                {isManualRecipient ? "Use Saved Directory" : <><Plus size={12} /> Enter Destination Directly</>}
                             </button>
                         </div>
 
@@ -234,44 +221,31 @@ const RateCalculator = () => {
                             </div>
                         ) : (
                             <div className="space-y-4 border-t border-[#687280]/15 pt-4">
-                                <div className="grid md:grid-cols-3 gap-4">
+                                <div className="grid md:grid-cols-2 gap-4">
                                     <div>
-                                        <input type="text" placeholder="Contact Name *" value={calcForm.receiverName} onChange={(e) => setCalcForm({ ...calcForm, receiverName: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
-                                    </div>
-                                    <div>
-                                        <input type="text" placeholder="Mobile *" value={calcForm.receiverMobile} onChange={(e) => setCalcForm({ ...calcForm, receiverMobile: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
-                                    </div>
-                                    <div>
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Destination Country <span className="text-red-500">* (Compulsory)</span></label>
                                         <Select
-                                            placeholder="Country (AE) *"
+                                            placeholder="Country (Compulsory) *"
                                             options={ARAMEX_SUPPORTED_COUNTRIES}
                                             value={calcForm.receiverCountry}
                                             onChange={(val) => setCalcForm({ ...calcForm, receiverCountry: val.toUpperCase() })}
                                         />
                                     </div>
-                                </div>
-
-                                <div>
-                                    <input type="text" placeholder="Full Address *" value={calcForm.receiverAddress} onChange={(e) => setCalcForm({ ...calcForm, receiverAddress: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
-                                </div>
-
-                                <div className="grid md:grid-cols-3 gap-4">
                                     <div>
-                                        <input type="text" placeholder="City *" value={calcForm.receiverCity} onChange={(e) => setCalcForm({ ...calcForm, receiverCity: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
-                                    </div>
-                                    <div>
-                                        <input type="text" placeholder="State / Province *" value={calcForm.receiverState} onChange={(e) => setCalcForm({ ...calcForm, receiverState: e.target.value.toUpperCase() })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs uppercase shadow-sm" required />
-                                    </div>
-                                    <div>
-                                        <input type="text" placeholder="Pincode *" value={calcForm.receiverPincode} onChange={(e) => setCalcForm({ ...calcForm, receiverPincode: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" required />
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Zip / Postal Code <span className="text-gray-400 font-normal lowercase">(optional)</span></label>
+                                        <input type="text" placeholder="Zip / Postal Code (Optional)" value={calcForm.receiverPincode} onChange={(e) => setCalcForm({ ...calcForm, receiverPincode: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 pt-2">
-                                    <input type="checkbox" id="saveCalcRecipient" checked={saveManualRecipient} onChange={(e) => setSaveManualRecipient(e.target.checked)} className="accent-[#FF6A00] w-4 h-4 cursor-pointer" />
-                                    <label htmlFor="saveCalcRecipient" className="text-xs text-[#0A1F44] font-semibold cursor-pointer select-none">
-                                        Save this recipient to Customer Directory for future use
-                                    </label>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">City</label>
+                                        <input type="text" placeholder="City" value={calcForm.receiverCity} onChange={(e) => setCalcForm({ ...calcForm, receiverCity: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">State / Province</label>
+                                        <input type="text" placeholder="State / Province" value={calcForm.receiverState} onChange={(e) => setCalcForm({ ...calcForm, receiverState: e.target.value.toUpperCase() })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs uppercase shadow-sm" />
+                                    </div>
                                 </div>
                             </div>
                         )}

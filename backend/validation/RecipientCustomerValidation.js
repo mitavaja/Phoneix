@@ -12,7 +12,7 @@ const validateRecipient = (data) => {
         }),
         city: Joi.string().trim().required(),
         stateOrProvinceCode: Joi.string().trim().required(),
-        postCode: Joi.string().trim().required()
+        postCode: Joi.string().trim().allow('', null).optional()
     });
 
     return schema.validate(data, {
