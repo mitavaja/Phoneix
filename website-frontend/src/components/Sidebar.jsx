@@ -146,7 +146,7 @@ const Sidebar = ({ user, wallet, handleLogout }) => {
           {icons.logout}
           <span>Logout</span>
         </button>
-        <div className="text-[10px] text-gray-500 text-center font-medium">Phoenix Aggregator v1.1</div>
+        <div className="text-[10px] text-gray-400 text-center font-medium">Phreights Logistics v1.1</div>
       </div>
     </div>
   );
