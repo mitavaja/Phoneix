@@ -28,6 +28,7 @@ router.use(authMiddleware);
 router.get("/me", getMyWallet);
 router.get("/transactions/me", getMyTransactions);
 router.post("/recharge", rechargeWallet);
+router.post("/create-recharge-order", rechargeWallet);
 router.post("/verify-recharge", verifyRecharge);
 router.post("/bank-transfer", requestBankTransfer);
 
