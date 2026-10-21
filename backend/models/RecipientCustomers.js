@@ -40,7 +40,7 @@ const RecipientSchema = new Schema({
     },
     postCode: {
         type: String,
-        required: true,
+        default: "",
     }
 }, {
     timestamps: true,

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import API from "../../services/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Logo from "../../components/Logo";
 import { 
   Upload, User, Mail, Lock, Phone, Building, Briefcase, 
@@ -9,7 +9,16 @@ import {
 import { isValidEmail, isValidPhone, isValidPassword, checkPasswordStrength } from "../../utils/validation";
 
 const Register = () => {
-  const [step, setStep] = useState(1);
+  const [searchParams] = useSearchParams();
+  const queryStep = parseInt(searchParams.get("step"));
+  const [step, setStep] = useState(queryStep || 1);
+
+  React.useEffect(() => {
+    const s = parseInt(searchParams.get("step"));
+    if (s && s >= 1 && s <= 4) {
+      setStep(s);
+    }
+  }, [searchParams]);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -75,7 +84,7 @@ const Register = () => {
       if (!files.panCard) return "PAN Card file is required.";
       if (!files.aadhaarCard) return "Aadhaar Card file is required.";
       if (form.gstType === "Non-GST") {
-        if (!files.lightbill) return "Lightbill file is required.";
+        // Lightbill is optional for Non-GST partners
       } else {
         if (!files.addressProof) return "Address Proof file is required.";
         if (!files.companyRegistration) return "Company Registration file is required.";
@@ -525,7 +534,7 @@ const Register = () => {
 
                 {form.gstType === "Non-GST" ? (
                   <div className="grid sm:grid-cols-1 gap-4">
-                    <FileUploadField label="Lightbill" field="lightbill" required={true} />
+                    <FileUploadField label="Lightbill (Optional)" field="lightbill" required={false} />
                   </div>
                 ) : (
                   <>
@@ -590,7 +599,7 @@ const Register = () => {
                       {[
                         { label: "PAN Card", name: files.panCard?.name },
                         { label: "Aadhaar Card", name: files.aadhaarCard?.name },
-                        form.gstType === "Non-GST" ? { label: "Lightbill", name: files.lightbill?.name } : null,
+                        form.gstType === "Non-GST" ? { label: "Lightbill", name: files.lightbill?.name || "Not uploaded (Optional)" } : null,
                         form.gstType !== "Non-GST" ? { label: "Address Proof", name: files.addressProof?.name } : null,
                         form.gstType !== "Non-GST" ? { label: "Company Reg.", name: files.companyRegistration?.name } : null,
                         form.gstType !== "Non-GST" ? { label: "GST Cert.", name: files.gstCertificate?.name || "Not provided" } : null
