@@ -19,11 +19,11 @@
     "xlsx-js-style": "^1.2.0"
   },
   "scripts": {
-    "start": "vite",
-    "build": "vite build",
+    "start": "node init && vite",
+    "build": "node init && vite build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "dev": "vite",
+    "dev": "node init && vite",
     "preview": "vite preview"
   },
   "eslintConfig": {

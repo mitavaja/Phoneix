@@ -862,9 +862,9 @@ const Dashboard = () => {
         key: keyId,
         amount: orderDetails.amount,
         currency: orderDetails.currency || "INR",
-        name: "Phoenix Commerce",
+        name: "Phreights",
         description: `Wallet Topup - ${selectedCurrency} ${parseFloat(rechargeAmount).toFixed(2)}`,
-        image: "https://razorpay.com/favicon.png",
+        image: `${window.location.origin}/phreights-logo.png`,
         order_id: orderId,
         handler: async function (response) {
           try {
@@ -897,7 +897,7 @@ const Dashboard = () => {
           currency: selectedCurrency
         },
         theme: {
-          color: "#FF6A00",
+          color: "#0A1F44",
           backdrop_color: "rgba(10, 31, 68, 0.85)"
         }
       };
@@ -1123,8 +1123,8 @@ const Dashboard = () => {
               Secure Logout
             </button>
 
-            <div className="text-xs text-gray-500 text-center font-medium">
-              Phoenix Aggregator v1.1
+            <div className="text-xs text-gray-400 text-center font-medium">
+              Phreights Logistics v1.1
             </div>
           </div>
         </aside>
@@ -3126,17 +3126,15 @@ const Dashboard = () => {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
               <div className="w-full max-w-2xl bg-white rounded-3xl overflow-hidden shadow-2xl border border-gray-200 flex flex-col md:flex-row text-gray-800 font-sans">
 
-                {/* Left Header Panel (Orange Theme #FF6A00) */}
-                <div className="w-full md:w-5/12 bg-gradient-to-b from-[#FF6A00] to-[#e05b00] p-6 text-white flex flex-col justify-between relative overflow-hidden">
+                {/* Left Header Panel (Website Navy Brand Theme #0A1F44) */}
+                <div className="w-full md:w-5/12 bg-gradient-to-b from-[#0A1F44] to-[#071630] p-6 text-white flex flex-col justify-between relative overflow-hidden border-r border-[#687280]/20">
                   <div className="space-y-4 relative z-10">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center font-black text-white text-sm">
-                        P
-                      </div>
-                      <span className="font-extrabold text-sm tracking-wide">PHOENIX COMMERCE</span>
+                    <div className="flex items-center gap-2.5">
+                      <img src="/phreights-logo.png" alt="Phreights Logo" className="h-8 w-auto object-contain" />
+                      <span className="font-extrabold text-sm tracking-wide text-white">PHREIGHTS</span>
                     </div>
 
-                    <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm border border-white/20">
+                    <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-sm border border-white/15">
                       <span className="text-[10px] text-white/80 block uppercase tracking-wider font-bold">Price Summary</span>
                       <span className="text-3xl font-black text-white">₹{razorpayOrderData.amount.toFixed(2)}</span>
                     </div>
@@ -3147,9 +3145,9 @@ const Dashboard = () => {
                     </div>
                   </div>
 
-                  <div className="pt-6 relative z-10 flex items-center justify-between text-[11px] text-white/80 border-t border-white/20 mt-4">
+                  <div className="pt-6 relative z-10 flex items-center justify-between text-[11px] text-white/80 border-t border-white/15 mt-4">
                     <span>Secured by <strong>Razorpay</strong></span>
-                    <span className="bg-black/20 px-2 py-0.5 rounded font-mono text-[9px]">Live Checkout</span>
+                    <span className="bg-[#FF6A00]/20 text-[#FF6A00] px-2 py-0.5 rounded font-mono text-[9px] font-bold">Secure Checkout</span>
                   </div>
                 </div>
 
