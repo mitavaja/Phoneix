@@ -6,8 +6,6 @@
 **/.vite
 
 # Environment
-**/.env
-**/.env.*
 
 # Logs
 *.log
@@ -27,3 +25,4 @@ Phoneix-main/
 FETCH_HEAD
 git
 {
+config.bat
