@@ -5,6 +5,8 @@ import moment from "moment";
 import { ARAMEX_SUPPORTED_COUNTRIES } from "../../utils/countries";
 import { Select } from "../../components/ui/Select";
 import { toast } from "react-toastify";
+import { fetchLocationByPincode } from "../../utils/pincodeHelper";
+import { Loader2 } from "lucide-react";
 
 const Warehouses = () => {
     const [warehouses, setWarehouses] = useState([]);
@@ -12,6 +14,31 @@ const Warehouses = () => {
     const [isEditingWarehouse, setIsEditingWarehouse] = useState(false);
     const [canEditLocation, setCanEditLocation] = useState(false);
     const [nextEditDate, setNextEditDate] = useState("");
+    const [isFetchingPin, setIsFetchingPin] = useState(false);
+
+    const handlePincodeChange = async (val) => {
+        setWarehouseForm(prev => ({ ...prev, pincode: val }));
+        const clean = val.trim();
+        if (clean.length === 6 && /^\d{6}$/.test(clean)) {
+            setIsFetchingPin(true);
+            try {
+                const loc = await fetchLocationByPincode(clean, warehouseForm.country || "IN");
+                if (loc && (!isEditingWarehouse || canEditLocation)) {
+                    setWarehouseForm(prev => ({
+                        ...prev,
+                        city: loc.city || prev.city,
+                        state: loc.state || prev.state,
+                        country: "IN"
+                    }));
+                    toast.info(`Auto-fetched: ${loc.city}, ${loc.state}`);
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setIsFetchingPin(false);
+            }
+        }
+    };
 
     const [warehouseForm, setWarehouseForm] = useState({
         addressName: "",
@@ -214,12 +241,19 @@ const Warehouses = () => {
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Pincode</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="text-[10px] text-[#687280] font-bold uppercase tracking-wider">Pincode *</label>
+                                {isFetchingPin && (
+                                    <span className="text-[10px] text-[#FF6A00] flex items-center gap-1 font-semibold animate-pulse">
+                                        <Loader2 size={11} className="animate-spin" /> Fetching city/state...
+                                    </span>
+                                )}
+                            </div>
                             <input
                                 type="text"
-                                placeholder="400001"
+                                placeholder="Enter 6-digit Pincode (400001)"
                                 value={warehouseForm.pincode}
-                                onChange={(e) => setWarehouseForm({ ...warehouseForm, pincode: e.target.value })}
+                                onChange={(e) => handlePincodeChange(e.target.value)}
                                 required
                                 className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm"
                             />

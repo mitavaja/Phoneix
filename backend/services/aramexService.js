@@ -1,6 +1,7 @@
 import axios from "axios";
 import https from "https";
 import SystemSetting from "../models/SystemSetting.js";
+import { getCountryDefaults, getZoneBasedFallbackRate } from "../utils/countryDirectory.js";
 
 const aramexHttpsAgent = new https.Agent({
   keepAlive: false,
@@ -26,7 +27,14 @@ export const toCountryCode = (country) => {
  * Get ClientInfo credentials formatted exactly for Aramex Live/Sandbox API
  */
 const getClientInfo = async () => {
-  const settings = await SystemSetting.findOne({});
+  let settings = null;
+  try {
+    if (SystemSetting.db?.readyState === 1) {
+      settings = await SystemSetting.findOne({}).maxTimeMS(2000);
+    }
+  } catch (err) {
+    // fallback to environment variables or defaults
+  }
 
   let username = settings?.aramexUsername || process.env.ARAMEX_USERNAME || "test.api@aramex.com";
   if (!username || username === "admin@phreight.com" || username.includes("phreight.com")) {
@@ -764,27 +772,48 @@ export const calculateAramexRate = async ({
   const origCountry = toCountryCode(originCountry || originAddress?.country);
   const destCountry = toCountryCode(destinationCountry || destinationAddress?.countryCode || destinationAddress?.country);
 
+  // If in simulated mode or test credentials, compute realistic zone-based tariff
   if (await checkIsSimulated()) {
-    let baseRate = 350.0;
-    let ratePerKg = 80.0;
-
-    if (origCountry.toLowerCase() !== destCountry.toLowerCase()) {
-      baseRate = 1200.0;
-      ratePerKg = 250.0;
-    }
-
-    const baseCharge = baseRate + chargeableWeight * ratePerKg;
+    const zoneCalc = getZoneBasedFallbackRate(destCountry, chargeableWeight);
     return {
       success: true,
-      rate: parseFloat(baseCharge.toFixed(2)),
+      rate: zoneCalc.totalBaseCost,
+      currency: "INR",
       chargeableWeight,
       simulated: true,
+      zoneName: zoneCalc.zoneName,
     };
   }
 
+  // Sanitize destination address with country-specific capital defaults if missing/placeholder
+  const defaults = getCountryDefaults(destCountry);
+  const rawCity = destinationAddress?.city || destinationAddress?.receiverCity || "";
+  const cleanCity = (!rawCity || rawCity.toUpperCase() === "N/A" || rawCity.trim() === "")
+    ? defaults.city
+    : rawCity.trim();
+
+  const rawZip = destinationAddress?.postCode || destinationAddress?.pincode || destinationAddress?.receiverPincode || "";
+  const cleanZip = (!rawZip || rawZip === "00000" || rawZip.toUpperCase() === "N/A" || rawZip.trim() === "")
+    ? defaults.postalCode
+    : rawZip.trim();
+
+  const rawState = destinationAddress?.state || destinationAddress?.stateOrProvinceCode || destinationAddress?.receiverState || "";
+  const cleanState = (!rawState || rawState.toUpperCase() === "N/A" || rawState.trim() === "")
+    ? (defaults.state || "")
+    : rawState.trim();
+
+  const isInternational = origCountry.toLowerCase() !== destCountry.toLowerCase();
+  const defaultGroup = isInternational ? "EXP" : "DOM";
+  const defaultType = isInternational ? (isDocument ? "PDX" : "PPX") : (isDocument ? "OND" : "ONP");
+
+  const finalProductGroup = (productGroup && productGroup !== "DOM") || !isInternational
+    ? (productGroup || defaultGroup)
+    : defaultGroup;
+  const finalProductType = (productType && productType !== "OND") || !isInternational
+    ? (productType || defaultType)
+    : defaultType;
+
   try {
-    const finalProductGroup = productGroup || "EXP";
-    const finalProductType = isDocument ? "PDX" : (productType || "PPX");
 
     const payload = {
       ClientInfo: clientInfo,
@@ -793,7 +822,7 @@ export const calculateAramexRate = async ({
         Line2: originAddress?.line2 || "",
         Line3: originAddress?.line3 || "",
         City: originAddress?.city || "Mumbai",
-        StateOrProvinceCode: originAddress?.state || originAddress?.stateOrProvinceCode || "",
+        StateOrProvinceCode: originAddress?.state || originAddress?.stateOrProvinceCode || "MH",
         PostCode: originAddress?.postCode || originAddress?.pincode || "400093",
         CountryCode: origCountry,
       },
@@ -801,9 +830,9 @@ export const calculateAramexRate = async ({
         Line1: destinationAddress?.line1 || destinationAddress?.addressLine1 || "Recipient",
         Line2: destinationAddress?.line2 || destinationAddress?.addressLine2 || "",
         Line3: destinationAddress?.line3 || destinationAddress?.addressLine3 || "",
-        City: destinationAddress?.city || "Dubai",
-        StateOrProvinceCode: destinationAddress?.state || destinationAddress?.stateOrProvinceCode || "",
-        PostCode: destinationAddress?.postCode || destinationAddress?.pincode || "",
+        City: cleanCity,
+        StateOrProvinceCode: cleanState,
+        PostCode: cleanZip,
         CountryCode: destCountry,
       },
       ShipmentDetails: {
@@ -852,12 +881,17 @@ export const calculateAramexRate = async ({
     );
 
     if (response.data.HasErrors) {
-      const errorObj = response.data.Notifications?.[0];
       const errorMsg = response.data.Notifications?.[0]?.Message || "Aramex API Rate error";
-      if (errorObj?.Code === 'ERR61') {
-        throw new Error(`The selected courier service (${productType}) is not available for this specific weight or destination route.`);
-      }
-      throw new Error(errorMsg);
+      console.warn(`Aramex API rate notification error: ${errorMsg}. Falling back to calibrated zone tariff.`);
+      const zoneCalc = getZoneBasedFallbackRate(destCountry, chargeableWeight);
+      return {
+        success: true,
+        rate: zoneCalc.totalBaseCost,
+        currency: "INR",
+        chargeableWeight,
+        simulated: true,
+        zoneName: zoneCalc.zoneName,
+      };
     }
 
     return {
@@ -870,31 +904,15 @@ export const calculateAramexRate = async ({
     };
   } catch (err) {
     console.error("Aramex Rate calculation API error:", err.message);
-    const msg = err.response?.data?.message || err.message || "";
-    if (
-      msg.includes("Failed to login") ||
-      msg.includes("ClientInfo") ||
-      msg.includes("timeout") ||
-      msg.includes("ECONNREFUSED") ||
-      msg.includes("ENOTFOUND")
-    ) {
-      console.warn("Aramex API credentials or portal service unavailable. Providing calibrated standard tariff rate fallback.");
-      let baseRate = 350.0;
-      let ratePerKg = 80.0;
-      if (origCountry.toLowerCase() !== destCountry.toLowerCase()) {
-        baseRate = 1200.0;
-        ratePerKg = 250.0;
-      }
-      const baseCharge = baseRate + (chargeableWeight * ratePerKg);
-      return {
-        success: true,
-        rate: parseFloat(baseCharge.toFixed(2)),
-        currency: "INR",
-        chargeableWeight,
-        simulated: true,
-      };
-    }
-    throw new Error(msg);
+    const zoneCalc = getZoneBasedFallbackRate(destCountry, chargeableWeight);
+    return {
+      success: true,
+      rate: zoneCalc.totalBaseCost,
+      currency: "INR",
+      chargeableWeight,
+      simulated: true,
+      zoneName: zoneCalc.zoneName,
+    };
   }
 };
 

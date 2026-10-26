@@ -399,3 +399,74 @@ export const usersList = async (req, res) => {
     });
   }
 }
+
+// Forgot Password - Initiate OTP
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !isValidEmail(email.trim())) {
+      return res.status(400).json({ message: "Please provide a valid registered email address." });
+    }
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ message: "No registered merchant account found with this email." });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetPasswordOtp = otp;
+    user.resetPasswordExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Password reset OTP has been generated for ${user.email}. OTP is valid for 15 minutes.`,
+      otp,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error processing forgot password request", error: error.message });
+  }
+};
+
+// Reset Password - Verify OTP & Set New Password
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "Email, OTP, and new password are required." });
+    }
+
+    if (!isValidPassword(newPassword)) {
+      return res.status(400).json({
+        message: "Password must contain at least 8 characters, including uppercase, lowercase, number, and special character."
+      });
+    }
+
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ message: "Account not found." });
+    }
+
+    if (!user.resetPasswordOtp || user.resetPasswordOtp !== otp.trim()) {
+      return res.status(400).json({ message: "Invalid or incorrect OTP. Please verify and try again." });
+    }
+
+    if (!user.resetPasswordExpires || new Date() > user.resetPasswordExpires) {
+      return res.status(400).json({ message: "OTP has expired. Please request a new password reset OTP." });
+    }
+
+    user.password = hashPassword(newPassword);
+    user.resetPasswordOtp = "";
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successful! You can now log in with your new password.",
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error resetting password", error: error.message });
+  }
+};
+

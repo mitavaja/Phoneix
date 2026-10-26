@@ -6,6 +6,7 @@ import PickupAddress from "../models/PickupAddress.js";
 import RecipientCustomers from "../models/RecipientCustomers.js";
 import { calculateAramexRate } from "../services/aramexService.js";
 import { calculateShipGlobalRate } from "../services/shipglobalService.js";
+import { getCountryDefaults } from "../utils/countryDirectory.js";
 
 // List all weight slabs
 export const getAllRates = async (req, res) => {
@@ -153,7 +154,9 @@ export const calculateShippingCost = async (req, res) => {
       productType // e.g., 'PPX' for Aramex, or 'ShipGlobal Direct' for Phreight
     } = req.body;
 
-    if (!pickupAddressId || (!customerId && !req.body.receiverCountry) || !weight) {
+    const targetCountry = req.body.receiverCountry || req.body.destinationCountry;
+
+    if ((!pickupAddressId && !req.user) || (!customerId && !targetCountry) || !weight) {
       return res.status(400).json({
         message: "Origin warehouse, destination recipient details, and weight are required."
       });
@@ -166,24 +169,46 @@ export const calculateShippingCost = async (req, res) => {
       });
     }
 
-    const origin = await PickupAddress.findById(pickupAddressId);
-    if (!origin) return res.status(404).json({ message: "Origin warehouse not found." });
+    let origin = null;
+    if (pickupAddressId) {
+      origin = await PickupAddress.findById(pickupAddressId);
+    }
+    if (!origin && req.user) {
+      origin = (await PickupAddress.findOne({ userId: req.user._id, isDefault: true })) ||
+               (await PickupAddress.findOne({ userId: req.user._id }));
+    }
+    if (!origin) {
+      origin = {
+        addressName: "Default Origin Warehouse",
+        address: "Warehouse Hub, Andheri East",
+        city: "Mumbai",
+        state: "MH",
+        pincode: "400093",
+        country: "IN",
+      };
+    }
 
-
+    const defaults = getCountryDefaults(targetCountry || "AE");
     let destination = null;
     if (customerId) {
       destination = await RecipientCustomers.findById(customerId);
-    } else if (req.body.receiverCountry) {
+    }
+
+    if (!destination) {
+      const reqCity = req.body.receiverCity || req.body.city;
+      const reqZip = req.body.receiverPincode || req.body.postCode || req.body.postalCode || req.body.pincode;
+      const reqState = req.body.receiverState || req.body.state;
+
       destination = {
         name: req.body.receiverName || "Guest User",
         mobile: req.body.receiverMobile || "0000000000",
-        addressLine1: req.body.receiverAddressLine1 || "N/A",
+        addressLine1: req.body.receiverAddressLine1 || req.body.receiverAddress || "N/A",
         addressLine2: req.body.receiverAddressLine2 || "",
         addressLine3: req.body.receiverAddressLine3 || "",
-        city: req.body.receiverCity || "N/A",
-        stateOrProvinceCode: req.body.receiverState || "N/A",
-        countryCode: req.body.receiverCountry,
-        postCode: req.body.receiverPincode || "00000",
+        city: (!reqCity || reqCity === "N/A" || reqCity.trim() === "") ? defaults.city : reqCity.trim(),
+        stateOrProvinceCode: (!reqState || reqState === "N/A" || reqState.trim() === "") ? defaults.state : reqState.trim(),
+        countryCode: (targetCountry || "AE").toUpperCase().trim(),
+        postCode: (!reqZip || reqZip === "00000" || reqZip === "N/A" || reqZip.trim() === "") ? defaults.postalCode : reqZip.trim(),
         email: req.body.receiverEmail || (req.user ? req.user.email : "")
       };
     }
@@ -277,14 +302,47 @@ export const calculateShippingCost = async (req, res) => {
     }
 
     // ============================================================
-    // 4. COMBINED RESPONSE
+    // 4. GUEST / RETAIL ADJUSTMENT & COMBINED RESPONSE
     // ============================================================
+    const isGuest = !req.user;
+    if (isGuest) {
+      formattedServices = formattedServices.map(plan => {
+        const guestShipping = parseFloat((plan.shippingCharge * 1.35).toFixed(2));
+        const guestGst = parseFloat((guestShipping * 0.18).toFixed(2));
+        const guestTotal = parseFloat((guestShipping + guestGst).toFixed(2));
+        return {
+          ...plan,
+          shippingCharge: guestShipping,
+          gstAmount: guestGst,
+          invoiceTotal: guestTotal,
+          isRetailRate: true,
+        };
+      });
+      if (selectedPlan) {
+        const guestShipping = parseFloat((selectedPlan.shippingCharge * 1.35).toFixed(2));
+        const guestGst = parseFloat((guestShipping * 0.18).toFixed(2));
+        const guestTotal = parseFloat((guestShipping + guestGst).toFixed(2));
+        selectedPlan = {
+          ...selectedPlan,
+          shippingCharge: guestShipping,
+          gstAmount: guestGst,
+          invoiceTotal: guestTotal,
+          isRetailRate: true,
+        };
+      }
+    }
+
     res.status(200).json({
       courierName: courier,
       actualWeight: `${numericWeight} kg`,
       volumetricWeight: `${volumetricWeight.toFixed(2)} kg`,
       chargeableWeight: `${chargeableWeight.toFixed(2)} kg`,
       marginApplied: marginRule,
+      isGuest,
+      rateType: isGuest ? "Public Retail Tariff" : "Commercial Merchant Rate",
+      discountNotice: isGuest
+        ? "Showing standard retail rates. Register or contact us (+91 76980 39174) for best negotiated merchant rates!"
+        : "Exclusive commercial merchant rates applied to your account.",
 
       // Top-level defaults (keeps existing Aramex UI fully functioning)
       baseCost: selectedPlan.baseCost,

@@ -2,23 +2,26 @@ import React, { useState, useEffect } from "react";
 import API from "../../services/api";
 import { Calculator, AlertTriangle, Plus } from "lucide-react";
 import { Select } from "../../components/ui/Select";
-import { ARAMEX_SUPPORTED_COUNTRIES } from "../../utils/countries";
+import { ARAMEX_SUPPORTED_COUNTRIES, COUNTRY_DEFAULTS } from "../../utils/countries";
 
 const RateCalculator = () => {
     const [warehouses, setWarehouses] = useState([]);
     const [customers, setCustomers] = useState([]);
 
+    const initialCountry = "AE";
+    const initialDefaults = (typeof COUNTRY_DEFAULTS !== "undefined" && COUNTRY_DEFAULTS[initialCountry]) || {};
+
     const [calcForm, setCalcForm] = useState({
         pickupAddressId: "",
         customerId: "",
         isGuestRecipient: false,
-        receiverName: "",
-        receiverMobile: "",
-        receiverAddress: "",
-        receiverCity: "",
-        receiverState: "",
-        receiverCountry: "AE",
-        receiverPincode: "",
+        receiverName: "Guest Recipient",
+        receiverMobile: "0000000000",
+        receiverAddress: "N/A",
+        receiverCity: initialDefaults.city || "Dubai",
+        receiverState: initialDefaults.state || "DU",
+        receiverCountry: initialCountry,
+        receiverPincode: initialDefaults.postalCode || "",
         courier: "aramex",
         productGroup: "EXP",
         productType: "PPX",
@@ -27,6 +30,20 @@ const RateCalculator = () => {
         width: "",
         height: "",
     });
+
+    const handleCountryChange = (val) => {
+        const code = (val || "").toUpperCase();
+        const defaults = (typeof COUNTRY_DEFAULTS !== "undefined" && COUNTRY_DEFAULTS[code]) || { city: "", state: "", postalCode: "" };
+        setCalcForm(prev => ({
+            ...prev,
+            receiverCountry: code,
+            receiverCity: defaults.city || "",
+            receiverState: defaults.state || "",
+            receiverPincode: defaults.postalCode || "",
+        }));
+        setCalcResult(null);
+        setCalcError("");
+    };
 
     const [calcResult, setCalcResult] = useState(null);
     const [calcLoading, setCalcLoading] = useState(false);
@@ -68,6 +85,12 @@ const RateCalculator = () => {
         setCalcResult(null);
 
         try {
+            if (!calcForm.weight || isNaN(parseFloat(calcForm.weight)) || parseFloat(calcForm.weight) <= 0) {
+                setCalcError("Package dead weight is compulsory and must be greater than 0 kg.");
+                setCalcLoading(false);
+                return;
+            }
+
             if (isManualRecipient) {
                 if (!calcForm.receiverCountry) {
                     setCalcError("Destination Country is compulsory.");
@@ -82,6 +105,17 @@ const RateCalculator = () => {
                 }
             }
 
+            const countryDef = (typeof COUNTRY_DEFAULTS !== "undefined" && COUNTRY_DEFAULTS[calcForm.receiverCountry]) || {};
+            const finalCity = (calcForm.receiverCity && calcForm.receiverCity.trim() !== "")
+                ? calcForm.receiverCity.trim()
+                : (countryDef.city || "Dubai");
+            const finalPincode = (calcForm.receiverPincode && calcForm.receiverPincode.trim() !== "")
+                ? calcForm.receiverPincode.trim()
+                : (countryDef.postalCode || "");
+            const finalState = (calcForm.receiverState && calcForm.receiverState.trim() !== "")
+                ? calcForm.receiverState.trim()
+                : (countryDef.state || "");
+
             const payload = {
                 courier: calcForm.courier,
                 pickupAddressId: calcForm.pickupAddressId,
@@ -95,10 +129,10 @@ const RateCalculator = () => {
                 receiverName: "Guest Recipient",
                 receiverMobile: "0000000000",
                 receiverAddressLine1: "N/A",
-                receiverCity: calcForm.receiverCity || "N/A",
-                receiverState: calcForm.receiverState || "N/A",
+                receiverCity: finalCity,
+                receiverState: finalState,
                 receiverCountry: calcForm.receiverCountry,
-                receiverPincode: calcForm.receiverPincode || "",
+                receiverPincode: finalPincode,
             };
 
             const res = await API.post("/rates/calculate", payload);
@@ -228,23 +262,41 @@ const RateCalculator = () => {
                                             placeholder="Country (Compulsory) *"
                                             options={ARAMEX_SUPPORTED_COUNTRIES}
                                             value={calcForm.receiverCountry}
-                                            onChange={(val) => setCalcForm({ ...calcForm, receiverCountry: val.toUpperCase() })}
+                                            onChange={handleCountryChange}
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Zip / Postal Code <span className="text-gray-400 font-normal lowercase">(optional)</span></label>
-                                        <input type="text" placeholder="Zip / Postal Code (Optional)" value={calcForm.receiverPincode} onChange={(e) => setCalcForm({ ...calcForm, receiverPincode: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Zip / Postal Code <span className="text-gray-400 font-normal lowercase">(auto-populated)</span></label>
+                                        <input 
+                                            type="text" 
+                                            placeholder={(typeof COUNTRY_DEFAULTS !== "undefined" && COUNTRY_DEFAULTS[calcForm.receiverCountry]?.postalCode) || "Postal Code"} 
+                                            value={calcForm.receiverPincode} 
+                                            onChange={(e) => setCalcForm({ ...calcForm, receiverPincode: e.target.value })} 
+                                            className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" 
+                                        />
                                     </div>
                                 </div>
 
                                 <div className="grid md:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">City</label>
-                                        <input type="text" placeholder="City" value={calcForm.receiverCity} onChange={(e) => setCalcForm({ ...calcForm, receiverCity: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">City <span className="text-gray-400 font-normal lowercase">(auto-populated)</span></label>
+                                        <input 
+                                            type="text" 
+                                            placeholder={(typeof COUNTRY_DEFAULTS !== "undefined" && COUNTRY_DEFAULTS[calcForm.receiverCountry]?.city) || "City"} 
+                                            value={calcForm.receiverCity} 
+                                            onChange={(e) => setCalcForm({ ...calcForm, receiverCity: e.target.value })} 
+                                            className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" 
+                                        />
                                     </div>
                                     <div>
                                         <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">State / Province</label>
-                                        <input type="text" placeholder="State / Province" value={calcForm.receiverState} onChange={(e) => setCalcForm({ ...calcForm, receiverState: e.target.value.toUpperCase() })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs uppercase shadow-sm" />
+                                        <input 
+                                            type="text" 
+                                            placeholder={(typeof COUNTRY_DEFAULTS !== "undefined" && COUNTRY_DEFAULTS[calcForm.receiverCountry]?.state) || "State / Province"} 
+                                            value={calcForm.receiverState} 
+                                            onChange={(e) => setCalcForm({ ...calcForm, receiverState: e.target.value.toUpperCase() })} 
+                                            className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs uppercase shadow-sm" 
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -257,7 +309,7 @@ const RateCalculator = () => {
                     <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">Package Specifications</h4>
                     <div className="grid md:grid-cols-2 gap-4">
                         <div>
-                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Dead Weight (kg)</label>
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Dead Weight (kg) <span className="text-red-500 font-bold">*</span></label>
                             <input type="number" step="0.01" value={calcForm.weight} onChange={(e) => setCalcForm({ ...calcForm, weight: e.target.value })} required className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                         </div>
                         {calcForm.courier === "aramex" && (

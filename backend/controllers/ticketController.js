@@ -159,7 +159,32 @@ export const createClaim = async (req, res) => {
     });
 
     if (!shipment) {
-      return res.status(404).json({ message: "Reference Shipment record not found." });
+      return res.status(404).json({ message: "No booked shipment found with this Tracking / Shipment ID." });
+    }
+
+    // Ownership check (for merchant/seller accounts)
+    if (req.user.role === "Seller" && shipment.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Unauthorized: This shipment does not belong to your account." });
+    }
+
+    // Validation: Cannot claim on Draft shipments
+    if (shipment.status === "Draft") {
+      return res.status(400).json({ message: "Insurance claims cannot be raised on Draft shipments. Only active or delivered bookings are eligible." });
+    }
+
+    // Validation: Cannot claim on Cancelled shipments
+    if (shipment.status === "Cancelled" || shipment.status === "Hold") {
+      return res.status(400).json({ message: "Insurance claims cannot be raised on Cancelled/Hold shipments." });
+    }
+
+    // Validation: Damage option is removed
+    if (String(claimType).toLowerCase().includes("damage")) {
+      return res.status(400).json({ message: "Damage claims are currently not accepted. Eligible claim options are: Lost Shipment and Delayed Shipment." });
+    }
+
+    const allowedTypes = ["Lost Shipment", "Delayed Shipment"];
+    if (!allowedTypes.includes(claimType)) {
+      return res.status(400).json({ message: "Invalid claim type selected. Allowed options: Lost Shipment, Delayed Shipment." });
     }
 
     const claim = await Claim.create({

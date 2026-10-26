@@ -22,6 +22,61 @@ const AllUsers = () => {
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
 
+  // Wallet Adjustment Modal State
+  const [walletModalUser, setWalletModalUser] = useState(null);
+  const [walletAction, setWalletAction] = useState("add"); // "add", "cut", "set"
+  const [walletAmount, setWalletAmount] = useState("");
+  const [walletNote, setWalletNote] = useState("");
+  const [updatingWallet, setUpdatingWallet] = useState(false);
+
+  const handleUpdateWallet = async (e) => {
+    e.preventDefault();
+    if (!walletModalUser || !walletAmount || parseFloat(walletAmount) <= 0) {
+      alert("Please enter a valid amount.");
+      return;
+    }
+    setUpdatingWallet(true);
+    try {
+      const amt = parseFloat(walletAmount);
+      const currentBal = walletModalUser.wallet?.availableBalance ?? 0;
+      let endpoint = "/wallet/admin/add";
+      let finalAmt = amt;
+
+      if (walletAction === "cut") {
+        endpoint = "/wallet/admin/cut";
+        finalAmt = amt;
+      } else if (walletAction === "set") {
+        if (amt > currentBal) {
+          endpoint = "/wallet/admin/add";
+          finalAmt = amt - currentBal;
+        } else if (amt < currentBal) {
+          endpoint = "/wallet/admin/cut";
+          finalAmt = currentBal - amt;
+        } else {
+          alert("Target balance matches current balance.");
+          setUpdatingWallet(false);
+          return;
+        }
+      }
+
+      await API.post(endpoint, {
+        userId: walletModalUser._id,
+        amount: finalAmt,
+        note: walletNote || `Admin manual balance adjustment (${walletAction})`
+      });
+
+      alert("User wallet balance updated successfully!");
+      setWalletModalUser(null);
+      setWalletAmount("");
+      setWalletNote("");
+      if (typeof fetchUsers === "function") fetchUsers(currentPage || 1);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to adjust user wallet balance.");
+    } finally {
+      setUpdatingWallet(false);
+    }
+  };
+
   const fetchUsers = async () => {
     try {
       const res = await API.get("/users");
@@ -243,6 +298,18 @@ const AllUsers = () => {
                     </td>
                     <td className="py-4 text-right">
                       <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setWalletModalUser(user);
+                            setWalletAction("add");
+                            setWalletAmount("");
+                            setWalletNote("");
+                          }}
+                          className="p-1 px-2.5 bg-[#FF6A00]/10 hover:bg-[#FF6A00] text-[#FF6A00] hover:text-white rounded text-[10px] font-bold border border-[#FF6A00]/25 transition-colors"
+                          title="Edit / Update User Wallet Balance"
+                        >
+                          Wallet
+                        </button>
                         <button
                           onClick={() => handleOpenDetails(user)}
                           className="p-1 px-2.5 bg-[#0A1F44]/5 hover:bg-[#0A1F44] text-[#0A1F44] hover:text-white rounded text-[10px] font-bold border border-[#0A1F44]/10 transition-colors"
@@ -488,6 +555,98 @@ const AllUsers = () => {
                 Close Workstation
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Edit / Update Wallet Modal */}
+      {walletModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full border border-gray-200 shadow-2xl p-6 text-[#0A1F44] space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <h3 className="font-extrabold text-base text-[#0A1F44]">Adjust Wallet Balance</h3>
+                <p className="text-xs text-gray-500 font-semibold">{walletModalUser.name} ({walletModalUser.email})</p>
+              </div>
+              <button onClick={() => setWalletModalUser(null)} className="text-gray-400 hover:text-gray-700 font-bold text-lg">✕</button>
+            </div>
+
+            <div className="p-3 bg-gray-50 border rounded-2xl flex justify-between items-center">
+              <span className="text-xs text-gray-500 font-semibold uppercase">Current Balance</span>
+              <span className="text-base font-black text-[#0A1F44]">₹{(walletModalUser.wallet?.availableBalance ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            </div>
+
+            <form onSubmit={handleUpdateWallet} className="space-y-4 text-xs">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-1.5">Adjustment Mode</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setWalletAction("add")}
+                    className={`py-2 rounded-xl font-bold transition text-xs ${walletAction === "add" ? "bg-green-600 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  >
+                    + Credit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWalletAction("cut")}
+                    className={`py-2 rounded-xl font-bold transition text-xs ${walletAction === "cut" ? "bg-red-600 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  >
+                    - Debit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWalletAction("set")}
+                    className={`py-2 rounded-xl font-bold transition text-xs ${walletAction === "set" ? "bg-[#0A1F44] text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                  >
+                    = Set Exact
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-1">
+                  {walletAction === "set" ? "New Total Balance (₹)" : "Amount to Adjust (₹)"} *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="e.g. 5000"
+                  value={walletAmount}
+                  onChange={(e) => setWalletAmount(e.target.value)}
+                  required
+                  className="w-full p-2.5 rounded-xl border border-gray-300 text-[#0A1F44] outline-none focus:border-[#FF6A00] font-mono font-bold text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 block mb-1">Administrative Reason / Note</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Manual payment received / Client wallet adjustment"
+                  value={walletNote}
+                  onChange={(e) => setWalletNote(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-gray-300 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={updatingWallet}
+                  className="flex-1 bg-[#FF6A00] hover:bg-[#ff7b1a] text-white font-extrabold py-3 rounded-xl text-xs transition shadow-md shadow-[#FF6A00]/20 disabled:opacity-50"
+                >
+                  {updatingWallet ? "Updating Wallet..." : "Confirm Wallet Update"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setWalletModalUser(null)}
+                  className="px-5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl text-xs transition"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

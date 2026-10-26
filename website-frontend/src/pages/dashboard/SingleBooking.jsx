@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import API from "../../services/api";
 import { useOutletContext, useNavigate } from "react-router-dom";
-import { PlusCircle, Plus, CheckCircle, AlertTriangle, Check, XCircle } from "lucide-react";
+import { PlusCircle, Plus, CheckCircle, AlertTriangle, Check, XCircle, Home, MapPin, Loader2 } from "lucide-react";
+import { fetchLocationByPincode } from "../../utils/pincodeHelper";
 import { Select } from "../../components/ui/Select";
 import { ARAMEX_SUPPORTED_COUNTRIES, ARAMEX_SUPPORTED_CURRENCIES } from "../../utils/countries";
 
@@ -47,6 +48,118 @@ const SingleBooking = () => {
     const [bookingSuccess, setBookingSuccess] = useState("");
     const [isManualRecipient, setIsManualRecipient] = useState(false);
     const [saveManualRecipient, setSaveManualRecipient] = useState(false);
+
+    // Quick Warehouse Modal
+    const [showAddWarehouseModal, setShowAddWarehouseModal] = useState(false);
+    const [savingWarehouse, setSavingWarehouse] = useState(false);
+    const [isFetchingWhPin, setIsFetchingWhPin] = useState(false);
+    const [isFetchingRecPin, setIsFetchingRecPin] = useState(false);
+    const [newWarehouseForm, setNewWarehouseForm] = useState({
+        addressName: "",
+        contactPerson: "",
+        mobile: "",
+        address: "",
+        city: "",
+        state: "",
+        country: "IN",
+        pincode: "",
+        isDefault: true
+    });
+
+    const handleWhPinChange = async (pin) => {
+        setNewWarehouseForm(prev => ({ ...prev, pincode: pin }));
+        const clean = pin.trim();
+        if (clean.length === 6 && /^\d{6}$/.test(clean)) {
+            setIsFetchingWhPin(true);
+            try {
+                const loc = await fetchLocationByPincode(clean, "IN");
+                if (loc) {
+                    setNewWarehouseForm(prev => ({
+                        ...prev,
+                        city: loc.city || prev.city,
+                        state: loc.state || prev.state,
+                        country: "IN"
+                    }));
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setIsFetchingWhPin(false);
+            }
+        }
+    };
+
+    const handleSaveNewWarehouse = async (e) => {
+        e.preventDefault();
+        if (!newWarehouseForm.addressName || !newWarehouseForm.contactPerson || !newWarehouseForm.mobile || !newWarehouseForm.address || !newWarehouseForm.pincode || !newWarehouseForm.city || !newWarehouseForm.state) {
+            alert("Please complete all compulsory warehouse fields.");
+            return;
+        }
+        setSavingWarehouse(true);
+        try {
+            const res = await API.post("/warehouses/add", newWarehouseForm);
+            const savedWh = res.data?.data || res.data;
+            if (savedWh && savedWh._id) {
+                setWarehouses(prev => [...prev, savedWh]);
+                setSingleForm(prev => ({
+                    ...prev,
+                    pickupAddressId: savedWh._id,
+                    goodsOriginCountry: savedWh.country || "IN"
+                }));
+            } else {
+                // re-fetch warehouses
+                const whRes = await API.get("/warehouses/my-addresses");
+                setWarehouses(whRes.data || []);
+                if (whRes.data?.length > 0) {
+                    const latestWh = whRes.data[whRes.data.length - 1];
+                    setSingleForm(prev => ({
+                        ...prev,
+                        pickupAddressId: latestWh._id,
+                        goodsOriginCountry: latestWh.country || "IN"
+                    }));
+                }
+            }
+            setShowAddWarehouseModal(false);
+            setNewWarehouseForm({
+                addressName: "",
+                contactPerson: "",
+                mobile: "",
+                address: "",
+                city: "",
+                state: "",
+                country: "IN",
+                pincode: "",
+                isDefault: false
+            });
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to create warehouse address.");
+        } finally {
+            setSavingWarehouse(false);
+        }
+    };
+
+    // Auto-fetch Zip for manual recipient
+    const handleManualRecipientZipChange = async (zip) => {
+        setSingleForm(prev => ({ ...prev, receiverPincode: zip }));
+        const clean = zip.trim();
+        if (clean.length >= 3 && singleForm.receiverCountry) {
+            setIsFetchingRecPin(true);
+            try {
+                const loc = await fetchLocationByPincode(clean, singleForm.receiverCountry);
+                if (loc) {
+                    setSingleForm(prev => ({
+                        ...prev,
+                        receiverCity: loc.city || prev.receiverCity,
+                        receiverState: loc.state || prev.receiverState
+                    }));
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setIsFetchingRecPin(false);
+            }
+        }
+    };
 
     // Recipient Customer Form
     const [showSingleCustomerModal, setShowSingleCustomerModal] = useState(false);
@@ -348,25 +461,56 @@ const SingleBooking = () => {
                     {/* Warehouse Origin */}
                     <div className="bg-[#E5E7EB]/30 p-5 rounded-2xl border border-[#687280]/15 space-y-4 flex flex-col justify-between h-full">
                         <div className="flex justify-between items-center">
-                            <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider">1. Select Warehouse Pickup Origin</h4>
+                            <h4 className="text-xs font-bold uppercase text-[#FF6A00] tracking-wider flex items-center gap-1.5">
+                                <Home size={14} /> 1. Warehouse Pickup Origin <span className="text-red-500">*</span>
+                            </h4>
+                            <button
+                                type="button"
+                                onClick={() => setShowAddWarehouseModal(true)}
+                                className="text-[10px] text-[#FF6A00] hover:text-[#0A1F44] font-bold transition flex items-center gap-1 bg-[#FF6A00]/10 px-2.5 py-1 rounded-lg"
+                            >
+                                <Plus size={12} /> Add Warehouse Inline
+                            </button>
                         </div>
-                        <div>
-                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Saved Warehouses</label>
-                            <Select
-                                options={warehouseOptions}
-                                value={singleForm.pickupAddressId}
-                                onChange={(val) => {
-                                    const selectedWarehouse = warehouses.find(w => w._id === val);
-                                    setSingleForm({
-                                        ...singleForm,
-                                        pickupAddressId: val,
-                                        goodsOriginCountry: selectedWarehouse ? selectedWarehouse.country : singleForm.goodsOriginCountry
-                                    });
-                                }}
-                                placeholder="-- Choose Warehouse --"
-                                disabled={true}
-                            />
-                        </div>
+
+                        {warehouses.length === 0 ? (
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-2">
+                                <div className="flex items-center gap-2 text-amber-800 text-xs font-bold">
+                                    <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+                                    <span>No Warehouse Address Found</span>
+                                </div>
+                                <p className="text-[11px] text-amber-700">
+                                    A pickup warehouse origin is compulsory before booking consignments. Add your store/dispatch warehouse directly without leaving this page.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddWarehouseModal(true)}
+                                    className="w-full bg-[#0A1F44] hover:bg-[#FF6A00] text-white font-bold py-2 rounded-lg text-xs transition flex items-center justify-center gap-1.5 shadow-sm mt-2"
+                                >
+                                    <Plus size={14} /> + Add Warehouse Address Now
+                                </button>
+                            </div>
+                        ) : (
+                            <div>
+                                <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                    Saved Warehouses <span className="text-red-500">*</span>
+                                </label>
+                                <Select
+                                    options={warehouseOptions}
+                                    value={singleForm.pickupAddressId}
+                                    onChange={(val) => {
+                                        const selectedWarehouse = warehouses.find(w => w._id === val);
+                                        setSingleForm({
+                                            ...singleForm,
+                                            pickupAddressId: val,
+                                            goodsOriginCountry: selectedWarehouse ? selectedWarehouse.country : singleForm.goodsOriginCountry
+                                        });
+                                    }}
+                                    placeholder="-- Choose Warehouse --"
+                                    disabled={false}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Recipient Details */}
@@ -434,7 +578,20 @@ const SingleBooking = () => {
                                         <input type="text" placeholder="State / Province *" value={singleForm.receiverState} onChange={(e) => setSingleForm({ ...singleForm, receiverState: e.target.value.toUpperCase() })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs uppercase shadow-sm" required />
                                     </div>
                                     <div>
-                                        <input type="text" placeholder="Zip / Postal Code (Optional)" value={singleForm.receiverPincode} onChange={(e) => setSingleForm({ ...singleForm, receiverPincode: e.target.value })} className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
+                                        <div className="relative">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Zip / Postal Code (Optional)" 
+                                                value={singleForm.receiverPincode} 
+                                                onChange={(e) => handleManualRecipientZipChange(e.target.value)} 
+                                                className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" 
+                                            />
+                                            {isFetchingRecPin && (
+                                                <span className="absolute right-3 top-3 text-[10px] text-[#FF6A00] flex items-center gap-1 font-semibold">
+                                                    <Loader2 size={12} className="animate-spin" />
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
@@ -450,6 +607,148 @@ const SingleBooking = () => {
                 </div>
 
                 {/* Quick Add Recipient Modal */}
+                                {/* Inline Warehouse Addition Modal */}
+                {showAddWarehouseModal && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white w-full max-w-xl rounded-3xl border border-[#687280]/20 shadow-2xl overflow-hidden text-[#0A1F44] animate-fade-in">
+                            <div className="px-6 py-4 border-b border-[#687280]/15 flex justify-between items-center bg-[#0A1F44] text-white">
+                                <h3 className="font-bold text-sm flex items-center gap-2">
+                                    <Home size={16} className="text-[#FF6A00]" /> Add Pickup Warehouse Origin
+                                </h3>
+                                <button type="button" onClick={() => setShowAddWarehouseModal(false)} className="text-gray-300 hover:text-white">
+                                    <XCircle size={20} />
+                                </button>
+                            </div>
+                            <form onSubmit={handleSaveNewWarehouse} className="p-6 space-y-4">
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                            Warehouse Nickname <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Surat Main Hub"
+                                            value={newWarehouseForm.addressName}
+                                            onChange={(e) => setNewWarehouseForm({ ...newWarehouseForm, addressName: e.target.value })}
+                                            required
+                                            className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                            Contact Person <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Ramesh Kumar"
+                                            value={newWarehouseForm.contactPerson}
+                                            onChange={(e) => setNewWarehouseForm({ ...newWarehouseForm, contactPerson: e.target.value })}
+                                            required
+                                            className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                            Mobile Number <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="+91 98765 43210"
+                                            value={newWarehouseForm.mobile}
+                                            onChange={(e) => setNewWarehouseForm({ ...newWarehouseForm, mobile: e.target.value })}
+                                            required
+                                            className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs"
+                                        />
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="text-[10px] text-[#687280] font-bold uppercase tracking-wider">
+                                                6-Digit Pincode <span className="text-red-500">*</span>
+                                            </label>
+                                            {isFetchingWhPin && (
+                                                <span className="text-[10px] text-[#FF6A00] flex items-center gap-1 font-semibold animate-pulse">
+                                                    <Loader2 size={11} className="animate-spin" /> Fetching...
+                                                </span>
+                                            )}
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. 395006"
+                                            maxLength={6}
+                                            value={newWarehouseForm.pincode}
+                                            onChange={(e) => handleWhPinChange(e.target.value)}
+                                            required
+                                            className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs font-mono"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                        Warehouse Address Line <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Plot / Shop / Building No, Industrial Area"
+                                        value={newWarehouseForm.address}
+                                        onChange={(e) => setNewWarehouseForm({ ...newWarehouseForm, address: e.target.value })}
+                                        required
+                                        className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs"
+                                    />
+                                </div>
+
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                            City <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Surat"
+                                            value={newWarehouseForm.city}
+                                            onChange={(e) => setNewWarehouseForm({ ...newWarehouseForm, city: e.target.value })}
+                                            required
+                                            className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                            State <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            placeholder="Gujarat"
+                                            value={newWarehouseForm.state}
+                                            onChange={(e) => setNewWarehouseForm({ ...newWarehouseForm, state: e.target.value })}
+                                            required
+                                            className="w-full p-2.5 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-3 border-t border-[#687280]/15">
+                                    <button
+                                        type="submit"
+                                        disabled={savingWarehouse}
+                                        className="flex-1 bg-[#FF6A00] hover:bg-[#ff7b1a] text-white font-bold py-3 rounded-xl text-xs transition shadow-md shadow-[#FF6A00]/20 flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                    >
+                                        {savingWarehouse ? "Saving Warehouse..." : "Save & Select Origin"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAddWarehouseModal(false)}
+                                        className="px-5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-xl text-xs transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
                 {showSingleCustomerModal && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                         <div className="bg-white w-full max-w-2xl rounded-3xl border border-[#687280]/20 shadow-2xl overflow-hidden text-[#0A1F44]">
@@ -516,18 +815,24 @@ const SingleBooking = () => {
 
                     <div className="grid md:grid-cols-3 gap-4">
                         <div>
-                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Dead Weight (kg)</label>
-                            <input type="number" step="0.01" placeholder="1.5" value={singleForm.weight} onChange={(e) => setSingleForm({ ...singleForm, weight: e.target.value })} required className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                Dead Weight (kg) <span className="text-red-500">*</span>
+                            </label>
+                            <input type="number" step="0.01" min="0.01" placeholder="1.5" value={singleForm.weight} onChange={(e) => setSingleForm({ ...singleForm, weight: e.target.value })} required className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Total Pieces</label>
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                Total Pieces <span className="text-red-500">*</span>
+                            </label>
                             <input type="number" min="1" value={singleForm.numberOfPieces || 1} onChange={(e) => setSingleForm({ ...singleForm, numberOfPieces: e.target.value })} required className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                         </div>
 
                         {/* Aramex Product Type Selector */}
                         {singleForm.courier === "aramex" && (
                             <div>
-                                <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">International Product Type</label>
+                                <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                    Product Type <span className="text-red-500">*</span>
+                                </label>
                                 <Select
                                     options={productTypeOptions}
                                     value={singleForm.productType}
@@ -540,11 +845,15 @@ const SingleBooking = () => {
 
                     <div className="grid md:grid-cols-2 gap-4">
                         <div>
-                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Product Description</label>
-                            <input type="text" placeholder="Apparel, Electronics..." value={singleForm.productDescription} onChange={(e) => setSingleForm({ ...singleForm, productDescription: e.target.value })} required className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                Product Description <span className="text-red-500">*</span>
+                            </label>
+                            <input type="text" placeholder="Apparel, Electronics, Handicrafts..." value={singleForm.productDescription} onChange={(e) => setSingleForm({ ...singleForm, productDescription: e.target.value })} required className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                         </div>
                         <div>
-                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Goods Origin Country</label>
+                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                                Goods Origin Country <span className="text-red-500">*</span>
+                            </label>
                             <Select
                                 options={ARAMEX_SUPPORTED_COUNTRIES}
                                 value={singleForm.goodsOriginCountry}
@@ -555,11 +864,13 @@ const SingleBooking = () => {
                     </div>
 
                     <div>
-                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Dimensions (L x W x H cm)</label>
+                        <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
+                            Dimensions (L x W x H cm) <span className="text-gray-400 font-normal">(Optional)</span>
+                        </label>
                         <div className="grid grid-cols-3 gap-3">
                             <input
                                 type="number"
-                                placeholder="Length"
+                                placeholder="Length (Optional)"
                                 value={singleForm.length}
                                 onChange={(e) => setSingleForm({
                                     ...singleForm,
@@ -567,8 +878,8 @@ const SingleBooking = () => {
                                 })}
                                 className="p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] text-center outline-none focus:border-[#FF6A00] text-xs shadow-sm"
                             />
-                            <input type="number" placeholder="Width" value={singleForm.width} onChange={(e) => setSingleForm({ ...singleForm, width: e.target.value })} className="p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] text-center outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
-                            <input type="number" placeholder="Height" value={singleForm.height} onChange={(e) => setSingleForm({ ...singleForm, height: e.target.value })} className="p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] text-center outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
+                            <input type="number" placeholder="Width (Optional)" value={singleForm.width} onChange={(e) => setSingleForm({ ...singleForm, width: e.target.value })} className="p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] text-center outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
+                            <input type="number" placeholder="Height (Optional)" value={singleForm.height} onChange={(e) => setSingleForm({ ...singleForm, height: e.target.value })} className="p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] text-center outline-none focus:border-[#FF6A00] text-xs shadow-sm" />
                         </div>
                     </div>
 

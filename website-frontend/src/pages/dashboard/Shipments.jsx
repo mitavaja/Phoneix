@@ -75,7 +75,7 @@ const Shipments = () => {
         refreshShipments(currentPage);
 
         setInvoiceFromDate(moment().startOf('month').format('YYYY-MM-DD'));
-        setInvoiceToDate(moment().endOf('month').format('YYYY-MM-DD'));
+        setInvoiceToDate(moment().format('YYYY-MM-DD'));
     }, [currentPage]);
 
     const handlePageChange = async (newPage) => {
@@ -132,6 +132,16 @@ const Shipments = () => {
     const handleGenerateInvoice = async () => {
         if (!invoiceFromDate || !invoiceToDate) {
             toast.error("Please select both From and To dates.");
+            return;
+        }
+
+        const todayStr = moment().format('YYYY-MM-DD');
+        if (invoiceToDate > todayStr || invoiceFromDate > todayStr) {
+            toast.error("Invoice date range cannot include future dates.");
+            return;
+        }
+        if (invoiceFromDate > invoiceToDate) {
+            toast.error("From Date cannot be later than To Date.");
             return;
         }
 
@@ -329,9 +339,9 @@ const Shipments = () => {
                 </div>
             </div>
 
-            {/* Filter Bar */}
-            <div className="glass-card p-4 rounded-2xl border border-[#687280]/20 shadow-md flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="relative w-full md:w-80">
+            {/* Filter Bar with Tab Pills */}
+            <div className="glass-card p-4 rounded-2xl border border-[#687280]/20 shadow-md flex flex-col lg:flex-row gap-4 items-center justify-between">
+                <div className="relative w-full lg:w-80">
                     <Search className="absolute left-3 top-2.5 text-[#687280]" size={15} />
                     <input
                         type="text"
@@ -342,23 +352,27 @@ const Shipments = () => {
                     />
                 </div>
 
-                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    <div className="flex items-center gap-2 bg-[#E5E7EB]/40 border border-[#687280]/20 rounded-xl px-3 py-1.5">
-                        <Filter size={14} className="text-[#687280]" />
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="bg-transparent text-xs text-[#0A1F44] font-semibold outline-none cursor-pointer"
+                <div className="flex items-center gap-1.5 overflow-x-auto w-full lg:w-auto pb-1 lg:pb-0">
+                    {[
+                        { label: "All", value: "All" },
+                        { label: `Drafts (${shipments.filter(s => s.status === "Draft").length})`, value: "Draft" },
+                        { label: "Booked", value: "Booked" },
+                        { label: "In Transit", value: "In Transit" },
+                        { label: "Delivered", value: "Delivered" },
+                        { label: "Hold / Cancelled", value: "Cancelled" }
+                    ].map(tab => (
+                        <button
+                            key={tab.value}
+                            onClick={() => setStatusFilter(tab.value)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                                statusFilter === tab.value
+                                    ? "bg-[#0A1F44] text-white shadow-sm"
+                                    : "bg-[#E5E7EB]/40 text-[#687280] hover:text-[#0A1F44] hover:bg-[#E5E7EB]"
+                            }`}
                         >
-                            <option value="All">All Statuses</option>
-                            <option value="Draft">Draft</option>
-                            <option value="Booked">Booked</option>
-                            <option value="Pickup Scheduled">Pickup Scheduled</option>
-                            <option value="In Transit">In Transit</option>
-                            <option value="Delivered">Delivered</option>
-                            <option value="Cancelled">Hold Shipment</option>
-                        </select>
-                    </div>
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
@@ -371,7 +385,7 @@ const Shipments = () => {
                             <th className="py-3 px-4 font-semibold">Shipment ID</th>
                             <th className="py-3 px-4 font-semibold">Date Booked</th>
                             <th className="py-3 px-4 font-semibold">Recipient</th>
-                            <th className="py-3 px-4 text-center font-semibold">AWB Code</th>
+                            <th className="py-3 px-4 text-center font-semibold">Last-Mile Tracking (AWB)</th>
                             <th className="py-3 px-4 text-center font-semibold">Weight</th>
                             <th className="py-3 px-4 text-right font-semibold">Invoice Charge</th>
                             <th className="py-3 px-4 text-center font-semibold">Status</th>
@@ -404,7 +418,25 @@ const Shipments = () => {
                                             {sh.customer}
                                             <span className="block text-[10px] text-[#687280] truncate max-w-[150px] font-normal">{sh.to}</span>
                                         </td>
-                                        <td className="py-3.5 px-4 text-center font-mono font-semibold text-[#0A1F44]">{sh.courierTrackingNumber || "Awaiting Allocation"}</td>
+                                        <td className="py-3.5 px-4 text-center">
+                                            {sh.status === "Draft" ? (
+                                                <div>
+                                                    <span className="font-mono text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 block">
+                                                        Draft (Pending Recharge)
+                                                    </span>
+                                                    <span className="text-[9px] text-[#687280] block mt-0.5">Click Reprocess to book</span>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <span className="font-mono font-bold text-xs text-[#0A1F44] block">
+                                                        {sh.courierTrackingNumber || "Allocating AWB..."}
+                                                    </span>
+                                                    <span className="text-[10px] text-[#687280] font-semibold capitalize block">
+                                                        {sh.courierName || "Aramex"} • Last-Mile
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="py-3.5 px-4 text-center font-semibold text-[#0A1F44]">{sh.weight} kg</td>
                                         <td className="py-3.5 px-4 text-right font-extrabold text-[#0A1F44]">₹{sh.invoiceTotal?.toFixed(2)}</td>
                                         <td className="py-3.5 px-4 text-center">{getStatusBadge(sh.status)}</td>
@@ -575,15 +607,17 @@ const Shipments = () => {
                                     <label className="text-[10px] text-[#687280] font-bold uppercase block mb-1">From Date</label>
                                     <input
                                         type="date"
+                                        max={moment().format('YYYY-MM-DD')}
                                         value={invoiceFromDate}
                                         onChange={(e) => setInvoiceFromDate(e.target.value)}
                                         className="w-full p-3 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/20 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs"
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] text-[#687280] font-bold uppercase block mb-1">To Date</label>
+                                    <label className="text-[10px] text-[#687280] font-bold uppercase block mb-1">To Date (Max Today)</label>
                                     <input
                                         type="date"
+                                        max={moment().format('YYYY-MM-DD')}
                                         value={invoiceToDate}
                                         onChange={(e) => setInvoiceToDate(e.target.value)}
                                         className="w-full p-3 rounded-xl bg-[#E5E7EB]/30 border border-[#687280]/20 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs"
@@ -648,10 +682,10 @@ const Shipments = () => {
                 isOpen={cancelModalData.isOpen}
                 onClose={closeCancelModal}
                 onConfirm={confirmCancelShipment}
-                title="Cancel Shipment"
-                description={`Are you sure you want to cancel shipment ${cancelModalData.trackingNumber || cancelModalData.shId}? This action cannot be undone, and the shipment costs will be refunded to your wallet immediately.`}
-                confirmText="Yes, Cancel Shipment"
-                cancelText="Keep Shipment"
+                title="Cancel Consignment"
+                description={`Are you sure you want to cancel consignment ${cancelModalData.trackingNumber || cancelModalData.shId}? Note: Draft shipments are discarded with zero fee deductions. For active booked shipments, eligible booking amounts are credited back to your store wallet.`}
+                confirmText="Yes, Cancel Consignment"
+                cancelText="Keep Consignment"
                 variant="danger"
                 isLoading={cancelModalData.isLoading}
             />

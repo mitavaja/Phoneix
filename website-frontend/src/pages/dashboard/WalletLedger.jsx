@@ -48,8 +48,13 @@ const WalletLedger = () => {
     }, [selectedCurrency, wallets]);
 
     const handleRazorpayCheckout = async () => {
-        if (!rechargeAmount || isNaN(parseFloat(rechargeAmount)) || parseFloat(rechargeAmount) <= 0) {
+        const amountNum = parseFloat(rechargeAmount);
+        if (!rechargeAmount || isNaN(amountNum) || amountNum <= 0) {
             setRechargeError("Please enter a valid recharge amount.");
+            return;
+        }
+        if (selectedCoupon && amountNum < 1000) {
+            setRechargeError("Promo coupons require a minimum recharge amount of ₹1,000.");
             return;
         }
         setRechargeError("");
@@ -236,7 +241,9 @@ const WalletLedger = () => {
                                     </label>
                                     <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
                                         {coupons.map((coupon) => {
-                                            const isEligible = (parseFloat(rechargeAmount) || 0) >= coupon.minRecharge;
+                                            const minRequired = Math.max(1000, Number(coupon.minRecharge) || 1000);
+                                            const currentAmount = parseFloat(rechargeAmount) || 0;
+                                            const isEligible = currentAmount >= minRequired;
                                             const isSelected = selectedCoupon?._id === coupon._id;
 
                                             return (
@@ -246,8 +253,8 @@ const WalletLedger = () => {
                                                         if (isSelected) {
                                                             setSelectedCoupon(null);
                                                         } else {
-                                                            if (!isEligible) {
-                                                                setRechargeAmount(coupon.minRecharge.toString());
+                                                            if (currentAmount < minRequired) {
+                                                                setRechargeAmount(minRequired.toString());
                                                             }
                                                             setSelectedCoupon(coupon);
                                                         }
@@ -277,6 +284,9 @@ const WalletLedger = () => {
                                                         {coupon.description}
                                                     </p>
                                                     <div className="flex justify-between items-center text-[9px] pt-1">
+                                                        <span className="font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                                            Min Recharge: ₹{Math.max(1000, Number(coupon.minRecharge) || 1000).toLocaleString('en-IN')}
+                                                        </span>
                                                         <span className="text-[#687280]">
                                                             Min. Recharge: <span className="font-bold text-[#0A1F44]">₹{coupon.minRecharge}</span>
                                                         </span>

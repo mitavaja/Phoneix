@@ -65,10 +65,9 @@ const InsuranceClaims = () => {
         fetchShipmentDropdown();
     }, []);
 
-    // Static options for Claim Type dropdown
+    // Allowed Claim Dispute Categories (Damage option removed as per policy)
     const claimTypeOptions = [
         { label: "Lost Shipment (In-Transit)", value: "Lost Shipment" },
-        { label: "Damaged Shipment (Broken parcel)", value: "Damaged Shipment" },
         { label: "Delayed Shipment (SLA Breached)", value: "Delayed Shipment" },
     ];
 
@@ -89,13 +88,23 @@ const InsuranceClaims = () => {
                 <form onSubmit={handleFileClaim} className="space-y-4">
                     <div className="grid md:grid-cols-2 gap-4">
                         <div>
-                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Select Shipment ID</label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="text-[10px] text-[#687280] font-bold uppercase tracking-wider">
+                                    Select Booked Consignment <span className="text-red-500">*</span>
+                                </label>
+                                <span className="text-[9px] text-[#687280]">Active bookings only</span>
+                            </div>
                             <Select
                                 options={shipmentOptions}
                                 value={claimForm.shipmentId}
                                 onChange={(val) => setClaimForm({ ...claimForm, shipmentId: val })}
-                                placeholder="Search Shipment ID..."
+                                placeholder={shipmentOptions.length > 0 ? "-- Choose Active Shipment --" : "No eligible shipments found"}
                             />
+                            {shipmentOptions.length === 0 && (
+                                <p className="text-[10px] text-amber-600 mt-1">
+                                    Claims can only be filed against active booked consignments. Draft or Cancelled shipments cannot be claimed.
+                                </p>
+                            )}
                         </div>
                         <div>
                             <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">Claim Dispute Category</label>

@@ -132,6 +132,20 @@ const Contact = () => {
         {/* 📍 CONTACT INFO & CHANNELS */}
         <div className="space-y-4">
 
+          {/* Phone Helpline */}
+          <div className="bg-white border border-[#687280]/20 p-5 rounded-2xl shadow-sm flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-[#FF6A00]/10 border border-[#FF6A00]/20 flex items-center justify-center text-[#FF6A00] shrink-0 font-bold text-lg">
+              📞
+            </div>
+            <div>
+              <h3 className="text-xs uppercase font-extrabold tracking-wider text-[#687280]">Customer Support & Helpline</h3>
+              <a href="tel:+917698039174" className="text-base font-bold text-[#0A1F44] hover:text-[#FF6A00] transition block">
+                +91 76980 39174
+              </a>
+              <span className="text-[11px] text-gray-400">Available on Call & WhatsApp for immediate rate quotes & support</span>
+            </div>
+          </div>
+
           {/* Email */}
           <div className="bg-white border border-[#687280]/20 p-5 rounded-2xl shadow-sm flex items-start gap-4">
             <div className="w-10 h-10 rounded-xl bg-[#FF6A00]/10 border border-[#FF6A00]/20 flex items-center justify-center text-[#FF6A00] shrink-0 font-bold">

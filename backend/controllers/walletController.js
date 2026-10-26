@@ -343,13 +343,15 @@ export const cutBalanceAdmin = async (req, res) => {
     const targetCurrency = currency || "INR";
 
     // Find seller user
-    const user = await User.findOne({
-      $or: [
-        { name: storeName },
-        { companyName: storeName },
-        { email: storeName },
-      ],
-    });
+    const user = req.body.userId 
+      ? await User.findById(req.body.userId)
+      : await User.findOne({
+          $or: [
+            { name: storeName },
+            { companyName: storeName },
+            { email: storeName },
+          ],
+        });
 
     // Find wallet by storeName or user and currency
     let wallet = await Wallet.findOne({
@@ -436,7 +438,7 @@ export const cutBalanceAdmin = async (req, res) => {
  */
 export const rechargeWallet = async (req, res) => {
   try {
-    const { amount, currency } = req.body;
+    const { amount, currency, couponCode } = req.body;
     if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
       return res.status(400).json({ message: "A positive recharge amount is required" });
     }
@@ -451,8 +453,17 @@ export const rechargeWallet = async (req, res) => {
     const rate = conversionRates[targetCurrency] || 1.0;
     const amountInINR = parseFloat(amount) * rate;
 
+    if (couponCode && amountInINR < 1000) {
+      return res.status(400).json({ message: "Coupons require a minimum wallet recharge of ₹1,000." });
+    }
+
     const receiptId = `REC-${Date.now()}`;
-    const orderDetails = await createPaymentOrder(amountInINR, receiptId);
+    const notes = {
+      userId: req.user._id.toString(),
+      currency: targetCurrency,
+      couponCode: couponCode || "",
+    };
+    const orderDetails = await createPaymentOrder(amountInINR, receiptId, notes);
 
     res.status(201).json({
       message: "Razorpay recharge order created successfully",
@@ -479,7 +490,7 @@ export const verifyRecharge = async (req, res) => {
       return res.status(400).json({ message: "Payment checkout response details are required" });
     }
 
-    const isValid = verifyPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+    const isValid = await verifyPaymentSignature(razorpay_order_id, razorpay_payment_id, razorpay_signature);
     if (!isValid) {
       return res.status(400).json({ message: "Security Warning: Payment signature check failed" });
     }
@@ -510,7 +521,8 @@ export const verifyRecharge = async (req, res) => {
     if (couponCode) {
       const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true });
       if (coupon) {
-        if (numericAmount >= coupon.minRecharge) {
+        const minReq = Math.max(1000, Number(coupon.minRecharge) || 1000);
+        if (numericAmount >= minReq) {
           let isEligible = true;
           if (coupon.firstTimeOnly) {
             const completedRechargesCount = await WalletTransaction.countDocuments({
@@ -920,5 +932,62 @@ export const deleteWalletCategory = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Error deleting wallet category", error: error.message });
+  }
+};
+
+/**
+ * Razorpay Webhook Handler
+ */
+export const walletWebhook = async (req, res) => {
+  try {
+    const event = req.body.event;
+    if (event === "payment.captured") {
+      const payment = req.body.payload?.payment?.entity;
+      if (payment && payment.notes?.userId) {
+        const userId = payment.notes.userId;
+        const amount = payment.amount / 100.0;
+        const currency = payment.currency || "INR";
+        const paymentId = payment.id;
+
+        const existingTx = await WalletTransaction.findOne({ referenceId: paymentId });
+        if (!existingTx) {
+          let wallet = await Wallet.findOne({ user: userId, currency });
+          if (!wallet) {
+            wallet = await Wallet.findOne({ user: userId });
+          }
+          if (wallet) {
+            const openingBalance = wallet.availableBalance;
+            wallet.availableBalance += amount;
+            wallet.totalBalance += amount;
+            wallet.balance = wallet.availableBalance;
+            await wallet.save();
+
+            await WalletTransaction.create({
+              walletId: wallet._id,
+              userId,
+              transactionType: "Recharge",
+              amount,
+              currency,
+              openingBalance,
+              closingBalance: wallet.availableBalance,
+              referenceId: paymentId,
+              remarks: `Razorpay Webhook Auto-Credit (${currency} ${amount.toFixed(2)})`,
+              status: "Completed",
+            });
+
+            await Notification.create({
+              userId,
+              title: "Wallet Recharge Confirmed",
+              message: `Your wallet has been credited with ${currency} ${amount.toFixed(2)} via Razorpay.`,
+              type: "Wallet Recharged",
+            });
+          }
+        }
+      }
+    }
+    res.status(200).json({ status: "ok" });
+  } catch (err) {
+    console.error("Wallet webhook error:", err.message);
+    res.status(500).json({ error: err.message });
   }
 };

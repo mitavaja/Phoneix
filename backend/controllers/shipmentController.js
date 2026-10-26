@@ -1,3 +1,15 @@
+export const generateShipmentId = (courierName, isDraft = false) => {
+  const c = String(courierName || "").toLowerCase();
+  let prefix = "PHX-EXP";
+  if (c.includes("aramex")) {
+    prefix = "PHX-ARX";
+  } else if (c.includes("shipglobal") || c.includes("phreight") || c.includes("direct")) {
+    prefix = "PHX-DIR";
+  }
+  const suffix = Date.now().toString().slice(-6) + Math.floor(100 + Math.random() * 900);
+  return `${prefix}-${suffix}`;
+};
+
 import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
@@ -18,6 +30,7 @@ import AuditLog from "../models/AuditLog.js";
 import MarginRule from "../models/MarginRule.js";
 import RecipientCustomers from "../models/RecipientCustomers.js";
 import AdminWallet from "../models/AdminWallet.js";
+import { getZoneBasedFallbackRate } from "../utils/countryDirectory.js";
 
 import { createAramexShipment, createAramexPickup, calculateAramexRate } from "../services/aramexService.js";
 import { calculateShipGlobalRate, createShipGlobalOrder, getShipGlobalLabel } from "../services/shipglobalService.js";
@@ -562,7 +575,7 @@ export const bookShipment = async (req, res) => {
     });
 
     if (wallet.availableBalance < invoiceTotal) {
-      const draftShipmentId = `PHX-SH-${Date.now().toString().slice(-6)}`;
+      const draftShipmentId = generateShipmentId(courier, true);
       const draftInvoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
 
       const draftShipment = await Shipment.create({
@@ -643,7 +656,7 @@ export const bookShipment = async (req, res) => {
     wallet.balance = wallet.availableBalance;
     await wallet.save();
 
-    const shipmentId = `PHX-SH-${Date.now().toString().slice(-6)}`;
+    const shipmentId = generateShipmentId(courier, false);
     const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
 
     holdTransaction = await WalletTransaction.create({
@@ -982,6 +995,7 @@ export const getAllShipments = async (req, res) => {
         $match: {
           $or: [
             { shipmentId: searchRegex },
+            { courierTrackingNumber: searchRegex },
             { manifestCode: searchRegex },
             { pickupReferenceId: searchRegex },
             { "userDetails.companyName": searchRegex },
@@ -1474,7 +1488,7 @@ export const validateBulkUpload = async (req, res) => {
       } else {
         // Run simulated rate
         const isDomestic = receiverCountry.toLowerCase() === "in" || receiverCountry.toLowerCase() === "india";
-        const baseRate = isDomestic ? 300.0 + chargeableWeight * 60.0 : 1200.0 + chargeableWeight * 200.0;
+        const baseRate = getZoneBasedFallbackRate(receiverCountry, chargeableWeight).totalBaseCost;
         
         const marginRule = await evaluatePriorityMargin(receiverCountry, chargeableWeight);
         let shippingCharge = baseRate;
@@ -1680,7 +1694,7 @@ export const confirmBulkUpload = async (req, res) => {
         const invoiceTotal = parseFloat((shippingCharge + gstAmount).toFixed(2));
 
         // Generate IDs
-        const shipmentId = `PHX-SH-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
+        const shipmentId = generateShipmentId(row.courier || "aramex", false);
         const invoiceNumber = `INV-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
 
         const canFund = holdAmount > 0 && (actualProcessedCost + invoiceTotal) <= holdAmount;
@@ -2380,40 +2394,43 @@ export const cancelShipment = async (req, res) => {
       });
     }
 
-    const refundAmount = shipment.invoiceTotal;
+    const isDraft = shipment.status === "Draft";
+    const refundAmount = isDraft ? 0 : shipment.invoiceTotal;
 
-    // 3. Process Seller Wallet Refund
-    const sellerWallet = await Wallet.findOne({ user: shipment.user, currency: "INR" });
-    if (sellerWallet) {
-      const openingBalance = sellerWallet.availableBalance;
-      sellerWallet.availableBalance += refundAmount;
-      sellerWallet.totalBalance += refundAmount;
-      sellerWallet.balance = sellerWallet.availableBalance;
-      await sellerWallet.save();
+    // 3. Process Seller Wallet Refund ONLY if shipment was actually paid (not a draft)
+    if (!isDraft && refundAmount > 0) {
+      const sellerWallet = await Wallet.findOne({ user: shipment.user, currency: "INR" });
+      if (sellerWallet) {
+        const openingBalance = sellerWallet.availableBalance;
+        sellerWallet.availableBalance += refundAmount;
+        sellerWallet.totalBalance += refundAmount;
+        sellerWallet.balance = sellerWallet.availableBalance;
+        await sellerWallet.save();
 
-      await WalletTransaction.create({
-        walletId: sellerWallet._id,
-        userId: shipment.user,
-        transactionType: "Refund",
-        amount: refundAmount,
-        currency: "INR",
-        openingBalance,
-        closingBalance: sellerWallet.availableBalance,
-        referenceId: `REF-${shipment.shipmentId}`,
-        remarks: `Cancellation Refund for AWB: ${shipment.courierTrackingNumber || shipment.shipmentId}`,
-        shipmentId: shipment.shipmentId,
-        status: "Completed",
-      });
-    }
+        await WalletTransaction.create({
+          walletId: sellerWallet._id,
+          userId: shipment.user,
+          transactionType: "Refund",
+          amount: refundAmount,
+          currency: "INR",
+          openingBalance,
+          closingBalance: sellerWallet.availableBalance,
+          referenceId: `REF-${shipment.shipmentId}`,
+          remarks: `Cancellation Refund for AWB: ${shipment.courierTrackingNumber || shipment.shipmentId}`,
+          shipmentId: shipment.shipmentId,
+          status: "Completed",
+        });
+      }
 
-    // 4. Reverse Admin Wallet Ledger
-    const adminWallet = await AdminWallet.findOne({ currency: "INR" });
-    if (adminWallet) {
-      adminWallet.totalGrossRevenue -= refundAmount;
-      adminWallet.aramexPayables -= shipment.aramexBaseCost;
-      adminWallet.gstPayables -= shipment.gstAmount;
-      adminWallet.netProfit -= shipment.marginAmount;
-      await adminWallet.save();
+      // 4. Reverse Admin Wallet Ledger
+      const adminWallet = await AdminWallet.findOne({ currency: "INR" });
+      if (adminWallet) {
+        adminWallet.totalGrossRevenue -= refundAmount;
+        adminWallet.aramexPayables -= shipment.aramexBaseCost;
+        adminWallet.gstPayables -= shipment.gstAmount;
+        adminWallet.netProfit -= shipment.marginAmount;
+        await adminWallet.save();
+      }
     }
 
     // 5. Update Shipment Status
@@ -2458,14 +2475,29 @@ export const shipmentDropDownList = async (req, res) => {
     const shipments = await Shipment.aggregate([
       {
         $match : {
-          user : new mongoose.Types.ObjectId(_id)
+          user : new mongoose.Types.ObjectId(_id),
+          status: { $nin: ["Draft", "Cancelled", "Hold", "HOLD"] }
         }
       },
       {
         $project : {
           _id: 0,
-          label : "$shipmentId",
-          value : "$_id"
+          label : {
+            $concat: [
+              "$shipmentId",
+              {
+                $cond: [
+                  { $gt: [{ $strLenCP: { $ifNull: ["$courierTrackingNumber", ""] } }, 0] },
+                  { $concat: [" (AWB: ", "$courierTrackingNumber", ")"] },
+                  ""
+                ]
+              }
+            ]
+          },
+          value : "$_id",
+          shipmentId: "$shipmentId",
+          courierTrackingNumber: "$courierTrackingNumber",
+          status: "$status"
         }
       }
     ]);

@@ -205,10 +205,43 @@ const RateCalculator = () => {
           <div className="my-auto flex flex-col items-center justify-center py-6">
             {result ? (
               <div className="text-center w-full space-y-4 animate-fade-in">
-                <div className="text-sm text-[#687280] uppercase tracking-widest font-semibold">Total Payable</div>
+                {result.isGuest && (
+                  <div className="inline-flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 text-amber-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                    <span>Public Retail Tariff</span>
+                  </div>
+                )}
+                <div className="text-sm text-[#687280] uppercase tracking-widest font-semibold">
+                  {result.isGuest ? "Estimated Standard Retail Tariff" : "Total Commercial Payable"}
+                </div>
                 <div className="text-5xl font-black text-[#FF6A00] tracking-tight">
                   ₹{result.invoiceTotal}
                 </div>
+                {result.isGuest && (
+                  <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 p-4 rounded-xl text-left space-y-2">
+                    <div className="flex items-center gap-2 text-[#FF6A00] font-bold text-xs uppercase tracking-wide">
+                      <span>💡 Get Up To 40% Lower Rates!</span>
+                    </div>
+                    <p className="text-xs text-[#0A1F44] font-medium leading-relaxed">
+                      This is a standard retail tariff. Register for a free merchant account or contact us to unlock our best discounted B2B shipping slabs!
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                      <button
+                        onClick={() => navigate("/register")}
+                        className="bg-[#FF6A00] hover:bg-orange-600 text-white font-bold px-3.5 py-2 rounded-lg text-xs transition shadow-sm text-center"
+                      >
+                        Register for Best Rates
+                      </button>
+                      <a
+                        href="https://wa.me/917698039174?text=Hi%2C%20I%20want%20the%20best%20shipping%20rates%20for%20Phreights"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="bg-[#0A1F44] hover:bg-[#071630] text-white font-bold px-3.5 py-2 rounded-lg text-xs transition shadow-sm text-center flex items-center justify-center gap-1.5"
+                      >
+                        Contact: +91 76980 39174
+                      </a>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4 text-left bg-[#0A1F44]/5 p-4 rounded-xl text-sm mt-4 border border-[#687280]/20">
                   <div>

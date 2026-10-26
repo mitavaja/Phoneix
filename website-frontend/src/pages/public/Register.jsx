@@ -26,6 +26,7 @@ const Register = () => {
     companyName: "",
     ownerName: "",
     mobileNumber: "",
+    accountCategory: "Individual", // "Individual" or "Business"
     gstType: "Non-GST",
     gstNumber: "",
     confirmPassword: "",
@@ -75,9 +76,11 @@ const Register = () => {
       if (form.password !== form.confirmPassword) return "Passwords do not match.";
     }
     if (currentStep === 2) {
-      if (!form.companyName.trim()) return "Store / Company Name is required.";
-      if (form.gstType === "GST Registered" && !form.gstNumber.trim()) {
-        return "GST Number is required for GST Registered partners.";
+      if (form.accountCategory === "Business" || form.gstType === "GST Registered") {
+        if (!form.companyName.trim()) return "Store / Company Name is required for business registrations.";
+        if (form.gstType === "GST Registered" && !form.gstNumber.trim()) {
+          return "GST Number is required for GST Registered partners.";
+        }
       }
     }
     if (currentStep === 3) {
@@ -450,49 +453,89 @@ const Register = () => {
               </div>
             )}
 
-            {/* STEP 2: Business Details */}
+            {/* STEP 2: Business / Account Classification */}
             {step === 2 && (
-              <div className="space-y-4 animate-fade-in">
+              <div className="space-y-5 animate-fade-in">
                 <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-white">Business Details</h3>
-                  <p className="text-xs text-gray-400">Configure company registration parameters for your dashboard ledger.</p>
+                  <h3 className="text-lg font-bold text-white">Account Classification</h3>
+                  <p className="text-xs text-gray-400">Select whether you are registering as an individual or a company.</p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs text-gray-400 block font-bold uppercase tracking-wider">Store / Company Name</label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
-                      <Building size={16} />
-                    </span>
-                    <input
-                      type="text"
-                      name="companyName"
-                      placeholder="Apex Logistics Ltd"
-                      value={form.companyName}
-                      onChange={handleChange}
-                      required
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300"
-                    />
+                {/* Account Category Selector */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    onClick={() => setForm(prev => ({ ...prev, accountCategory: "Individual", companyName: "" }))}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition ${
+                      form.accountCategory === "Individual"
+                        ? "bg-[#FF6A00]/15 border-[#FF6A00] text-white"
+                        : "bg-[#0A1F44]/50 border-[#687280]/20 text-gray-400 hover:border-gray-500"
+                    }`}
+                  >
+                    <span className="block font-bold text-xs text-white">👤 Individual Person</span>
+                    <span className="text-[10px] text-gray-400">Personal documents (Aadhaar & PAN). No company name needed.</span>
+                  </div>
+
+                  <div
+                    onClick={() => setForm(prev => ({ ...prev, accountCategory: "Business" }))}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition ${
+                      form.accountCategory === "Business"
+                        ? "bg-[#FF6A00]/15 border-[#FF6A00] text-white"
+                        : "bg-[#0A1F44]/50 border-[#687280]/20 text-gray-400 hover:border-gray-500"
+                    }`}
+                  >
+                    <span className="block font-bold text-xs text-white">🏢 Company / Business</span>
+                    <span className="text-[10px] text-gray-400">Commercial entity, GST or MSME registration.</span>
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-xs text-gray-400 block font-bold uppercase tracking-wider">Tax GST Class Type</label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
-                      <Briefcase size={16} />
-                    </span>
-                    <select
-                      name="gstType"
-                      value={form.gstType}
-                      onChange={handleChange}
-                      className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300 appearance-none"
-                    >
-                      <option value="Non-GST">Non-GST (Small Business / Exempt)</option>
-                      <option value="GST Registered">GST Registered Partner</option>
-                    </select>
+                {form.accountCategory === "Business" ? (
+                  <div className="space-y-4 pt-1">
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-400 block font-bold uppercase tracking-wider">
+                        Store / Company Name <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
+                          <Building size={16} />
+                        </span>
+                        <input
+                          type="text"
+                          name="companyName"
+                          placeholder="Apex Logistics Ltd"
+                          value={form.companyName}
+                          onChange={handleChange}
+                          required
+                          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-gray-400 block font-bold uppercase tracking-wider">Tax GST Class Type</label>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">
+                          <Briefcase size={16} />
+                        </span>
+                        <select
+                          name="gstType"
+                          value={form.gstType}
+                          onChange={handleChange}
+                          className="w-full pl-10 pr-4 py-3 rounded-xl bg-[#0A1F44] border border-[#687280]/20 text-white focus:ring-2 focus:ring-[#FF6A00] outline-none text-sm transition-all duration-300 appearance-none"
+                        >
+                          <option value="Non-GST">Non-GST (Small Business / Sole Trader)</option>
+                          <option value="GST Registered">GST Registered Partner</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 bg-[#0A1F44]/60 border border-[#687280]/20 rounded-2xl space-y-1 text-xs">
+                    <span className="text-[#FF6A00] font-bold block">✓ Individual Account Selected</span>
+                    <p className="text-gray-300 text-[11px] leading-relaxed">
+                      You are registering with individual documents. Company name is not required. Your merchant account will be identified under your name ({form.ownerName || "Merchant"}).
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <label className="text-xs text-gray-400 block font-bold uppercase tracking-wider">

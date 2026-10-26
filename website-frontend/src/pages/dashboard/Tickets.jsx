@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from "react";
 import API from "../../services/api";
-import { HelpCircle, Send, Upload } from "lucide-react";
+import { HelpCircle, Send, Upload, Plus, XCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "react-toastify";
 
 const Tickets = () => {
@@ -28,14 +28,32 @@ const Tickets = () => {
         }
     }
 
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [createdTicketId, setCreatedTicketId] = useState("");
+
     const handleCreateTicket = async (e) => {
         e.preventDefault();
         setTicketSuccess("");
+        setCreatedTicketId("");
         try {
             const res = await API.post("/tickets/ticket", ticketForm);
-            setTicketSuccess(res.data.message || "Support ticket created successfully.");
+            const created = res.data?.ticket;
+            const tId = created?.ticketId || "";
+            setCreatedTicketId(tId);
+            setTicketSuccess(`Support Ticket Raised Successfully! Assigned Ticket ID: ${tId}`);
+            toast.success(`Ticket ${tId} opened successfully!`);
             setTicketForm({ subject: "", type: "Shipment Issue", description: "" });
-            await fetchTickets();
+            setShowCreateModal(false);
+
+            const updatedRes = await API.get("/tickets/my-tickets");
+            const allTickets = updatedRes.data || [];
+            setTickets(allTickets);
+            if (created && created._id) {
+                const found = allTickets.find(t => t._id === created._id);
+                setSelectedTicket(found || created);
+            } else if (allTickets.length > 0) {
+                setSelectedTicket(allTickets[allTickets.length - 1]);
+            }
         } catch (err) {
             toast.error(err.response?.data?.message || "Failed to open support ticket.");
         }
@@ -59,68 +77,34 @@ const Tickets = () => {
     return (
         <div className="glass-card border border-[#687280]/20 rounded-2xl p-6 shadow-xl animate-fade-in grid lg:grid-cols-3 gap-8">
 
-            {/* Ticket creation and listing */}
-            <div className="lg:col-span-1 space-y-6">
-                <div className="space-y-4">
-                    <h3 className="text-lg font-black text-[#0A1F44] border-b border-[#687280]/20 pb-2">Open New Ticket</h3>
-
-                    <form onSubmit={handleCreateTicket} className="space-y-3 text-xs">
-                        <div>
-                            <label className="text-[11px] font-bold text-[#687280] uppercase tracking-wider block mb-1">Subject</label>
-                            <input
-                                type="text"
-                                placeholder="Delayed delivery AWB..."
-                                value={ticketForm.subject}
-                                onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })}
-                                required
-                                className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] placeholder:text-[#687280]/60 outline-none focus:border-[#FF6A00] focus:ring-1 focus:ring-[#FF6A00] text-xs transition"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-[11px] font-bold text-[#687280] uppercase tracking-wider block mb-1">Issue category</label>
-                            <select
-                                value={ticketForm.type}
-                                onChange={(e) => setTicketForm({ ...ticketForm, type: e.target.value })}
-                                className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] focus:ring-1 focus:ring-[#FF6A00] text-xs transition"
-                            >
-                                <option value="Shipment Issue">Shipment Issue</option>
-                                <option value="Tracking Issue">Tracking Issue</option>
-                                <option value="Pickup Issue">Pickup Issue</option>
-                                <option value="Billing Issue">Billing Issue</option>
-                                <option value="Account Issue">Account Issue</option>
-                                <option value="Other">Other Query</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-[11px] font-bold text-[#687280] uppercase tracking-wider block mb-1">Problem details</label>
-                            <textarea
-                                placeholder="Elaborate details..."
-                                value={ticketForm.description}
-                                onChange={(e) => setTicketForm({ ...ticketForm, description: e.target.value })}
-                                rows="3"
-                                required
-                                className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] placeholder:text-[#687280]/60 outline-none focus:border-[#FF6A00] focus:ring-1 focus:ring-[#FF6A00] text-xs transition"
-                            />
-                        </div>
-
-                        {ticketSuccess && (
-                            <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-2.5 rounded-xl font-medium">
-                                {ticketSuccess}
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            className="w-full bg-[#FF6A00] text-white font-bold py-2.5 rounded-xl text-xs hover:brightness-110 shadow-md transition active:scale-[0.99]"
-                        >
-                            Submit Ticket
-                        </button>
-                    </form>
+            {/* Ticket roster list & New Ticket Header */}
+            <div className="lg:col-span-1 space-y-4">
+                <div className="flex justify-between items-center pb-2 border-b border-[#687280]/20">
+                    <div>
+                        <h3 className="text-base font-extrabold text-[#0A1F44]">Support Tickets</h3>
+                        <p className="text-[10px] text-[#687280]">{tickets.length} total tickets logged</p>
+                    </div>
+                    <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="bg-[#FF6A00] hover:bg-[#ff7b1a] text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center gap-1 shadow-sm transition active:scale-95"
+                    >
+                        <Plus size={14} /> New Ticket
+                    </button>
                 </div>
 
+                {ticketSuccess && (
+                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs p-3 rounded-xl flex items-center gap-2">
+                        <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
+                        <div>
+                            <span className="font-bold block">Ticket Logged</span>
+                            <span className="text-[11px]">{ticketSuccess}</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Ticket roster list */}
-                <div className="space-y-4 pt-4 border-t border-[#687280]/20">
-                    <h3 className="text-xs font-black text-[#0A1F44] uppercase tracking-wider">Active Tickets</h3>
+                <div className="space-y-4">
+                    <h3 className="text-xs font-black text-[#0A1F44] uppercase tracking-wider">Your Active Tickets</h3>
 
                     <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar pr-1">
                         {tickets.map(t => (

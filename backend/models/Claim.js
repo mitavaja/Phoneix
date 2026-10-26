@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
-const claimSchema = new mongoose.Schema({
+const claimSchema = new mongoose.Schema(
+    {
         shipmentId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: "Shipment",
@@ -13,7 +14,7 @@ const claimSchema = new mongoose.Schema({
         },
         claimType: {
             type: String,
-            enum: ["Lost Shipment", "Damaged Shipment", "Delayed Shipment"],
+            enum: ["Lost Shipment", "Delayed Shipment"],
             required: true,
         },
         description: {
@@ -43,8 +44,8 @@ const claimSchema = new mongoose.Schema({
     }
 );
 
-claimSchema.index({shipmentId: 1});
-claimSchema.index({status: 1});
+claimSchema.index({ shipmentId: 1 });
+claimSchema.index({ status: 1 });
 
 const Claim = mongoose.model("Claim", claimSchema);
 export default Claim;

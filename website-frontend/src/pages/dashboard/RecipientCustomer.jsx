@@ -4,6 +4,8 @@ import { Select } from "../../components/ui/Select";
 import { UserRoundKey, Plus, MapPin, Edit2, Trash2 } from "lucide-react";
 import { ARAMEX_SUPPORTED_COUNTRIES } from "../../utils/countries";
 import { toast } from "react-toastify";
+import { fetchLocationByPincode } from "../../utils/pincodeHelper";
+import { Loader2 } from "lucide-react";
 
 const RecipientCustomer = () => {
     const [customers, setCustomers] = useState([]);
@@ -21,6 +23,65 @@ const RecipientCustomer = () => {
         countryCode: ""
     };
     const [customerForm, setCustomerForm] = useState(initialCustomerForm);
+    const [isFetchingZip, setIsFetchingZip] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState({});
+
+    const handleZipChange = async (zipVal) => {
+        setCustomerForm(prev => ({ ...prev, postCode: zipVal }));
+        const clean = zipVal.trim();
+        if (clean.length >= 3) {
+            setIsFetchingZip(true);
+            try {
+                const loc = await fetchLocationByPincode(clean, customerForm.countryCode || "IN");
+                if (loc) {
+                    setCustomerForm(prev => ({
+                        ...prev,
+                        city: loc.city || prev.city,
+                        stateOrProvinceCode: loc.state || prev.stateOrProvinceCode
+                    }));
+                    toast.info(`Auto-fetched: ${loc.city}, ${loc.state}`);
+                }
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setIsFetchingZip(false);
+            }
+        }
+    };
+
+    const validateRecipient = () => {
+        const errors = {};
+        const nameRegex = /^[a-zA-Z\s.'-]{2,60}$/;
+        const phoneRegex = /^\+?[0-9\s-]{7,16}$/;
+        const cityRegex = /^[a-zA-Z\s.'-]{2,50}$/;
+
+        if (!customerForm.name || !nameRegex.test(customerForm.name.trim())) {
+            errors.name = "Enter a valid recipient name (letters and spaces only).";
+        }
+        if (!customerForm.mobile || !phoneRegex.test(customerForm.mobile.trim())) {
+            errors.mobile = "Enter a valid mobile number (7 to 15 digits).";
+        }
+        if (!customerForm.countryCode) {
+            errors.countryCode = "Select a valid destination country.";
+        }
+        if (!customerForm.addressLine1 || customerForm.addressLine1.trim().length < 5) {
+            errors.addressLine1 = "Address Line 1 must be at least 5 characters.";
+        } else if (/^\d+$/.test(customerForm.addressLine1.trim())) {
+            errors.addressLine1 = "Address Line 1 cannot be only numeric digits.";
+        }
+        if (!customerForm.city || !cityRegex.test(customerForm.city.trim())) {
+            errors.city = "Enter a valid city name (letters only).";
+        }
+        if (!customerForm.stateOrProvinceCode || customerForm.stateOrProvinceCode.trim().length < 2) {
+            errors.stateOrProvinceCode = "State/Province code is required (min 2 chars).";
+        }
+        if (!customerForm.postCode || customerForm.postCode.trim().length < 2) {
+            errors.postCode = "Postal/Zip code is required.";
+        }
+
+        setFieldErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
 
     const fetchCustomers = async () => {
         try {
@@ -35,6 +96,10 @@ const RecipientCustomer = () => {
 
     const handleSaveCustomer = async (e) => {
         e.preventDefault();
+        if (!validateRecipient()) {
+            toast.error("Please correct the invalid fields in the recipient form.");
+            return;
+        }
         try {
             if (customerForm._id) {
                 await API.put(`/recipient-customer/${customerForm._id}`, customerForm);
@@ -210,17 +275,25 @@ const RecipientCustomer = () => {
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] text-[#687280] font-bold block mb-1 uppercase tracking-wider">
-                                Pincode / Zipcode <span className="text-red-500">*</span>
-                            </label>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="text-[10px] text-[#687280] font-bold uppercase tracking-wider">
+                                    Pincode / Zipcode <span className="text-red-500">*</span>
+                                </label>
+                                {isFetchingZip && (
+                                    <span className="text-[10px] text-[#FF6A00] flex items-center gap-1 font-semibold animate-pulse">
+                                        <Loader2 size={11} className="animate-spin" /> Auto-fetching...
+                                    </span>
+                                )}
+                            </div>
                             <input
                                 type="text"
-                                placeholder="12345"
+                                placeholder="Enter Zip/Postal (e.g. 10001 or 400001)"
                                 value={customerForm.postCode}
-                                onChange={(e) => setCustomerForm({ ...customerForm, postCode: e.target.value })}
+                                onChange={(e) => handleZipChange(e.target.value)}
                                 required
                                 className="w-full p-3 rounded-xl bg-white border border-[#687280]/30 text-[#0A1F44] outline-none focus:border-[#FF6A00] text-xs shadow-sm"
                             />
+                            {fieldErrors.postCode && <p className="text-[10px] text-red-500 mt-1">{fieldErrors.postCode}</p>}
                         </div>
                     </div>
 

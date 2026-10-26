@@ -14,13 +14,26 @@ export const generateInvoicePDF = async (req, res) => {
         let fromDate = req.query.fromDate || req.query.startDate;
         let toDate = req.query.toDate || req.query.endDate;
 
+        const todayEnd = moment().endOf('day').toDate();
+
         if (!fromDate || !toDate) {
             fromDate = moment().startOf('month').toDate();
-            toDate = moment().endOf('month').toDate();
+            toDate = todayEnd;
         } else {
             // Parse custom dates and span entire days
             fromDate = moment(fromDate).startOf('day').toDate();
             toDate = moment(toDate).endOf('day').toDate();
+        }
+
+        if (moment(fromDate).isAfter(todayEnd)) {
+            return res.status(400).json({ message: "From Date cannot be a future date." });
+        }
+        if (moment(toDate).isAfter(todayEnd)) {
+            // Disallow future dates for invoice generation
+            return res.status(400).json({ message: "Invoice date cannot be in the future. Maximum allowed date is today." });
+        }
+        if (moment(fromDate).isAfter(toDate)) {
+            return res.status(400).json({ message: "From Date cannot be after To Date." });
         }
 
         // 1. Fetch User Data

@@ -12,7 +12,7 @@ const Footer = () => {
     },
     contact: {
       email: "admin@phreights.com",
-      phone: "+91 98765 43210",
+      phone: "+91 76980 39174",
       address: "Global Headquarters, India"
     },
     copyright: {
@@ -132,7 +132,7 @@ const Footer = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <Phone size={16} /> {footerData.contact.phone}
+              <Phone size={16} /> <a href="tel:+917698039174" className="hover:text-[#FF6A00] transition">+91 76980 39174</a>
             </div>
 
             <div className="flex items-center gap-2">

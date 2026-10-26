@@ -21,7 +21,7 @@ const getRazorpayInstance = () => {
 /**
  * Create a new Payment Order
  */
-export const createPaymentOrder = async (amountInINR, receipt = "") => {
+export const createPaymentOrder = async (amountInINR, receipt = "", notes = {}) => {
   // Razorpay accepts amounts in paise (1 INR = 100 Paise)
   const amountInPaise = Math.round(amountInINR * 100);
 
@@ -32,6 +32,7 @@ export const createPaymentOrder = async (amountInINR, receipt = "") => {
       amount: amountInPaise,
       currency: "INR",
       receipt,
+      notes,
       status: "created",
       simulated: true,
     };
@@ -47,6 +48,7 @@ export const createPaymentOrder = async (amountInINR, receipt = "") => {
       amount: amountInPaise,
       currency: "INR",
       receipt,
+      notes,
     });
     return {
       success: true,
@@ -62,7 +64,7 @@ export const createPaymentOrder = async (amountInINR, receipt = "") => {
 /**
  * Verify Razorpay Web Signature
  */
-export const verifyPaymentSignature = (orderId, paymentId, signature) => {
+export const verifyPaymentSignature = async (orderId, paymentId, signature) => {
   if (process.env.RAZORPAY_KEY_ID === "rzp_test_1234567890abcd") {
     return signature === "dummy_signature";
   }
@@ -72,15 +74,40 @@ export const verifyPaymentSignature = (orderId, paymentId, signature) => {
     return false;
   }
 
-  try {
-    const generatedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(`${orderId}|${paymentId}`)
-      .digest("hex");
+  // 1. Check HMAC signature if orderId and signature are provided
+  if (orderId && signature && signature !== "dummy_signature") {
+    try {
+      const generatedSignature = crypto
+        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+        .update(`${orderId}|${paymentId}`)
+        .digest("hex");
 
-    return generatedSignature === signature;
-  } catch (err) {
-    console.error("Razorpay signature validation failed:", err.message);
-    return false;
+      if (generatedSignature === signature) {
+        return true;
+      }
+    } catch (err) {
+      console.warn("Razorpay HMAC signature check failed:", err.message);
+    }
   }
+
+  // 2. Fallback / Direct verification with Razorpay Live API
+  if (paymentId) {
+    try {
+      const payment = await instance.payments.fetch(paymentId);
+      if (payment) {
+        if (payment.status === "captured") {
+          return true;
+        }
+        if (payment.status === "authorized") {
+          // Auto-capture authorized payment
+          await instance.payments.capture(paymentId, payment.amount, payment.currency || "INR");
+          return true;
+        }
+      }
+    } catch (apiErr) {
+      console.error("Razorpay API fetch payment failed:", apiErr.message);
+    }
+  }
+
+  return false;
 };

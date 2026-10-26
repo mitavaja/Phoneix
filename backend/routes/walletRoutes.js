@@ -15,12 +15,16 @@ import {
   getWalletCategories,
   createWalletCategory,
   deleteWalletCategory,
+  walletWebhook,
 } from "../controllers/walletController.js";
 import { getDashboardMetrics } from  "../controllers/adminWalletController.js"
 import authMiddleware from "../middleware/authMiddleware.js";
 import roleMiddleware from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
+
+// Webhook (No auth header from Razorpay)
+router.post("/webhook", walletWebhook);
 
 router.use(authMiddleware);
 
