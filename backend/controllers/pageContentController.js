@@ -29,15 +29,19 @@ export const updatePageContent = async (req, res) => {
       return res.status(400).json({ message: "Sections data is required" });
     }
 
-    let content = await PageContent.findOne({ page });
-    if (!content) {
-      content = await PageContent.create({ page, sections });
-    } else {
-      content.sections = sections;
-      // Mark as modified if Mongoose doesn't auto-detect Mixed changes
-      content.markModified("sections");
-      await content.save();
-    }
+    const content = await PageContent.findOneAndUpdate(
+      { page },
+      {
+        $set: {
+          sections,
+          updatedAt: new Date()
+        },
+        $setOnInsert: {
+          createdAt: new Date()
+        }
+      },
+      { new: true, upsert: true, runValidators: false }
+    );
 
     res.status(200).json({ message: `Page content for '${page}' updated successfully`, content });
   } catch (error) {
