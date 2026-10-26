@@ -504,6 +504,12 @@ const CMSManager = () => {
       await API.put(`/page-content/${activeTab}`, { sections: pageData });
       setIsSaved(true);
       setTimeout(() => setIsSaved(false), 3000);
+      if (activeTab === "header") {
+        window.dispatchEvent(new Event("logo-updated"));
+        try {
+          localStorage.setItem("phreights_brand_logo_ts", Date.now().toString());
+        } catch (err) {}
+      }
       toast.success(`Success: ${activeTab.toUpperCase()} page sections updated and committed successfully!`);
     } catch (err) {
       console.error(`Failed to update ${activeTab} page content`, err);
@@ -541,8 +547,26 @@ const CMSManager = () => {
     setLoading(true);
     try {
       const res = await API.post("/page-content/upload", formData);
-      updateNestedField("logo", "logoUrl", res.data.url);
-      toast.success("Logo image uploaded successfully!");
+      const newLogoUrl = res.data.url;
+      updateNestedField("logo", "logoUrl", newLogoUrl);
+
+      // Instantly save to header settings in database so all panels sync immediately
+      const updatedSections = {
+        ...(pageData || {}),
+        logo: {
+          ...(pageData?.logo || {}),
+          logoUrl: newLogoUrl
+        }
+      };
+      await API.put("/page-content/header", { sections: updatedSections });
+
+      // Notify all local components and other tabs
+      window.dispatchEvent(new Event("logo-updated"));
+      try {
+        localStorage.setItem("phreights_brand_logo_ts", Date.now().toString());
+      } catch (err) {}
+
+      toast.success("Logo uploaded and updated across all panels successfully!");
     } catch (err) {
       console.error("Error uploading logo", err);
       toast.error(err.response?.data?.message || "Failed to upload logo image");
@@ -683,7 +707,26 @@ const CMSManager = () => {
                             />
                             <button
                               type="button"
-                              onClick={() => updateNestedField("logo", "logoUrl", "")}
+                              onClick={async () => {
+                                updateNestedField("logo", "logoUrl", "");
+                                try {
+                                  const updatedSections = {
+                                    ...(pageData || {}),
+                                    logo: {
+                                      ...(pageData?.logo || {}),
+                                      logoUrl: ""
+                                    }
+                                  };
+                                  await API.put("/page-content/header", { sections: updatedSections });
+                                  window.dispatchEvent(new Event("logo-updated"));
+                                  try {
+                                    localStorage.setItem("phreights_brand_logo_ts", Date.now().toString());
+                                  } catch (err) {}
+                                  toast.info("Logo reset to default brand logo");
+                                } catch (err) {
+                                  console.warn("Failed to reset logo", err);
+                                }
+                              }}
                               className="text-red-500 hover:text-red-700 font-bold"
                             >
                               Clear
