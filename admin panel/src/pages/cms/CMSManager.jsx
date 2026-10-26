@@ -530,16 +530,17 @@ const CMSManager = () => {
     const file = e.target.files[0];
     if (!file) return;
 
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("Logo file is too large! Maximum allowed size is 25MB.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("logo", file);
 
     setLoading(true);
     try {
-      const res = await API.post("/page-content/upload", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const res = await API.post("/page-content/upload", formData);
       updateNestedField("logo", "logoUrl", res.data.url);
       toast.success("Logo image uploaded successfully!");
     } catch (err) {
