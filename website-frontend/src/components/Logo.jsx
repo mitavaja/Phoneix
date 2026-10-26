@@ -1,28 +1,52 @@
 import React, { useState, useEffect } from "react";
 import API, { resolveAssetUrl } from "../services/api";
 
+const DEFAULT_LOGO_URL = "/phreights-logo.png";
+
 const Logo = ({ className = "", showText = true, theme = "navy", size = "md", text, subtitle, logoUrl }) => {
   const [logoConfig, setLogoConfig] = useState(null);
+  const [imgError, setImgError] = useState(false);
+
+  const fetchHeaderLogo = () => {
+    API.get("/page-content/header?t=" + Date.now())
+      .then(res => {
+        if (res.data?.sections?.logo) {
+          setLogoConfig(res.data.sections.logo);
+          setImgError(false);
+        }
+      })
+      .catch(() => {
+        // Fallback silently
+      });
+  };
 
   useEffect(() => {
     // If text/subtitle/logoUrl is not explicitly passed, fetch from backend API
     if (text === undefined || subtitle === undefined || logoUrl === undefined) {
-      API.get("/page-content/header")
-        .then(res => {
-          if (res.data?.sections?.logo) {
-            setLogoConfig(res.data.sections.logo);
-          }
-        })
-        .catch(err => {
-          // Fallback silently if endpoint fails or 404
-        });
+      fetchHeaderLogo();
     }
   }, [text, subtitle, logoUrl]);
 
-  // Keep it optional: If dynamic content isn't loaded yet or not configured, fall back.
+  // Listen to cross-component or cross-tab logo updates
+  useEffect(() => {
+    const handleUpdate = () => {
+      fetchHeaderLogo();
+    };
+
+    window.addEventListener("logo-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("logo-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
+  }, []);
+
   const displayText = text !== undefined ? text : logoConfig?.text;
   const displaySubtitle = subtitle !== undefined ? subtitle : logoConfig?.subtitle;
-  const displayLogoUrl = logoUrl !== undefined ? logoUrl : logoConfig?.logoUrl;
+  const activeLogoUrl = logoUrl !== undefined ? logoUrl : logoConfig?.logoUrl;
+
+  // Determine which image URL to show: custom logo if configured, else default brand logo
+  const effectiveLogoUrl = activeLogoUrl && activeLogoUrl.trim() !== "" ? activeLogoUrl : DEFAULT_LOGO_URL;
 
   const iconColorMap = {
     light: {
@@ -55,21 +79,29 @@ const Logo = ({ className = "", showText = true, theme = "navy", size = "md", te
   // Proper sizes for logo image to prevent distortion (maintaining aspect-ratio)
   const imgSizeClasses = {
     sm: "h-9 w-auto max-w-[130px]",
-    md: "h-12 w-auto max-w-[190px]",
-    lg: "h-20 w-auto max-w-[190px]",
-    xl: "h-26 w-auto max-w-[260px]",
-    sidebar: "h-20 w-auto max-w-[190px]"
-  }[size] || "h-14 w-auto max-w-[190px]";
+    md: "h-11 sm:h-12 w-auto max-w-[190px]",
+    lg: "h-16 sm:h-20 w-auto max-w-[200px]",
+    xl: "h-22 sm:h-26 w-auto max-w-[260px]",
+    sidebar: "h-16 sm:h-20 w-auto max-w-[200px]"
+  }[size] || "h-12 w-auto max-w-[190px]";
+
+  const srcToRender = !imgError 
+    ? (effectiveLogoUrl.startsWith("/") && !effectiveLogoUrl.startsWith("/uploads/") 
+        ? effectiveLogoUrl 
+        : resolveAssetUrl(effectiveLogoUrl))
+    : (effectiveLogoUrl !== DEFAULT_LOGO_URL ? DEFAULT_LOGO_URL : null);
 
   return (
     <div className={`flex items-center gap-2.5 ${className}`}>
-      {displayLogoUrl ? (
+      {srcToRender ? (
         <img
-          src={resolveAssetUrl(displayLogoUrl)}
+          src={srcToRender}
           alt="Brand Logo"
           className={`${imgSizeClasses} object-contain select-none`}
-          onError={(e) => {
-            e.target.style.display = "none";
+          onError={() => {
+            if (!imgError && effectiveLogoUrl !== DEFAULT_LOGO_URL) {
+              setImgError(true);
+            }
           }}
         />
       ) : (
@@ -110,7 +142,7 @@ const Logo = ({ className = "", showText = true, theme = "navy", size = "md", te
         </svg>
       )}
 
-      {showText && displayText && !displayLogoUrl && (
+      {showText && displayText && !srcToRender && (
         <div className="flex flex-col select-none leading-none">
           <span
             className={`font-black tracking-wider uppercase ${sizeClasses.text}`}

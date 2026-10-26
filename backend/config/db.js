@@ -77,7 +77,7 @@ const connectDB = async () => {
           logo: {
             text: "",
             subtitle: "",
-            logoUrl: "/public/logo/phreights.png"
+            logoUrl: "/uploads/phreights-logo.png"
           },
           navigation: [
             { name: "Home", path: "/" },

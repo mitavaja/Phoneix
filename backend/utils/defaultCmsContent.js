@@ -1,4 +1,25 @@
 export const defaultCmsContent = {
+  header: {
+    logo: {
+      text: "",
+      subtitle: "",
+      logoUrl: "/uploads/phreights-logo.png"
+    },
+    navigation: [
+      { name: "Home", path: "/" },
+      { name: "About", path: "/" },
+      { name: "Services", path: "/services" },
+      { name: "Rate", path: "/rate" },
+      { name: "Tracking", path: "/tracking" },
+      { name: "Contact", path: "/contact" }
+    ],
+    buttons: {
+      loginText: "Login",
+      registerText: "Register",
+      showLogin: true,
+      showRegister: true
+    }
+  },
   about: {
     hero: {
       title: "About PHREIGHTS | International Shipping & Courier Solutions",

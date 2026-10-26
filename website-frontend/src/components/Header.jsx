@@ -99,6 +99,7 @@ const Header = () => {
             size="md" 
             text={headerConfig?.logo?.text} 
             subtitle={headerConfig?.logo?.subtitle} 
+            logoUrl={headerConfig?.logo?.logoUrl}
           />
         </Link>
 
