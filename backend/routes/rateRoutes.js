@@ -9,12 +9,13 @@ import {
   deleteMarginRule,
 } from "../controllers/rateController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
+import optionalAuthMiddleware from "../middleware/optionalAuthMiddleware.js";
 import roleMiddleware from "../middleware/roleMiddleware.js";
 
 const router = express.Router();
 
-// Merchant or Guest calculation (public-facing)
-router.post("/calculate", authMiddleware, calculateShippingCost);
+// Merchant (Wholesale) or Guest (Retail Tariff) calculation (public-facing)
+router.post("/calculate", optionalAuthMiddleware, calculateShippingCost);
 
 // Secured list view
 router.get("/", authMiddleware, getAllRates);
