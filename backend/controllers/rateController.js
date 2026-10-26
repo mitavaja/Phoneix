@@ -156,7 +156,7 @@ export const calculateShippingCost = async (req, res) => {
 
     const targetCountry = req.body.receiverCountry || req.body.destinationCountry;
 
-    if ((!pickupAddressId && !req.user) || (!customerId && !targetCountry) || !weight) {
+    if ((!customerId && !targetCountry) || !weight) {
       return res.status(400).json({
         message: "Origin warehouse, destination recipient details, and weight are required."
       });
