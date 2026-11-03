@@ -458,6 +458,7 @@ export const createAramexPickup = async ({
       },
       Transaction: { Reference1: "CreatePickup", Reference2: "", Reference3: "", Reference4: "", Reference5: "" },
     };
+    console.log("Aramex CreatePickup payload:", JSON.stringify(payload, null, 2)); // DEBUG
 
     const response = await axios.post(
         "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CreatePickup",
@@ -470,23 +471,86 @@ export const createAramexPickup = async ({
           timeout: 15000 // Prevents the request from hanging forever if Aramex is slow
         }
     );
-
+    console.log("Aramex CreatePickup response:", JSON.stringify(response.data, null, 2)); // DEBUG
     if (response.data.HasErrors) {
       const errorMsg = response.data.Notifications?.[0]?.Message || "Aramex Pickup schedule error";
       throw new Error(errorMsg);
     }
 
-    const pickupId = response.data.Pickup?.GUID || response.data.Pickup?.ID || `PKP${Math.floor(1000000 + Math.random() * 9000000)}`;
+    const processedPickup = response.data.ProcessedPickup || response.data.Pickup;
+    const pickupGUID = processedPickup?.GUID || `PKP${Math.floor(1000000 + Math.random() * 9000000)}`;
+    const pickupShortId = processedPickup?.ID || pickupGUID.slice(-6).toUpperCase();
 
     return {
       success: true,
-      pickupId,
-      manifestCode: `MNF-${pickupId.slice(-6).toUpperCase()}`,
+      pickupId: pickupGUID,
+      manifestCode: `MNF-${pickupShortId}`,
       data: response.data,
       simulated: false,
     };
   } catch (err) {
     console.error("Aramex API Error in createAramexPickup:", err.message);
+    throw new Error(err.response?.data?.message || err.message);
+  }
+};
+
+// 2. Add this new function to services/aramexService.js:
+/**
+ * 3B. Cancel Pickup (API: CancelPickup)
+ * Live Endpoint: https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CancelPickup
+ */
+export const cancelAramexPickup = async ({ pickupGUID, comments = "Cancelled by merchant" }) => {
+  const clientInfo = await getClientInfo();
+
+  if (await checkIsSimulated() || !pickupGUID || pickupGUID.startsWith("PKP")) {
+    return {
+      success: true,
+      message: "Pickup cancelled successfully (Simulated / Local)",
+      simulated: true,
+    };
+  }
+
+  try {
+    const payload = {
+      ClientInfo: clientInfo,
+      Transaction: {
+        Reference1: "CancelPickup",
+        Reference2: "",
+        Reference3: "",
+        Reference4: "",
+        Reference5: "",
+      },
+      PickupGUID: pickupGUID,
+      Comments: comments,
+    };
+
+    console.log("Aramex CancelPickup payload:", JSON.stringify(payload, null, 2)); // DEBUG
+
+    const response = await axios.post(
+        "https://ws.aramex.net/ShippingAPI.V2/Shipping/Service_1_0.svc/json/CancelPickup",
+        payload,
+        {
+          httpsAgent: aramexHttpsAgent,
+          headers: { "Connection": "close" },
+          timeout: 15000,
+        }
+    );
+
+    console.log("Aramex CancelPickup response:", JSON.stringify(response.data, null, 2)); // DEBUG
+    if (response.data.HasErrors) {
+      const errorObj = response.data.Notifications?.[0];
+      const errorMsg = errorObj?.Message || "Aramex Pickup cancellation error";
+      // ERR14 = past pickup, ERR15 = already assigned to courier
+      throw new Error(`Aramex Error (${errorObj?.Code || "ERR"}): ${errorMsg}`);
+    }
+
+    return {
+      success: true,
+      data: response.data,
+      simulated: false,
+    };
+  } catch (err) {
+    console.error("Aramex API Error in cancelAramexPickup:", err.message);
     throw new Error(err.response?.data?.message || err.message);
   }
 };
@@ -695,6 +759,8 @@ export const trackAramexShipment = async (trackingNumber) => {
       else if (latest.includes("in transit") || latest.includes("sorting")) currentStatus = "In Transit";
       else if (latest.includes("pickup") || latest.includes("collected")) currentStatus = "Picked Up";
     }
+
+    console.log(`Aramex Current Status for ${trackingNumber}:`, currentStatus);
 
     return {
       success: true,

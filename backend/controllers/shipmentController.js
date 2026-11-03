@@ -19,7 +19,12 @@ import MarginRule from "../models/MarginRule.js";
 import RecipientCustomers from "../models/RecipientCustomers.js";
 import AdminWallet from "../models/AdminWallet.js";
 
-import { createAramexShipment, createAramexPickup, calculateAramexRate } from "../services/aramexService.js";
+import {
+  createAramexShipment,
+  createAramexPickup,
+  calculateAramexRate,
+  trackAramexShipment, cancelAramexPickup
+} from "../services/aramexService.js";
 import { calculateShipGlobalRate, createShipGlobalOrder, getShipGlobalLabel } from "../services/shipglobalService.js";
 import { sendShipmentBookedEmail } from "../services/emailService.js";
 
@@ -1828,16 +1833,56 @@ export const cancelShipment = async (req, res) => {
     }
 
     // 2. Status Validation (Hard-Lock)
-    const allowedStatuses = ["Draft", "Booked", "Pickup Scheduled"];
+    const allowedStatuses = ["Draft", "Booked", "Pickup Scheduled", "Pickup Requested"];
     if (!allowedStatuses.includes(shipment.status)) {
       return res.status(400).json({
         message: `Cannot cancel shipment at status: ${shipment.status}. Once picked up, please contact support for an RTO.`
       });
     }
 
+    const isAramex = (shipment.courierName || shipment.courier || "").toLowerCase() === "aramex";
+    console.log(isAramex)
+
+    // 3. Carrier-Side Cancellation Check
+    if (isAramex) {
+      // Optional safety: Quick live tracking check to ensure driver hasn't scanned it already
+      if (shipment.courierTrackingNumber && !shipment.courierTrackingNumber.startsWith("ARM")) {
+        try {
+          const liveTrack = await trackAramexShipment(shipment.courierTrackingNumber);
+          if (["Picked Up", "In Transit", "Out For Delivery", "Delivered"].includes(liveTrack.status)) {
+            shipment.status = liveTrack.status;
+            shipment.courierStatus = liveTrack.status;
+            await shipment.save();
+            return res.status(400).json({
+              message: `Cannot cancel: Aramex has already scanned this parcel as '${liveTrack.status}'.`
+            });
+          }
+        } catch (trackErr) {
+          console.warn("Live tracking pre-cancel check skipped:", trackErr.message);
+        }
+      }
+
+      // If a pickup was scheduled, check if other active shipments share the same PickupGUID
+      if (shipment.status === "Pickup Scheduled" && shipment.pickupReferenceId) {
+        const otherActiveInSamePickup = await Shipment.countDocuments({
+          _id: { $ne: shipment._id },
+          pickupReferenceId: shipment.pickupReferenceId,
+          status: { $in: ["Booked", "Pickup Scheduled", "Pickup Requested"] }
+        });
+
+        // Only cancel the Aramex pickup if this is the ONLY (or last) shipment in that manifest
+        if (otherActiveInSamePickup === 0) {
+          await cancelAramexPickup({
+            pickupGUID: shipment.pickupReferenceId,
+            comments: `Cancelled by ${req.user.role} (${req.user.name}) for Shipment ${shipment.shipmentId}`
+          });
+        }
+      }
+    }
+
     const refundAmount = shipment.invoiceTotal;
 
-    // 3. Process Seller Wallet Refund
+    // 4. Process Seller Wallet Refund
     const sellerWallet = await Wallet.findOne({ user: shipment.user, currency: "INR" });
     if (sellerWallet) {
       const openingBalance = sellerWallet.availableBalance;
@@ -1861,39 +1906,51 @@ export const cancelShipment = async (req, res) => {
       });
     }
 
-    // 4. Reverse Admin Wallet Ledger
+    // 5. Reverse Admin Wallet Ledger (Respecting Carrier Type)
     const adminWallet = await AdminWallet.findOne({ currency: "INR" });
     if (adminWallet) {
       adminWallet.totalGrossRevenue -= refundAmount;
-      adminWallet.aramexPayables -= shipment.aramexBaseCost;
+      if (isAramex) {
+        adminWallet.aramexPayables -= shipment.aramexBaseCost;
+      } else {
+        adminWallet.shipglobalPayables -= shipment.aramexBaseCost;
+      }
       adminWallet.gstPayables -= shipment.gstAmount;
       adminWallet.netProfit -= shipment.marginAmount;
       await adminWallet.save();
     }
 
-    // 5. Update Shipment Status
+    // 6. Update Shipment Status
+    const oldStatus = shipment.status;
     shipment.status = "Cancelled";
     shipment.courierStatus = "Cancelled";
     shipment.dateCancelled = new Date();
     shipment.statusHistory.push({ status: "Cancelled", time: new Date() });
     await shipment.save();
 
-    // 6. Logs & Tracking
+    // 7. Logs, Tracking & Notification
     await TrackingHistory.create({
       shipmentId: shipment._id,
       status: "Cancelled",
       location: "System",
-      description: "Shipment cancelled by merchant. Wallet refunded.",
+      description: `Shipment cancelled by ${req.user.role}. Wallet refunded ₹${refundAmount.toFixed(2)}.`,
       eventTime: new Date(),
     });
 
     await AuditLog.create({
       userId: req.user._id,
-      action: "Merchant Cancelled Shipment",
+      action: `${req.user.role} Cancelled Shipment`,
       module: "Shipments",
-      oldValue: "Booked/Scheduled",
+      oldValue: oldStatus,
       newValue: "Cancelled",
       ipAddress: req.ip || "127.0.0.1",
+    });
+
+    await Notification.create({
+      userId: shipment.user,
+      title: "Shipment Cancelled & Refunded",
+      message: `Shipment ${shipment.shipmentId} (AWB: ${shipment.courierTrackingNumber || "N/A"}) was cancelled. ₹${refundAmount.toFixed(2)} has been credited to your wallet.`,
+      type: "Claim Updated",
     });
 
     res.status(200).json({
@@ -1903,7 +1960,7 @@ export const cancelShipment = async (req, res) => {
 
   } catch (error) {
     console.error("Cancellation Error:", error.message);
-    res.status(500).json({ message: "Failed to cancel shipment.", error: error.message });
+    res.status(500).json({ message: error.message || "Failed to cancel shipment.", error: error.message });
   }
 };
 
