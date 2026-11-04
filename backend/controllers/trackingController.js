@@ -15,21 +15,23 @@ export const trackShipment = async (req, res) => {
     });
 
     if (!shipment) {
-      return res.status(404).json({ message: `Shipment record not found` });
+      return res.status(404).json({ message: "Shipment record not found" });
     }
 
-    // Only hit the live Aramex API if the shipment has an AWB and isn't already finalized
     if (shipment.courierTrackingNumber && !["Delivered", "Cancelled"].includes(shipment.status)) {
       const trackingResult = await trackAramexShipment(shipment.courierTrackingNumber);
 
       if (trackingResult.success && trackingResult.events.length > 0) {
-
-        // 1. Sync Chronological Events to Database
+        // 1. Sync Chronological Events to Database (Skip SH014 "Record created." since we already log "Booked")
         for (const event of trackingResult.events) {
+          if (event.updateCode === "SH014" || event.status.toLowerCase().includes("record created")) {
+            continue;
+          }
+
           const exists = await TrackingHistory.findOne({
             shipmentId: shipment._id,
             status: event.status,
-            eventTime: event.eventTime // Removed the redundant new Date() wrapping
+            eventTime: event.eventTime,
           });
 
           if (!exists) {
@@ -38,13 +40,13 @@ export const trackShipment = async (req, res) => {
               status: event.status,
               description: event.description,
               location: event.location || "",
-              eventTime: event.eventTime // Removed the redundant new Date() wrapping
+              eventTime: event.eventTime,
             });
           }
         }
 
-        // 2. Update Primary Shipment Status if it progressed
-        if (shipment.status !== trackingResult.status) {
+        // 2. Update Primary Shipment Status ONLY if trackingResult.status is non-null and progressed
+        if (trackingResult.status && shipment.status !== trackingResult.status) {
           shipment.status = trackingResult.status;
           shipment.courierStatus = trackingResult.status;
           shipment.statusHistory.push({ status: trackingResult.status, time: new Date() });
@@ -57,7 +59,6 @@ export const trackShipment = async (req, res) => {
       }
     }
 
-    // Fetch the newly synced timeline (sorted newest to oldest)
     const timeline = await TrackingHistory.find({ shipmentId: shipment._id }).sort({ eventTime: -1 });
 
     res.status(200).json({
@@ -66,7 +67,6 @@ export const trackShipment = async (req, res) => {
       trackingSteps: timeline,
     });
   } catch (error) {
-    console.log(error)
     console.error("Live Tracking Error:", error.message);
     res.status(500).json({ message: "Error tracking shipment", error: error.message });
   }
