@@ -720,7 +720,7 @@ export const trackAramexShipment = async (trackingNumber) => {
     const payload = {
       ClientInfo: clientInfo,
       GetLastTrackingUpdateOnly: false,
-      Shipments: Array.isArray(trackingNumber) ? trackingNumber : [trackingNumber],
+      Shipments: Array.isArray(trackingNumber) ? trackingNumber : [String(trackingNumber).trim()],
       Transaction: { Reference1: "", Reference2: "", Reference3: "", Reference4: "", Reference5: "" },
     };
 
@@ -729,10 +729,8 @@ export const trackAramexShipment = async (trackingNumber) => {
         payload,
         {
           httpsAgent: aramexHttpsAgent,
-          headers: {
-            "Connection": "close"
-          },
-          timeout: 15000
+          headers: { "Connection": "close" },
+          timeout: 15000,
         }
     );
 
@@ -743,21 +741,47 @@ export const trackAramexShipment = async (trackingNumber) => {
 
     const trackingResults = response.data.TrackingResults?.[0]?.Value || [];
 
-    // APPLY THE PARSER HERE
-    const events = trackingResults.map((ev) => ({
-      status: ev.UpdateDescription || ev.UpdateAction,
-      description: ev.UpdateDescription,
-      location: ev.UpdateLocation,
-      eventTime: parseAramexDate(ev.UpdateDateTime),
-    }));
+    // 1. Parse and sort chronologically (Oldest -> Newest) so the last item is guaranteed to be the latest event
+    const events = trackingResults
+        .map((ev) => ({
+          status: ev.UpdateDescription || ev.UpdateAction || "Update",
+          updateCode: ev.UpdateCode || "",
+          description: ev.UpdateDescription || "",
+          location: ev.UpdateLocation || "",
+          eventTime: parseAramexDate(ev.UpdateDateTime),
+        }))
+        .sort((a, b) => a.eventTime - b.eventTime);
 
-    let currentStatus = "Booked";
+    // 2. Default to null so "Record created." (SH014) NEVER downgrades "Pickup Scheduled" back to "Booked"
+    let currentStatus = null;
+
     if (events.length > 0) {
-      const latest = events[events.length - 1].status.toLowerCase();
-      if (latest.includes("delivered")) currentStatus = "Delivered";
-      else if (latest.includes("out for delivery")) currentStatus = "Out For Delivery";
-      else if (latest.includes("in transit") || latest.includes("sorting")) currentStatus = "In Transit";
-      else if (latest.includes("pickup") || latest.includes("collected")) currentStatus = "Picked Up";
+      const latestEvent = events[events.length - 1];
+      const latest = latestEvent.status.toLowerCase();
+      const code = (latestEvent.updateCode || "").toUpperCase();
+
+      if (latest.includes("delivered") || code === "SH005") {
+        currentStatus = "Delivered";
+      } else if (latest.includes("out for delivery") || code === "SH003" || code === "SH004") {
+        currentStatus = "Out For Delivery";
+      } else if (
+          latest.includes("in transit") ||
+          latest.includes("sorting") ||
+          latest.includes("departed") ||
+          latest.includes("forwarded") ||
+          latest.includes("received at") ||
+          latest.includes("customs")
+      ) {
+        currentStatus = "In Transit";
+      } else if (
+          latest.includes("collected") ||
+          latest.includes("picked up") ||
+          code === "SH001"
+      ) {
+        currentStatus = "Picked Up";
+      }
+      // Note: Do NOT match `latest.includes("pickup")` broadly, or "Pickup scheduled" / "Pickup cancelled" might misfire.
+      // And if it's only "Record created." (SH014), currentStatus remains `null`.
     }
 
     console.log(`Aramex Current Status for ${trackingNumber}:`, currentStatus);
@@ -770,7 +794,6 @@ export const trackAramexShipment = async (trackingNumber) => {
       simulated: false,
     };
   } catch (err) {
-    console.log(err,"aramex srvice")
     console.error("Aramex tracking API error:", err.message);
     throw new Error(err.response?.data?.message || err.message);
   }
@@ -874,6 +897,8 @@ export const calculateAramexRate = async ({
       }
     };
 
+    console.log("Aramex Rate Calculation payload:", JSON.stringify(payload, null, 2)); // DEBUG
+
     const response = await axios.post(
         "https://ws.aramex.net/ShippingAPI.V2/RateCalculator/Service_1_0.svc/json/CalculateRate",
         payload,
@@ -885,6 +910,8 @@ export const calculateAramexRate = async ({
           timeout: 15000
         }
     );
+
+    console.log("Aramex Rate Calculation response:", JSON.stringify(response.data, null, 2)); // DEBUG
 
     if (response.data.HasErrors) {
       const errorObj = response.data.Notifications?.[0];
